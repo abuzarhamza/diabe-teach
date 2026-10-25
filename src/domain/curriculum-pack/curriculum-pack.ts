@@ -9,23 +9,6 @@ import {
 } from "./curriculum-pack.types.js";
 import { PackId } from "./pack-id.js";
 
-function normalizeLookupKey(text: string): string {
-  return text.trim().toLowerCase().replace(/[\s_-]+/g, " ");
-}
-
-function deepFreeze<T>(obj: T): T {
-  if (obj === null || typeof obj !== "object") {
-    return obj;
-  }
-  Object.freeze(obj);
-  for (const value of Object.values(obj as Record<string, unknown>)) {
-    if (value !== null && typeof value === "object" && !Object.isFrozen(value)) {
-      deepFreeze(value);
-    }
-  }
-  return obj;
-}
-
 export class CurriculumPack {
   public readonly id: PackId;
   public readonly title: string;
@@ -47,15 +30,17 @@ export class CurriculumPack {
     this.title = props.title;
     this.version = props.version;
     this.description = props.description;
-    this.boardConfig = deepFreeze({ ...props.boardConfig });
-    this.domains = deepFreeze(props.domains.map((d) => ({ ...d })));
-    this.cards = deepFreeze(
+    this.boardConfig = CurriculumPack.#deepFreeze({ ...props.boardConfig });
+    this.domains = CurriculumPack.#deepFreeze(
+      props.domains.map((d) => ({ ...d })),
+    );
+    this.cards = CurriculumPack.#deepFreeze(
       props.cards.map((c) => ({
         ...c,
         aliases: [...c.aliases],
       })),
     );
-    this.adjudicationRubric = deepFreeze({
+    this.adjudicationRubric = CurriculumPack.#deepFreeze({
       evaluatorPersona: props.adjudicationRubric.evaluatorPersona,
       subjectDomain: props.adjudicationRubric.subjectDomain,
       chainContinuityCriteria: [
@@ -78,7 +63,7 @@ export class CurriculumPack {
       ),
     });
     this.assessmentInstrument = props.assessmentInstrument
-      ? deepFreeze({
+      ? CurriculumPack.#deepFreeze({
           questions: props.assessmentInstrument.questions.map((q) => ({
             ...q,
             options: [...q.options] as const,
@@ -87,7 +72,7 @@ export class CurriculumPack {
         })
       : null;
     this.perceptionSurvey = props.perceptionSurvey
-      ? deepFreeze({
+      ? CurriculumPack.#deepFreeze({
           items: props.perceptionSurvey.items.map((item) => ({ ...item })),
         })
       : null;
@@ -97,11 +82,14 @@ export class CurriculumPack {
 
     for (const card of this.cards) {
       byId.set(card.id, card);
-      byLookup.set(normalizeLookupKey(card.id), card);
-      byLookup.set(normalizeLookupKey(card.verbatimLabel), card);
-      byLookup.set(normalizeLookupKey(card.displayLabel), card);
+      byLookup.set(CurriculumPack.#normalizeLookupKey(card.id), card);
+      byLookup.set(
+        CurriculumPack.#normalizeLookupKey(card.verbatimLabel),
+        card,
+      );
+      byLookup.set(CurriculumPack.#normalizeLookupKey(card.displayLabel), card);
       for (const alias of card.aliases) {
-        byLookup.set(normalizeLookupKey(alias), card);
+        byLookup.set(CurriculumPack.#normalizeLookupKey(alias), card);
       }
     }
 
@@ -121,7 +109,28 @@ export class CurriculumPack {
   public resolveCardByLabelOrAlias(query: string): KeywordCard | undefined {
     return (
       this.#cardsById.get(query) ??
-      this.#cardsByLookupKey.get(normalizeLookupKey(query))
+      this.#cardsByLookupKey.get(CurriculumPack.#normalizeLookupKey(query))
     );
+  }
+
+  static #normalizeLookupKey(text: string): string {
+    return text.trim().toLowerCase().replace(/[\s_-]+/g, " ");
+  }
+
+  static #deepFreeze<T>(obj: T): T {
+    if (obj === null || typeof obj !== "object") {
+      return obj;
+    }
+    Object.freeze(obj);
+    for (const value of Object.values(obj as Record<string, unknown>)) {
+      if (
+        value !== null &&
+        typeof value === "object" &&
+        !Object.isFrozen(value)
+      ) {
+        CurriculumPack.#deepFreeze(value);
+      }
+    }
+    return obj;
   }
 }

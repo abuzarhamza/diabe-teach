@@ -1,49 +1,50 @@
-import { GetCurriculumPackByIdQuery } from "../../../application/ports/get-curriculum-pack-by-id.port.js";
+import {
+  GetCurriculumPackByIdQuery,
+  GetCurriculumPackByIdResult,
+} from "../../../application/ports/get-curriculum-pack-by-id.port.js";
 import { GetCurriculumPackByIdUseCase } from "../../../application/use-cases/get-curriculum-pack-by-id.use-case.js";
 import { PackNotFoundError } from "../../../domain/errors/domain-errors.js";
+import { BaseHttpHandler } from "./endpoint-handler.factory.js";
 import {
-  createEndpointHandler,
-  parseBearerTokenHeader,
-} from "./endpoint-handler.factory.js";
-import {
-  EndpointHttpHandler,
   GetPackByIdHandlerDependencies,
   HttpRequestInput,
   RouteContext,
 } from "./http-handler.types.js";
 
-function resolvePackIdFromContext(context?: RouteContext): string {
-  const paramPackId = context?.params?.packId;
-  if (typeof paramPackId === "string" && paramPackId.length > 0) {
-    return decodeURIComponent(paramPackId);
+export class GetPackByIdHttpHandler extends BaseHttpHandler<
+  GetCurriculumPackByIdQuery,
+  GetCurriculumPackByIdResult
+> {
+  readonly #useCase: GetCurriculumPackByIdUseCase;
+
+  public constructor(deps: GetPackByIdHandlerDependencies) {
+    super(200);
+    this.#useCase = new GetCurriculumPackByIdUseCase(deps);
   }
-  throw new PackNotFoundError("");
-}
 
-/**
- * Pure Request Transformer: converts raw HTTP (Request + OpenAPI RouteContext)
- * into the typed Application/Domain query.
- */
-export function transformGetPackByIdRequest({
-  request,
-  context,
-}: HttpRequestInput): GetCurriculumPackByIdQuery {
-  return {
-    packId: resolvePackIdFromContext(context),
-    bearerToken: parseBearerTokenHeader(request.headers.get("authorization")),
-  };
-}
+  public transformRequest({
+    request,
+    context,
+  }: HttpRequestInput): GetCurriculumPackByIdQuery {
+    return {
+      packId: this.#resolvePackIdFromContext(context),
+      bearerToken: BaseHttpHandler.parseBearerTokenHeader(
+        request.headers.get("authorization"),
+      ),
+    };
+  }
 
-/**
- * Factory: wires Request Transformer -> GetCurriculumPackByIdUseCase -> HTTP Response.
- */
-export function createGetPackByIdHandler(
-  deps: GetPackByIdHandlerDependencies,
-): EndpointHttpHandler {
-  const useCase = new GetCurriculumPackByIdUseCase(deps);
+  protected async execute(
+    query: GetCurriculumPackByIdQuery,
+  ): Promise<GetCurriculumPackByIdResult> {
+    return this.#useCase.execute(query);
+  }
 
-  return createEndpointHandler({
-    transformRequest: transformGetPackByIdRequest,
-    execute: (query) => useCase.execute(query),
-  });
+  #resolvePackIdFromContext(context?: RouteContext): string {
+    const paramPackId = context?.params?.packId;
+    if (typeof paramPackId === "string" && paramPackId.length > 0) {
+      return decodeURIComponent(paramPackId);
+    }
+    throw new PackNotFoundError("");
+  }
 }

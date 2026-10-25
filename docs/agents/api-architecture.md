@@ -8,13 +8,14 @@ Organize code into four explicit hexagonal rings plus a thin Netlify composition
 
 ```
 src/
-├── domain/                     ← Inner Ring: Pure DDD tactical model (zero I/O, zero async infra)
-├── application/                ← Middle Ring: Use-case orchestrators, Inbound & Outbound Ports
-├── adapters/
-│   ├── inbound/
-│   │   └── http/               ← Inbound Adapters: openapi-backend router (createApp) + per-endpoint handlers
-│   └── outbound/               ← Outbound Adapters: In-Memory, MongoDB (all collection/URI wiring), HMAC Token
-└── config/                     ← Composition Root Config: runtime.types.ts & runtime.config.ts
+├── app-runtime.ts              ← Top-Level Composition Root Class (AppRuntime)
+├── app-runtime.types.ts        ← Composition Root Contracts (RuntimeEnvConfig, ProductionDependencies)
+├── domain/                     ← Inner Ring: Pure DDD tactical classes (CurriculumPack, PackId, DomainError)
+├── application/                ← Middle Ring: Use-case classes, Projector classes, Inbound & Outbound Ports
+└── adapters/
+    ├── inbound/
+    │   └── http/               ← Inbound Adapter Classes: OpenApiHttpApp, BaseHttpHandler, GetPackByIdHttpHandler
+    └── outbound/               ← Outbound Adapter Classes: MongoCurriculumPackRepository, MongoConnectionManager, HmacCapabilityTokenAdapter
 netlify/
 └── functions/
     └── api.ts                  ← Single Netlify Functions v2 Entrypoint (/api/v1/*)
@@ -25,8 +26,8 @@ netlify/
 - **`src/domain/**`** imports only from `src/domain/**`. Pure, synchronous, deterministic computation. Inject time and randomness as values (`nowMs`, `seed`) rather than calling `Date.now()`, `Math.random()`, `crypto`, `fetch`, or `node:*`.
 - **`src/application/**`** imports only from `src/application/**` and `src/domain/**`. Defines **Inbound Ports** (use-case command/query handlers) and **Outbound Ports** (interfaces for persistence, narrative adjudication, event streaming, clock, and ID generation).
 - **`src/adapters/inbound/**`** imports from `src/application/**` and `src/domain/**`. Translates HTTP `Request`, `BearerAuth` capability tokens, and JSON payloads into Application commands/queries, and maps Domain Results/Errors into OpenAPI `Response` shapes (`docs/api/openapi.yaml`).
-- **`src/adapters/outbound/**`** imports from `src/application/**` and `src/domain/**` to implement Outbound Ports, and encapsulates all MongoDB driver/collection wiring (`DEFAULT_MONGODB_DB_NAME`, `CURRICULUM_PACKS_COLLECTION`, `getMongoDatabase`).
-- **No cross-adapter imports**: Inbound Adapters (`src/adapters/inbound/`) and Outbound Adapters (`src/adapters/outbound/`) never import each other directly; only the **Composition Root** (`src/config/runtime.config.ts`, `netlify/functions/api.ts`, and test harnesses) wires them together.
+- **`src/adapters/outbound/**`** imports from `src/application/**` and `src/domain/**` to implement Outbound Ports, and encapsulates all MongoDB driver/collection wiring (`DEFAULT_MONGODB_DB_NAME`, `CURRICULUM_PACKS_COLLECTION`, `MongoConnectionManager`).
+- **No cross-adapter imports**: Inbound Adapters (`src/adapters/inbound/`) and Outbound Adapters (`src/adapters/outbound/`) never import each other directly; only the **Composition Root** (`src/app-runtime.ts`, `netlify/functions/api.ts`, and test harnesses) wires them together.
 
 ### No God Modules: Separate Interface/Contract Files from Class/Implementation Files
 
@@ -83,13 +84,13 @@ Use the ubiquitous language from `GLOSSARY.md` across all class, type, method, a
   - Domain and Application layers return typed domain results or throw typed `DomainError` subclasses—never HTTP status codes.
   - `mapDomainErrorToResponse` in `endpoint-handler.factory.ts` maps every `DomainError` to `#/components/schemas/ApiErrorResponse` (`{ code, message, details? }`) using the 15 canonical `ApiErrorCode` values in `docs/api/openapi.yaml` (`INVALID_REQUEST_BODY`, `UNAUTHORIZED_TOKEN`, `FORBIDDEN_ROLE`, `PACK_NOT_FOUND`, `SESSION_NOT_FOUND`, `ROOM_CODE_NOT_FOUND`, `CHAIN_NOT_FOUND`, `PACK_ALREADY_EXISTS`, `INVALID_PHASE_TRANSITION`, `PHASE_CLOSED_FOR_SUBMISSIONS`, `ADJUDICATION_LOCKED_BY_INSTRUCTOR`, `ASSESSMENT_ALREADY_SUBMITTED`, `PACK_VALIDATION_FAILED`, `CHAIN_TOPOLOGY_INVALID`, `ASSESSMENT_INCOMPLETE`).
 
-## 5. Netlify Serverless Deployment & Composition Root (`src/config/` + `netlify/functions/api.ts`)
+## 5. Netlify Serverless Deployment & Composition Root (`src/app-runtime.ts` + `netlify/functions/api.ts`)
 
-- **Runtime Config Inside `src/config/` & Single Netlify Entrypoint (`netlify/functions/api.ts` + `netlify.toml`)**:
+- **Top-Level `AppRuntime` Class (`src/app-runtime.ts`) & Single Netlify Entrypoint (`netlify/functions/api.ts` + `netlify.toml`)**:
   - Project-root `netlify.toml` configures `[functions]` with `directory = "netlify/functions"`, `node_bundler = "esbuild"`, and `included_files = ["docs/api/openapi.yaml"]`.
-  - `src/config/runtime.types.ts` defines the composition root contracts (`RuntimeEnvConfig`, `ProductionDependencies`, `ServerlessRouteConfig`, `ServerlessHttpHandler`).
-  - `src/config/runtime.config.ts` centralizes environment parsing (`loadRuntimeEnvConfig`), warm-cached production Outbound Adapter wiring (`getProductionDependencies`), handler bridging (`createServerlessHttpHandler`), and route config helpers (`defineServerlessRouteConfig`).
-  - `netlify/functions/api.ts` is the sole file under `netlify/`, exporting `export default createServerlessHttpHandler()` and `export const config = defineServerlessRouteConfig({ path: "/api/v1/*", method: ["GET", "POST", "PUT", "PATCH", "DELETE"] })`.
+  - `src/app-runtime.types.ts` defines the composition root contracts (`RuntimeEnvConfig`, `ProductionDependencies`, `ServerlessRouteConfig`, `ServerlessHttpHandler`).
+  - `src/app-runtime.ts` (`export class AppRuntime`) sits at the root of `src/` and centralizes environment parsing (`AppRuntime.loadEnvConfig`), warm-cached production Outbound Adapter wiring (`AppRuntime.getProductionDependencies`), handler bridging (`AppRuntime.createServerlessHttpHandler`), and route config helpers (`AppRuntime.defineServerlessRouteConfig`).
+  - `netlify/functions/api.ts` is the sole file under `netlify/`, exporting `export default AppRuntime.createServerlessHttpHandler()` and `export const config = AppRuntime.defineServerlessRouteConfig({ path: "/api/v1/*", method: ["GET", "POST", "PUT", "PATCH", "DELETE"] })`.
 - **Stateless Persistence via MongoDB + Optimistic Concurrency Control**:
   - Production Driven Adapters for `SessionRepositoryPort` (`MongoSessionRepository`, collection `game_sessions`) and `CurriculumPackRepositoryPort` (`MongoCurriculumPackRepository`, collection `curriculum_packs`) use the official `mongodb` driver with a module-scoped cached `MongoClient` (`maxPoolSize: 5` for serverless warm-container reuse) and optimistic concurrency control (`version` field with atomic `findOneAndUpdate({ _id, version }, { $set: ..., $inc: { version: 1 } })`) so concurrent serverless invocations never silently overwrite each other's state.
 - **Server-Sent Events (`GET /api/v1/sessions/:sessionId/stream`)**:

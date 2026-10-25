@@ -1,10 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { Context } from "@netlify/functions";
-import { createApp } from "../src/adapters/inbound/http/create-app.js";
-import {
-  createGetPackByIdHandler,
-  transformGetPackByIdRequest,
-} from "../src/adapters/inbound/http/get-pack-by-id.handler.js";
+import { OpenApiHttpApp } from "../src/adapters/inbound/http/create-app.js";
+import { GetPackByIdHttpHandler } from "../src/adapters/inbound/http/get-pack-by-id.handler.js";
 import { FakeCapabilityTokenAdapter } from "../src/adapters/outbound/fake-capability-token-adapter.js";
 import { HmacCapabilityTokenAdapter } from "../src/adapters/outbound/hmac-capability-token-adapter.js";
 import { InMemoryCurriculumPackRepository } from "../src/adapters/outbound/in-memory-curriculum-pack-repository.js";
@@ -14,11 +11,7 @@ import { DIABE_TEACH_PACK } from "../src/domain/curriculum-pack/diabe-teach-pack
 import apiNetlifyHandler, {
   config as apiNetlifyConfig,
 } from "../netlify/functions/api.js";
-import {
-  createServerlessHttpHandler,
-  defineServerlessRouteConfig,
-  loadRuntimeEnvConfig,
-} from "../src/config/runtime.config.js";
+import { AppRuntime } from "../src/app-runtime.js";
 
 const APPENDIX_1_VERBATIM_KEYWORDS = [
   "Insulin",
@@ -75,7 +68,7 @@ const APPENDIX_1_VERBATIM_KEYWORDS = [
 describe("Ticket 01 — Walking Skeleton: GET /api/v1/packs/{packId}", () => {
   it("returns 200 OK with the complete 49-card diabe-teach CurriculumPack, 7 SemanticDomains, and Figure 2 CalibrationExamples", async () => {
     const packRepo = new InMemoryCurriculumPackRepository([DIABE_TEACH_PACK]);
-    const app = createApp({ packRepo });
+    const app = new OpenApiHttpApp({ packRepo });
 
     const response = await app.fetch(
       new Request("http://localhost:3000/api/v1/packs/diabe-teach", {
@@ -163,7 +156,7 @@ describe("Ticket 01 — Walking Skeleton: GET /api/v1/packs/{packId}", () => {
 
   it("returns 404 PACK_NOT_FOUND conforming to ApiErrorResponse when requesting an unknown packId", async () => {
     const packRepo = new InMemoryCurriculumPackRepository([DIABE_TEACH_PACK]);
-    const app = createApp({ packRepo });
+    const app = new OpenApiHttpApp({ packRepo });
 
     const response = await app.fetch(
       new Request("http://localhost:3000/api/v1/packs/unknown-pack", {
@@ -216,7 +209,7 @@ describe("Ticket 02 — Role-Aware Answer-Key Redaction & CapabilityToken Verifi
   it("redacts correctIndex and explanation for anonymous callers while returning all 10 Bloom Level 2/3 MCQs and 9 Appendix 2 Likert items", async () => {
     const packRepo = new InMemoryCurriculumPackRepository([DIABE_TEACH_PACK]);
     const tokenVerifier = new FakeCapabilityTokenAdapter();
-    const app = createApp({ packRepo, tokenVerifier });
+    const app = new OpenApiHttpApp({ packRepo, tokenVerifier });
 
     const response = await app.fetch(
       new Request("http://localhost:3000/api/v1/packs/diabe-teach"),
@@ -265,7 +258,7 @@ describe("Ticket 02 — Role-Aware Answer-Key Redaction & CapabilityToken Verifi
         participantId: "p-1",
       },
     });
-    const app = createApp({ packRepo, tokenVerifier });
+    const app = new OpenApiHttpApp({ packRepo, tokenVerifier });
 
     const response = await app.fetch(
       new Request("http://localhost:3000/api/v1/packs/diabe-teach", {
@@ -301,7 +294,7 @@ describe("Ticket 02 — Role-Aware Answer-Key Redaction & CapabilityToken Verifi
         sessionId: "sess-1",
       },
     });
-    const app = createApp({ packRepo, tokenVerifier });
+    const app = new OpenApiHttpApp({ packRepo, tokenVerifier });
 
     const instructorRes = await app.fetch(
       new Request("http://localhost:3000/api/v1/packs/diabe-teach", {
@@ -353,7 +346,7 @@ describe("Ticket 02 — Role-Aware Answer-Key Redaction & CapabilityToken Verifi
   it("returns 401 UNAUTHORIZED_TOKEN when Authorization header is malformed or invalid", async () => {
     const packRepo = new InMemoryCurriculumPackRepository([DIABE_TEACH_PACK]);
     const tokenVerifier = new FakeCapabilityTokenAdapter();
-    const app = createApp({ packRepo, tokenVerifier });
+    const app = new OpenApiHttpApp({ packRepo, tokenVerifier });
 
     for (const badHeader of [
       "Basic dXNlcjpwYXNz",
@@ -456,7 +449,7 @@ describe("Ticket 03 — Hybrid MongoDB Persistence & Netlify Functions v2 Compos
         findOne: findOneSpy,
       }),
     });
-    const app = createApp({ packRepo: repo });
+    const app = new OpenApiHttpApp({ packRepo: repo });
 
     const response = await app.fetch(
       new Request("http://localhost:3000/api/v1/packs/diabe-teach"),
@@ -481,7 +474,7 @@ describe("Ticket 03 — Hybrid MongoDB Persistence & Netlify Functions v2 Compos
         sessionId: "sess-cardio",
       },
     });
-    const app = createApp({ packRepo: repo, tokenVerifier });
+    const app = new OpenApiHttpApp({ packRepo: repo, tokenVerifier });
 
     const anonRes = await app.fetch(
       new Request("http://localhost:3000/api/v1/packs/cardio-teach"),
@@ -528,7 +521,7 @@ describe("Ticket 03 — Hybrid MongoDB Persistence & Netlify Functions v2 Compos
         findOne: async () => null,
       }),
     });
-    const app = createApp({ packRepo: repo });
+    const app = new OpenApiHttpApp({ packRepo: repo });
 
     const res = await app.fetch(
       new Request("http://localhost:3000/api/v1/packs/missing-mongo-pack"),
@@ -541,8 +534,10 @@ describe("Ticket 03 — Hybrid MongoDB Persistence & Netlify Functions v2 Compos
     });
   });
 
-  it("transforms HTTP Request + Context into a clean GetCurriculumPackByIdQuery via transformGetPackByIdRequest", () => {
-    const query = transformGetPackByIdRequest({
+  it("transforms HTTP Request + Context into a clean GetCurriculumPackByIdQuery via GetPackByIdHttpHandler.transformRequest", () => {
+    const packRepo = new InMemoryCurriculumPackRepository([DIABE_TEACH_PACK]);
+    const handler = new GetPackByIdHttpHandler({ packRepo });
+    const query = handler.transformRequest({
       request: new Request("https://internal.lambda.local/invoke", {
         headers: { Authorization: "Bearer my-token-123" },
       }),
@@ -557,9 +552,9 @@ describe("Ticket 03 — Hybrid MongoDB Persistence & Netlify Functions v2 Compos
 
   it("resolves packId from context.params (Netlify Context / AWS Lambda pathParameters) even on internal invocation URLs", async () => {
     const packRepo = new InMemoryCurriculumPackRepository([DIABE_TEACH_PACK]);
-    const handler = createGetPackByIdHandler({ packRepo });
+    const handler = new GetPackByIdHttpHandler({ packRepo });
 
-    const response = await handler(
+    const response = await handler.handle(
       new Request("https://internal.lambda.local/invoke", {
         method: "GET",
       }),
@@ -571,8 +566,8 @@ describe("Ticket 03 — Hybrid MongoDB Persistence & Netlify Functions v2 Compos
     expect(body.pack.id).toBe("diabe-teach");
   });
 
-  it("loads runtime config defaults and adapts createApp via createServerlessHttpHandler", async () => {
-    const envConfig = loadRuntimeEnvConfig({
+  it("loads runtime config defaults and adapts OpenApiHttpApp via AppRuntime", async () => {
+    const envConfig = AppRuntime.loadEnvConfig({
       MONGODB_URI: "  mongodb+srv://cluster.example.net  ",
       MONGODB_DB_NAME: "",
       CAPABILITY_TOKEN_SECRET: "  my-secret  ",
@@ -584,7 +579,7 @@ describe("Ticket 03 — Hybrid MongoDB Persistence & Netlify Functions v2 Compos
       capabilityTokenSecret: "my-secret",
     });
 
-    const routeConfig = defineServerlessRouteConfig({
+    const routeConfig = AppRuntime.defineServerlessRouteConfig({
       path: "/api/v1/*",
       method: "GET",
     });
@@ -594,7 +589,9 @@ describe("Ticket 03 — Hybrid MongoDB Persistence & Netlify Functions v2 Compos
     });
 
     const packRepo = new InMemoryCurriculumPackRepository([DIABE_TEACH_PACK]);
-    const wrappedNetlifyHandler = createServerlessHttpHandler({ packRepo });
+    const wrappedNetlifyHandler = AppRuntime.createServerlessHttpHandler({
+      packRepo,
+    });
 
     const res = await wrappedNetlifyHandler(
       new Request("http://localhost:3000/api/v1/packs/diabe-teach"),
@@ -640,7 +637,7 @@ describe("Ticket 03 — Hybrid MongoDB Persistence & Netlify Functions v2 Compos
 describe("Ticket 07 — x-api-key Header Validation (ApiKeyAuth) & Fail-Closed Production Security", () => {
   it("rejects missing or invalid x-api-key with 401 UNAUTHORIZED_TOKEN when apiKey is configured on createApp", async () => {
     const packRepo = new InMemoryCurriculumPackRepository([DIABE_TEACH_PACK]);
-    const app = createApp({
+    const app = new OpenApiHttpApp({
       packRepo,
       apiKey: "valid-client-api-key-123",
     });
@@ -674,7 +671,7 @@ describe("Ticket 07 — x-api-key Header Validation (ApiKeyAuth) & Fail-Closed P
         sessionId: "sess-1",
       },
     });
-    const app = createApp({
+    const app = new OpenApiHttpApp({
       packRepo,
       tokenVerifier,
       apiKey: "valid-client-api-key-123",
@@ -720,7 +717,7 @@ describe("Ticket 07 — x-api-key Header Validation (ApiKeyAuth) & Fail-Closed P
 
   it("enforces fail-closed x-api-key validation in Netlify runtime config when requireApiKey is true", async () => {
     const packRepo = new InMemoryCurriculumPackRepository([DIABE_TEACH_PACK]);
-    const failClosedApp = createApp({
+    const failClosedApp = new OpenApiHttpApp({
       packRepo,
       requireApiKey: true,
       apiKey: undefined,
@@ -737,7 +734,7 @@ describe("Ticket 07 — x-api-key Header Validation (ApiKeyAuth) & Fail-Closed P
       message: "Missing or invalid x-api-key header.",
     });
 
-    const envConfig = loadRuntimeEnvConfig({
+    const envConfig = AppRuntime.loadEnvConfig({
       MONGODB_URI: "mongodb+srv://cluster.example.net",
       API_KEY: "  prod-api-key-999  ",
     });

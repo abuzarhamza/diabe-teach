@@ -2,7 +2,7 @@ import { CurriculumPackRepositoryPort } from "../../application/ports/curriculum
 import { CurriculumPack } from "../../domain/curriculum-pack/curriculum-pack.js";
 import { DIABE_TEACH_PACK } from "../../domain/curriculum-pack/diabe-teach-pack.js";
 import { PackId } from "../../domain/curriculum-pack/pack-id.js";
-import { getMongoDatabase } from "./mongo-client-singleton.js";
+import { MongoConnectionManager } from "./mongo-client-singleton.js";
 import {
   CurriculumPackCollectionLike,
   CurriculumPackDocument,
@@ -40,7 +40,7 @@ export class MongoCurriculumPackRepository
             "MONGODB_URI environment variable is required to query custom Curriculum Packs.",
           );
         }
-        const db = await getMongoDatabase(
+        const db = await MongoConnectionManager.getDatabase(
           current.mongoUri,
           current.mongoDbName ?? DEFAULT_MONGODB_DB_NAME,
         );

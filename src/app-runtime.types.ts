@@ -1,5 +1,5 @@
-import { CapabilityTokenPort } from "../application/ports/capability-token.port.js";
-import { CurriculumPackRepositoryPort } from "../application/ports/curriculum-pack-repository.port.js";
+import { CapabilityTokenPort } from "./application/ports/capability-token.port.js";
+import { CurriculumPackRepositoryPort } from "./application/ports/curriculum-pack-repository.port.js";
 
 export type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 

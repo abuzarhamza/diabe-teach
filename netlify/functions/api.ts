@@ -1,12 +1,9 @@
 import type { Config } from "@netlify/functions";
-import {
-  createServerlessHttpHandler,
-  defineServerlessRouteConfig,
-} from "../../src/config/runtime.config.js";
+import { AppRuntime } from "../../src/app-runtime.js";
 
-export default createServerlessHttpHandler();
+export default AppRuntime.createServerlessHttpHandler();
 
-export const config: Config = defineServerlessRouteConfig({
+export const config: Config = AppRuntime.defineServerlessRouteConfig({
   path: "/api/v1/*",
   method: ["GET", "POST", "PUT", "PATCH", "DELETE"],
 });

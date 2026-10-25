@@ -6,100 +6,108 @@ import {
 } from "../../../domain/errors/domain-errors.js";
 import {
   ApiKeyValidationConfig,
-  EndpointHttpHandler,
-  HttpEndpointDefinition,
+  HttpRequestInput,
   RouteContext,
 } from "./http-handler.types.js";
 
-export const INVALID_API_KEY_MESSAGE = "Missing or invalid x-api-key header.";
+export abstract class BaseHttpHandler<TQuery, TResult> {
+  public static readonly INVALID_API_KEY_MESSAGE =
+    "Missing or invalid x-api-key header.";
 
-export function jsonResponse(body: unknown, status: number): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: {
-      "content-type": "application/json; charset=utf-8",
-    },
-  });
-}
+  protected readonly successStatus: number;
 
-export function verifyApiKeyHeader(
-  providedHeader: string | null,
-  config: ApiKeyValidationConfig,
-): boolean {
-  const shouldEnforce =
-    config.requireApiKey === true ||
-    (typeof config.apiKey === "string" && config.apiKey.length > 0);
-
-  if (!shouldEnforce) {
-    return true;
+  protected constructor(successStatus = 200) {
+    this.successStatus = successStatus;
   }
 
-  if (
-    !config.apiKey ||
-    config.apiKey.trim().length === 0 ||
-    !providedHeader
-  ) {
-    return false;
-  }
+  public abstract transformRequest(
+    input: HttpRequestInput,
+  ): TQuery | Promise<TQuery>;
 
-  const actualBuf = Buffer.from(providedHeader.trim(), "utf8");
-  const expectedBuf = Buffer.from(config.apiKey.trim(), "utf8");
+  protected abstract execute(query: TQuery): Promise<TResult>;
 
-  return (
-    actualBuf.length === expectedBuf.length &&
-    timingSafeEqual(actualBuf, expectedBuf)
-  );
-}
-
-export function parseBearerTokenHeader(
-  authorizationHeader: string | null,
-): string | null {
-  if (authorizationHeader === null) {
-    return null;
-  }
-  const match = /^Bearer\s+(\S+)$/.exec(authorizationHeader.trim());
-  if (!match || !match[1]) {
-    throw new UnauthorizedTokenError(
-      "Malformed Authorization header. Expected 'Bearer <token>'.",
-    );
-  }
-  return match[1];
-}
-
-export function mapDomainErrorToResponse(error: DomainError): Response {
-  const payload = {
-    code: error.code,
-    message: error.message,
-    ...(error.details ? { details: error.details } : {}),
-  };
-
-  if (error instanceof UnauthorizedTokenError) {
-    return jsonResponse(payload, 401);
-  }
-  if (error instanceof PackNotFoundError) {
-    return jsonResponse(payload, 404);
-  }
-  return jsonResponse(payload, 400);
-}
-
-export function createEndpointHandler<TQuery, TResult>(
-  definition: HttpEndpointDefinition<TQuery, TResult>,
-): EndpointHttpHandler {
-  const successStatus = definition.successStatus ?? 200;
-
-  return async function handleEndpointRequest(
+  public async handle(
     request: Request,
     context?: RouteContext,
   ): Promise<Response> {
     try {
-      const query = await definition.transformRequest({ request, context });
-      const result = await definition.execute(query);
-      return jsonResponse(result, successStatus);
+      const query = await this.transformRequest({ request, context });
+      const result = await this.execute(query);
+      return BaseHttpHandler.jsonResponse(result, this.successStatus);
     } catch (error) {
       if (error instanceof DomainError) {
-        return mapDomainErrorToResponse(error);
+        return BaseHttpHandler.mapDomainErrorToResponse(error);
       }
       throw error;
     }
-  };
+  }
+
+  public static jsonResponse(body: unknown, status: number): Response {
+    return new Response(JSON.stringify(body), {
+      status,
+      headers: {
+        "content-type": "application/json; charset=utf-8",
+      },
+    });
+  }
+
+  public static verifyApiKeyHeader(
+    providedHeader: string | null,
+    config: ApiKeyValidationConfig,
+  ): boolean {
+    const shouldEnforce =
+      config.requireApiKey === true ||
+      (typeof config.apiKey === "string" && config.apiKey.length > 0);
+
+    if (!shouldEnforce) {
+      return true;
+    }
+
+    if (
+      !config.apiKey ||
+      config.apiKey.trim().length === 0 ||
+      !providedHeader
+    ) {
+      return false;
+    }
+
+    const actualBuf = Buffer.from(providedHeader.trim(), "utf8");
+    const expectedBuf = Buffer.from(config.apiKey.trim(), "utf8");
+
+    return (
+      actualBuf.length === expectedBuf.length &&
+      timingSafeEqual(actualBuf, expectedBuf)
+    );
+  }
+
+  public static parseBearerTokenHeader(
+    authorizationHeader: string | null,
+  ): string | null {
+    if (authorizationHeader === null) {
+      return null;
+    }
+    const match = /^Bearer\s+(\S+)$/.exec(authorizationHeader.trim());
+    if (!match || !match[1]) {
+      throw new UnauthorizedTokenError(
+        "Malformed Authorization header. Expected 'Bearer <token>'.",
+      );
+    }
+    return match[1];
+  }
+
+  public static mapDomainErrorToResponse(error: DomainError): Response {
+    const payload = {
+      code: error.code,
+      message: error.message,
+      ...(error.details ? { details: error.details } : {}),
+    };
+
+    if (error instanceof UnauthorizedTokenError) {
+      return BaseHttpHandler.jsonResponse(payload, 401);
+    }
+    if (error instanceof PackNotFoundError) {
+      return BaseHttpHandler.jsonResponse(payload, 404);
+    }
+    return BaseHttpHandler.jsonResponse(payload, 400);
+  }
 }

@@ -50,15 +50,15 @@ module.exports = {
       },
     },
     {
-      name: "config-is-only-composition-root-in-src",
+      name: "app-runtime-is-only-composition-root-in-src",
       comment:
-        "Domain, Application, Inbound Adapters, and Outbound Adapters must never import from src/config/.",
+        "Domain, Application, Inbound Adapters, and Outbound Adapters must never import from src/app-runtime*.",
       severity: "error",
       from: {
         path: "^src/(domain|application|adapters)/",
       },
       to: {
-        path: "^src/config/",
+        path: "^src/app-runtime",
       },
     },
     {
