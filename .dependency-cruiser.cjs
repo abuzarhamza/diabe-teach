@@ -38,16 +38,27 @@ module.exports = {
       to: { path: "^src/adapters/inbound/" },
     },
     {
-      name: "mongodb-isolated-to-outbound-adapters-and-composition-root",
+      name: "mongodb-isolated-to-outbound-adapters",
       comment:
-        "The mongodb driver may only be imported inside Outbound Adapters or the Netlify Composition Root.",
+        "The mongodb driver and mongo-client-singleton may only be imported inside Outbound Adapters (src/adapters/outbound).",
       severity: "error",
       from: {
-        path: "^src/",
         pathNot: "^src/adapters/outbound/",
       },
       to: {
-        path: "node_modules/mongodb",
+        path: "(node_modules/mongodb|^src/adapters/outbound/mongo-client-singleton)",
+      },
+    },
+    {
+      name: "config-is-only-composition-root-in-src",
+      comment:
+        "Domain, Application, Inbound Adapters, and Outbound Adapters must never import from src/config/.",
+      severity: "error",
+      from: {
+        path: "^src/(domain|application|adapters)/",
+      },
+      to: {
+        path: "^src/config/",
       },
     },
     {

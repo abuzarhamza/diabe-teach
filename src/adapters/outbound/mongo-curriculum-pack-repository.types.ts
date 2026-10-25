@@ -16,3 +16,9 @@ export interface MongoCurriculumPackRepositoryOptions {
   readonly getCollection: () => Promise<CurriculumPackCollectionLike>;
   readonly builtInPacks?: readonly CurriculumPack[];
 }
+
+export interface MongoCurriculumPackConnectionConfig {
+  readonly mongoUri?: string;
+  readonly mongoDbName?: string;
+  readonly builtInPacks?: readonly CurriculumPack[];
+}

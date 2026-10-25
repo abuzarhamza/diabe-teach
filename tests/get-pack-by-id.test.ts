@@ -14,11 +14,11 @@ import { DIABE_TEACH_PACK } from "../src/domain/curriculum-pack/diabe-teach-pack
 import apiNetlifyHandler, {
   config as apiNetlifyConfig,
 } from "../netlify/functions/api.js";
-import { createNetlifyFunctionHandler } from "../netlify/config/create-netlify-function-handler.js";
 import {
-  defineNetlifyRouteConfig,
-  loadNetlifyRuntimeEnvConfig,
-} from "../netlify/config/netlify-runtime.config.js";
+  createServerlessHttpHandler,
+  defineServerlessRouteConfig,
+  loadRuntimeEnvConfig,
+} from "../src/config/runtime.config.js";
 
 const APPENDIX_1_VERBATIM_KEYWORDS = [
   "Insulin",
@@ -571,8 +571,8 @@ describe("Ticket 03 — Hybrid MongoDB Persistence & Netlify Functions v2 Compos
     expect(body.pack.id).toBe("diabe-teach");
   });
 
-  it("loads Netlify runtime config defaults and adapts createApp via createNetlifyFunctionHandler", async () => {
-    const envConfig = loadNetlifyRuntimeEnvConfig({
+  it("loads runtime config defaults and adapts createApp via createServerlessHttpHandler", async () => {
+    const envConfig = loadRuntimeEnvConfig({
       MONGODB_URI: "  mongodb+srv://cluster.example.net  ",
       MONGODB_DB_NAME: "",
       CAPABILITY_TOKEN_SECRET: "  my-secret  ",
@@ -584,7 +584,7 @@ describe("Ticket 03 — Hybrid MongoDB Persistence & Netlify Functions v2 Compos
       capabilityTokenSecret: "my-secret",
     });
 
-    const routeConfig = defineNetlifyRouteConfig({
+    const routeConfig = defineServerlessRouteConfig({
       path: "/api/v1/*",
       method: "GET",
     });
@@ -594,7 +594,7 @@ describe("Ticket 03 — Hybrid MongoDB Persistence & Netlify Functions v2 Compos
     });
 
     const packRepo = new InMemoryCurriculumPackRepository([DIABE_TEACH_PACK]);
-    const wrappedNetlifyHandler = createNetlifyFunctionHandler({ packRepo });
+    const wrappedNetlifyHandler = createServerlessHttpHandler({ packRepo });
 
     const res = await wrappedNetlifyHandler(
       new Request("http://localhost:3000/api/v1/packs/diabe-teach"),
@@ -737,7 +737,7 @@ describe("Ticket 07 — x-api-key Header Validation (ApiKeyAuth) & Fail-Closed P
       message: "Missing or invalid x-api-key header.",
     });
 
-    const envConfig = loadNetlifyRuntimeEnvConfig({
+    const envConfig = loadRuntimeEnvConfig({
       MONGODB_URI: "mongodb+srv://cluster.example.net",
       API_KEY: "  prod-api-key-999  ",
     });

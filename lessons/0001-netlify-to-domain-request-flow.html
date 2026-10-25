@@ -39,7 +39,7 @@
        ▼
 ┌──────────────────────────────────────────────────────────────────────────┐
 │ STEP 1: Netlify Entrypoint &amp; Runtime Config                              │
-│         netlify/functions/api.ts ──► createNetlifyFunctionHandler()      │
+│         netlify/functions/api.ts ──► src/config/runtime.config.ts        │
 └────────────────────────────────────┬─────────────────────────────────────┘
                                      │ calls app.fetch(request, context)
                                      ▼
@@ -90,20 +90,20 @@
       <div class="pipeline-list">
         <article class="step-card ring-inbound">
           <div class="step-header">
-            <span class="step-badge">Step 1 · Netlify Composition Root</span>
-            <span class="step-file">netlify/functions/api.ts → netlify/config/create-netlify-function-handler.ts</span>
+            <span class="step-badge">Step 1 · Netlify Entrypoint &amp; src/config/</span>
+            <span class="step-file">netlify/functions/api.ts → src/config/runtime.config.ts</span>
           </div>
           <p>
             When a request hits <code>/api/v1/*</code> on <a href="https://docs.netlify.com/functions/overview/" target="_blank" rel="noopener">Netlify Functions v2</a>,
             Netlify invokes the default export in <code>netlify/functions/api.ts</code>. That file delegates to
-            <code>createNetlifyFunctionHandler()</code>, which loads environment variables (<code>MONGODB_URI</code>,
+            <code>createServerlessHttpHandler()</code> in <code>src/config/runtime.config.ts</code>, which loads environment variables (<code>MONGODB_URI</code>,
             <code>CAPABILITY_TOKEN_SECRET</code>, <code>API_KEY</code>) once per warm container via
-            <code>getNetlifyProductionDependencies()</code> and calls <code>app.fetch(request, context)</code>.
+            <code>getProductionDependencies()</code> and calls <code>app.fetch(request, context)</code>.
           </p>
           <pre><code>// netlify/functions/api.ts
-export default createNetlifyFunctionHandler();
+export default createServerlessHttpHandler();
 
-export const config = defineNetlifyRouteConfig({
+export const config: Config = defineServerlessRouteConfig({
   path: "/api/v1/*",
   method: ["GET", "POST", "PUT", "PATCH", "DELETE"],
 });</code></pre>
