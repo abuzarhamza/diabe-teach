@@ -1,7 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 import type { Context } from "@netlify/functions";
 import { createApp } from "../src/adapters/driving/http/create-app.js";
-import { createGetPackByIdHandler } from "../src/adapters/driving/http/get-pack-by-id.handler.js";
+import {
+  createGetPackByIdHandler,
+  transformGetPackByIdRequest,
+} from "../src/adapters/driving/http/get-pack-by-id.handler.js";
 import { FakeCapabilityTokenAdapter } from "../src/adapters/driven/fake-capability-token-adapter.js";
 import { HmacCapabilityTokenAdapter } from "../src/adapters/driven/hmac-capability-token-adapter.js";
 import { InMemoryCurriculumPackRepository } from "../src/adapters/driven/in-memory-curriculum-pack-repository.js";
@@ -532,6 +535,20 @@ describe("Ticket 03 — Hybrid MongoDB Persistence & Netlify Functions v2 Compos
       code: "PACK_NOT_FOUND",
       message: "Curriculum Pack 'missing-mongo-pack' was not found.",
       details: { packId: "missing-mongo-pack" },
+    });
+  });
+
+  it("transforms HTTP Request + Context into a clean GetCurriculumPackByIdQuery via transformGetPackByIdRequest", () => {
+    const query = transformGetPackByIdRequest({
+      request: new Request("https://internal.lambda.local/invoke", {
+        headers: { Authorization: "Bearer my-token-123" },
+      }),
+      context: { params: { packId: "diabe-teach" } },
+    });
+
+    expect(query).toEqual({
+      packId: "diabe-teach",
+      bearerToken: "my-token-123",
     });
   });
 
