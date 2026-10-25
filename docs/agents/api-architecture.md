@@ -15,8 +15,9 @@ src/
     │   └── http/               ← Primary Driving Adapters: Per-endpoint Web-Standard handlers (Request + context.params -> Response)
     └── driven/                 ← Secondary Driven Adapters: In-Memory, MongoDB, LLM, Fake Judge
 netlify/
+├── config/                     ← Shared Netlify Composition Root Config & Handler Adapter (netlify-runtime.types.ts, netlify-runtime.config.ts, create-netlify-function-handler.ts)
 └── functions/
-    └── <endpoint>.ts           ← Per-Endpoint Composition Roots: Netlify Functions v2 (export const config: Config = { path, method })
+    └── <endpoint>.ts           ← Per-Endpoint Composition Roots: Netlify Functions v2 (createNetlifyFunctionHandler + defineNetlifyRouteConfig)
 ```
 
 ### Inward-Only Dependency Rule (Enforced by `dependency-cruiser`)

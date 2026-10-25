@@ -14,6 +14,11 @@ import { DIABE_TEACH_PACK } from "../src/domain/curriculum-pack/diabe-teach-pack
 import getPackByIdNetlifyHandler, {
   config as getPackByIdNetlifyConfig,
 } from "../netlify/functions/get-pack-by-id.js";
+import { createNetlifyFunctionHandler } from "../netlify/config/create-netlify-function-handler.js";
+import {
+  defineNetlifyRouteConfig,
+  loadNetlifyRuntimeEnvConfig,
+} from "../netlify/config/netlify-runtime.config.js";
 
 const APPENDIX_1_VERBATIM_KEYWORDS = [
   "Insulin",
@@ -581,6 +586,43 @@ describe("Ticket 03 — Hybrid MongoDB Persistence & Netlify Functions v2 Compos
         method: "GET",
       }),
       mockNetlifyContext,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { pack: { id: string } };
+    expect(body.pack.id).toBe("diabe-teach");
+  });
+
+  it("loads Netlify runtime config defaults and adapts any Driving Handler via createNetlifyFunctionHandler", async () => {
+    const envConfig = loadNetlifyRuntimeEnvConfig({
+      MONGODB_URI: "  mongodb+srv://cluster.example.net  ",
+      MONGODB_DB_NAME: "",
+      CAPABILITY_TOKEN_SECRET: "  my-secret  ",
+    });
+
+    expect(envConfig).toEqual({
+      mongoUri: "mongodb+srv://cluster.example.net",
+      mongoDbName: "diabe_teach",
+      capabilityTokenSecret: "my-secret",
+    });
+
+    const routeConfig = defineNetlifyRouteConfig({
+      path: "/api/v1/packs/:packId",
+      method: "GET",
+    });
+    expect(routeConfig).toEqual({
+      path: "/api/v1/packs/:packId",
+      method: "GET",
+    });
+
+    const packRepo = new InMemoryCurriculumPackRepository([DIABE_TEACH_PACK]);
+    const wrappedNetlifyHandler = createNetlifyFunctionHandler(
+      createGetPackByIdHandler,
+      { packRepo },
+    );
+
+    const res = await wrappedNetlifyHandler(
+      new Request("https://internal.netlify.local/invoke"),
+      { params: { packId: "diabe-teach" } } as unknown as Context,
     );
     expect(res.status).toBe(200);
     const body = (await res.json()) as { pack: { id: string } };
