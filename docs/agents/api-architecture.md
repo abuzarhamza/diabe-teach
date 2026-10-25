@@ -72,19 +72,24 @@ Use the ubiquitous language from `GLOSSARY.md` across all class, type, method, a
 
 ## 4. HTTP Driving Adapter & Error Translation
 
-- **Per-Endpoint Handler Seam (`create<Endpoint>Handler(deps)`)**:
-  - Expose per-endpoint Driving Adapter factories in `src/adapters/driving/http/` (such as `createGetPackByIdHandler(deps)`) accepting `(request: Request, context?: { params?: Record<string, string | undefined> }) => Promise<Response>`.
-  - Read path parameters from `context?.params` (populated natively by Netlify Functions v2 `URLPattern` routing or mapped from AWS Lambda `event.pathParameters`), falling back to URL path extraction when `context` is omitted in unit tests.
+- **Request Transformer + Endpoint Handler Factory Pipeline (`createEndpointHandler`)**:
+  - Each HTTP Driving Adapter in `src/adapters/driving/http/` separates transport parsing from use-case execution using two pure building blocks:
+    1. **Request Transformer (`transform<Endpoint>Request`)**: Pure function `(input: HttpRequestInput) => TQuery` that extracts path parameters from `context?.params` (populated natively by Netlify Functions v2 `URLPattern` routing or mapped from AWS Lambda `event.pathParameters`, with URL path fallback for plain `Request` unit tests) and parses `Authorization: Bearer <token>` headers via `parseBearerTokenHeader`.
+    2. **Endpoint Handler Factory (`create<Endpoint>Handler(deps)`)**: Instantiates the Application Use Case with injected Driven Ports (`deps`) and delegates `{ transformRequest, execute }` to `createEndpointHandler` (`src/adapters/driving/http/endpoint-handler.factory.ts`), returning `(request: Request, context?: RouteContext) => Promise<Response>`.
 - **Single Error Translation Boundary**:
   - Domain and Application layers return typed domain results or throw typed `DomainError` subclasses—never HTTP status codes.
-  - The HTTP Driving Adapter maps every error to `#/components/schemas/ApiErrorResponse` (`{ code, message, details? }`) using the 15 canonical `ApiErrorCode` values in `docs/api/openapi.yaml` (`INVALID_REQUEST_BODY`, `UNAUTHORIZED_TOKEN`, `FORBIDDEN_ROLE`, `PACK_NOT_FOUND`, `SESSION_NOT_FOUND`, `ROOM_CODE_NOT_FOUND`, `CHAIN_NOT_FOUND`, `PACK_ALREADY_EXISTS`, `INVALID_PHASE_TRANSITION`, `PHASE_CLOSED_FOR_SUBMISSIONS`, `ADJUDICATION_LOCKED_BY_INSTRUCTOR`, `ASSESSMENT_ALREADY_SUBMITTED`, `PACK_VALIDATION_FAILED`, `CHAIN_TOPOLOGY_INVALID`, `ASSESSMENT_INCOMPLETE`).
+  - `mapDomainErrorToResponse` in `endpoint-handler.factory.ts` maps every `DomainError` to `#/components/schemas/ApiErrorResponse` (`{ code, message, details? }`) using the 15 canonical `ApiErrorCode` values in `docs/api/openapi.yaml` (`INVALID_REQUEST_BODY`, `UNAUTHORIZED_TOKEN`, `FORBIDDEN_ROLE`, `PACK_NOT_FOUND`, `SESSION_NOT_FOUND`, `ROOM_CODE_NOT_FOUND`, `CHAIN_NOT_FOUND`, `PACK_ALREADY_EXISTS`, `INVALID_PHASE_TRANSITION`, `PHASE_CLOSED_FOR_SUBMISSIONS`, `ADJUDICATION_LOCKED_BY_INSTRUCTOR`, `ASSESSMENT_ALREADY_SUBMITTED`, `PACK_VALIDATION_FAILED`, `CHAIN_TOPOLOGY_INVALID`, `ASSESSMENT_INCOMPLETE`).
 
 ## 5. Netlify Serverless Deployment Conventions
 
-- **Per-Endpoint Native Netlify Functions v2 Routing (`Config` + `Context.params`)**:
-  - Each endpoint lives in its own function file under `netlify/functions/<endpoint>.ts` (e.g., `netlify/functions/get-pack-by-id.ts`), exporting the default Web-Standard handler `(req: Request, context: Context) => Promise<Response>` and `export const config: Config = { path: "/api/v1/...", method: "GET" | "POST" }` from `@netlify/functions`.
+- **Shared Netlify Runtime Config & Handler Wrapper (`netlify/config/` + `netlify.toml`)**:
+  - Project-root `netlify.toml` configures `[functions]` with `directory = "netlify/functions"` and `node_bundler = "esbuild"`.
+  - `netlify/config/netlify-runtime.types.ts` defines the Netlify composition root contracts (`NetlifyRuntimeEnvConfig`, `NetlifyProductionDependencies`, `NetlifyEndpointRouteConfig`, `NetlifyFunctionHandler`).
+  - `netlify/config/netlify-runtime.config.ts` centralizes environment parsing (`loadNetlifyRuntimeEnvConfig`), warm-cached production Driven Adapter wiring (`getNetlifyProductionDependencies`), and route config helpers (`defineNetlifyRouteConfig`).
+  - `netlify/config/create-netlify-function-handler.ts` provides `createNetlifyFunctionHandler(createDrivingHandler, deps?)`, bridging Netlify's `(request: Request, context: Context)` signature to `endpointHandler(request, { params: context?.params })`.
+- **Per-Endpoint Native Netlify Functions v2 Routing (`netlify/functions/<endpoint>.ts`)**:
+  - Each endpoint lives in its own declarative function file under `netlify/functions/<endpoint>.ts` (e.g., `netlify/functions/get-pack-by-id.ts`), exporting `export default createNetlifyFunctionHandler(create<Endpoint>Handler)` and `export const config = defineNetlifyRouteConfig({ path: "/api/v1/...", method: "GET" | "POST" })`.
   - Always declare both `path` (using `URLPattern` `:param` syntax) and `method` in `export const config` so Netlify's platform edge router enforces method matching and populates `context.params` before invoking the underlying AWS Lambda container.
-  - Keep `netlify/functions/<endpoint>.ts` as a pure Composition Root (reading env vars, instantiating Driven Adapters, and delegating `(req, context)` to the HTTP Driving Adapter handler).
 - **Stateless Persistence via MongoDB + Optimistic Concurrency Control**:
   - Production Driven Adapters for `SessionRepositoryPort` (`MongoSessionRepository`, collection `game_sessions`) and `CurriculumPackRepositoryPort` (`MongoCurriculumPackRepository`, collection `curriculum_packs`) use the official `mongodb` driver with a module-scoped cached `MongoClient` (`maxPoolSize: 5` for serverless warm-container reuse) and optimistic concurrency control (`version` field with atomic `findOneAndUpdate({ _id, version }, { $set: ..., $inc: { version: 1 } })`) so concurrent serverless invocations never silently overwrite each other's state.
 - **Server-Sent Events (`GET /api/v1/sessions/:sessionId/stream`)**:

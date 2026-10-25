@@ -72,6 +72,14 @@ export function createGetPackByIdHandler(
     execute: (query) => useCase.execute(query),
   });
 }
+
+// 3. Per-Endpoint Netlify Function (netlify/functions/get-pack-by-id.ts):
+export default createNetlifyFunctionHandler(createGetPackByIdHandler);
+
+export const config = defineNetlifyRouteConfig({
+  path: "/api/v1/packs/:packId",
+  method: "GET",
+});
 ```
 
 ### Why This Pattern Is Easier to Read and Review
