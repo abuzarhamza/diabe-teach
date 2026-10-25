@@ -1,7 +1,6 @@
 import { Connection, Model } from "mongoose";
 import { CurriculumPackRepositoryPort } from "../../application/ports/curriculum-pack-repository.port.js";
 import { CurriculumPack } from "../../domain/curriculum-pack/curriculum-pack.js";
-import { DIABE_TEACH_PACK } from "../../domain/curriculum-pack/diabe-teach-pack.js";
 import { PackId } from "../../domain/curriculum-pack/pack-id.js";
 import {
   CURRICULUM_PACK_MODEL_NAME,
@@ -30,14 +29,9 @@ export class MongoCurriculumPackRepository
   public static readonly modelName = CURRICULUM_PACK_MODEL_NAME;
   public static readonly collectionName = CURRICULUM_PACKS_COLLECTION;
 
-  readonly #builtInPacks = new Map<string, CurriculumPack>();
   readonly #getCollection: () => Promise<CurriculumPackCollectionLike>;
 
   public constructor(options: MongoCurriculumPackRepositoryOptions) {
-    const seeds = options.builtInPacks ?? [DIABE_TEACH_PACK];
-    for (const pack of seeds) {
-      this.#builtInPacks.set(pack.id.value, pack);
-    }
     this.#getCollection = options.getCollection;
   }
 
@@ -60,11 +54,10 @@ export class MongoCurriculumPackRepository
     config: MongoCurriculumPackConnectionConfig,
   ): MongoCurriculumPackRepository {
     return new MongoCurriculumPackRepository({
-      builtInPacks: config.builtInPacks,
       getCollection: async () => {
         if (!config.mongoUri) {
           throw new Error(
-            "MONGODB_URI environment variable is required to query custom Curriculum Packs.",
+            "MONGODB_URI environment variable is required to query Curriculum Packs.",
           );
         }
         const connection = await MongoConnectionManager.getConnection(
@@ -81,11 +74,6 @@ export class MongoCurriculumPackRepository
   }
 
   public async findById(packId: PackId): Promise<CurriculumPack | null> {
-    const builtIn = this.#builtInPacks.get(packId.value);
-    if (builtIn) {
-      return builtIn;
-    }
-
     const collection = await this.#getCollection();
     const doc = await collection.findOne({ _id: packId.value });
     return doc ? MongoCurriculumPackRepository.#toDomain(doc) : null;

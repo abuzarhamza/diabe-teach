@@ -1,4 +1,3 @@
-import { CurriculumPack } from "../../domain/curriculum-pack/curriculum-pack.js";
 import { CurriculumPackProps } from "../../domain/curriculum-pack/curriculum-pack.types.js";
 
 export interface CurriculumPackDocument
@@ -14,11 +13,9 @@ export interface CurriculumPackCollectionLike {
 
 export interface MongoCurriculumPackRepositoryOptions {
   readonly getCollection: () => Promise<CurriculumPackCollectionLike>;
-  readonly builtInPacks?: readonly CurriculumPack[];
 }
 
 export interface MongoCurriculumPackConnectionConfig {
   readonly mongoUri?: string;
   readonly mongoDbName?: string;
-  readonly builtInPacks?: readonly CurriculumPack[];
 }

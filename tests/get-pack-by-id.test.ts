@@ -7,7 +7,9 @@ import { HmacCapabilityTokenAdapter } from "../src/adapters/outbound/hmac-capabi
 import { InMemoryCurriculumPackRepository } from "../src/adapters/outbound/in-memory-curriculum-pack-repository.js";
 import { MongoCurriculumPackRepository } from "../src/adapters/outbound/mongo-curriculum-pack-repository.js";
 import { CurriculumPackDocument } from "../src/adapters/outbound/mongo-curriculum-pack-repository.types.js";
+import { MongoConnectionManager } from "../src/adapters/outbound/mongo-client-singleton.js";
 import { DIABE_TEACH_PACK } from "../src/domain/curriculum-pack/diabe-teach-pack.js";
+import { CurriculumPackSeeder } from "../scripts/seed-curriculum-packs.js";
 import apiNetlifyHandler, {
   config as apiNetlifyConfig,
 } from "../netlify/functions/api.js";
@@ -442,8 +444,10 @@ describe("Ticket 03 — Hybrid MongoDB Persistence & Netlify Functions v2 Compos
     perceptionSurvey: null,
   };
 
-  it("serves built-in diabe-teach in O(1) from memory with zero MongoDB findOne calls", async () => {
-    const findOneSpy = vi.fn(async () => null);
+  it("queries MongoDB curriculum_packs collection dynamically without in-memory fallback", async () => {
+    const findOneSpy = vi.fn(async (filter: { _id: string }) =>
+      filter._id === "diabe-teach" ? customCardioPackDoc : null,
+    );
     const repo = new MongoCurriculumPackRepository({
       getCollection: async () => ({
         findOne: findOneSpy,
@@ -456,7 +460,7 @@ describe("Ticket 03 — Hybrid MongoDB Persistence & Netlify Functions v2 Compos
     );
 
     expect(response.status).toBe(200);
-    expect(findOneSpy).not.toHaveBeenCalled();
+    expect(findOneSpy).toHaveBeenCalledWith({ _id: "diabe-teach" });
   });
 
   it("loads custom packs from MongoDB curriculum_packs collection and applies role-aware answer-key redaction", async () => {
@@ -605,9 +609,9 @@ describe("Ticket 03 — Hybrid MongoDB Persistence & Netlify Functions v2 Compos
       mongoUri: undefined,
       mongoDbName: "diabe_teach",
     });
-    expect(
-      (await directConfigRepo.findById(DIABE_TEACH_PACK.id))?.id.value,
-    ).toBe("diabe-teach");
+    await expect(
+      directConfigRepo.findById(DIABE_TEACH_PACK.id),
+    ).rejects.toThrow("MONGODB_URI environment variable is required");
 
     expect(MongoCurriculumPackRepository.modelName).toBe("CurriculumPack");
     expect(MongoCurriculumPackRepository.collectionName).toBe("curriculum_packs");
@@ -632,32 +636,43 @@ describe("Ticket 03 — Hybrid MongoDB Persistence & Netlify Functions v2 Compos
   it("routes /api/v1/* centrally via openapi-backend reading docs/api/openapi.yaml (operationId: getCurriculumPackById)", async () => {
     expect(apiNetlifyConfig.path).toBe("/api/v1/*");
 
-    const res = await apiNetlifyHandler(
-      new Request("http://localhost:3000/api/v1/packs/diabe-teach", {
-        method: "GET",
-      }),
-      {} as unknown as Context,
-    );
-    expect(res.status).toBe(200);
-    const body = (await res.json()) as { pack: { id: string } };
-    expect(body.pack.id).toBe("diabe-teach");
+    AppRuntime.setProductionDependencies({
+      packRepo: new InMemoryCurriculumPackRepository([DIABE_TEACH_PACK]),
+      apiKey: "netlify-prod-key",
+      requireApiKey: false,
+    });
 
-    const notFoundRes = await apiNetlifyHandler(
-      new Request("http://localhost:3000/api/v1/non-existent-route", {
-        method: "GET",
-      }),
-      {} as unknown as Context,
-    );
-    expect(notFoundRes.status).toBe(404);
+    try {
+      const res = await apiNetlifyHandler(
+        new Request("http://localhost:3000/api/v1/packs/diabe-teach", {
+          method: "GET",
+          headers: { "x-api-key": "netlify-prod-key" },
+        }),
+        {} as unknown as Context,
+      );
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as { pack: { id: string } };
+      expect(body.pack.id).toBe("diabe-teach");
 
-    const notImplementedRes = await apiNetlifyHandler(
-      new Request("http://localhost:3000/api/v1/packs", {
-        method: "GET",
-        headers: { "x-api-key": "netlify-prod-key" },
-      }),
-      {} as unknown as Context,
-    );
-    expect(notImplementedRes.status).toBe(501);
+      const notFoundRes = await apiNetlifyHandler(
+        new Request("http://localhost:3000/api/v1/non-existent-route", {
+          method: "GET",
+        }),
+        {} as unknown as Context,
+      );
+      expect(notFoundRes.status).toBe(404);
+
+      const notImplementedRes = await apiNetlifyHandler(
+        new Request("http://localhost:3000/api/v1/packs", {
+          method: "GET",
+          headers: { "x-api-key": "netlify-prod-key" },
+        }),
+        {} as unknown as Context,
+      );
+      expect(notImplementedRes.status).toBe(501);
+    } finally {
+      AppRuntime.setProductionDependencies(null);
+    }
   });
 });
 
@@ -766,5 +781,87 @@ describe("Ticket 07 — x-api-key Header Validation (ApiKeyAuth) & Fail-Closed P
       API_KEY: "  prod-api-key-999  ",
     });
     expect(envConfig.apiKey).toBe("prod-api-key-999");
+  });
+});
+
+describe("Ticket 12 — Pure MongoDB Persistence & Idempotent Database Seeding Script", () => {
+  it("converts CurriculumPack aggregate into a schema-conforming CurriculumPackDocument", () => {
+    const doc = CurriculumPackSeeder.toDocument(DIABE_TEACH_PACK);
+
+    expect(doc._id).toBe("diabe-teach");
+    expect(doc.title).toBe(DIABE_TEACH_PACK.title);
+    expect(doc.version).toBe("1.0.0");
+    expect(doc.cards).toHaveLength(49);
+    expect(doc.domains).toHaveLength(7);
+    expect(doc.boardConfig).toEqual({
+      rows: 7,
+      cols: 7,
+      minChainLength: 4,
+      adjacencyRule: "chebyshev-8",
+    });
+    expect(doc.adjudicationRubric.chainContinuityCriteria).toHaveLength(3);
+    expect(doc.adjudicationRubric.calibrationExamples).toHaveLength(3);
+    expect(doc.assessmentInstrument?.questions).toHaveLength(10);
+    expect(doc.perceptionSurvey?.items).toHaveLength(9);
+  });
+
+  it("throws an informative error when seeding without MONGODB_URI", async () => {
+    const originalUri = process.env.MONGODB_URI;
+    delete process.env.MONGODB_URI;
+
+    try {
+      await expect(CurriculumPackSeeder.seed()).rejects.toThrow(
+        "MONGODB_URI environment variable is required to seed Curriculum Packs into MongoDB.",
+      );
+    } finally {
+      if (originalUri !== undefined) {
+        process.env.MONGODB_URI = originalUri;
+      }
+    }
+  });
+
+  it("idempotently seeds packs via replaceOne with upsert: true", async () => {
+    const replaceOneSpy = vi.fn(async () => ({ acknowledged: true }));
+    const mockModel = {
+      replaceOne: replaceOneSpy,
+    };
+    const mockConnection = {
+      models: {
+        CurriculumPack: mockModel,
+      },
+      model: vi.fn(() => mockModel),
+    };
+
+    const getConnectionSpy = vi
+      .spyOn(MongoConnectionManager, "getConnection")
+      .mockResolvedValue(mockConnection as any);
+
+    try {
+      const result = await CurriculumPackSeeder.seed({
+        mongoUri: "mongodb+srv://test.example.net",
+        dbName: "test_db",
+        packs: [DIABE_TEACH_PACK],
+      });
+
+      expect(getConnectionSpy).toHaveBeenCalledWith(
+        "mongodb+srv://test.example.net",
+        "test_db",
+      );
+      expect(replaceOneSpy).toHaveBeenCalledTimes(1);
+      expect(replaceOneSpy).toHaveBeenCalledWith(
+        { _id: "diabe-teach" },
+        expect.objectContaining({
+          _id: "diabe-teach",
+          title: DIABE_TEACH_PACK.title,
+        }),
+        { upsert: true },
+      );
+      expect(result).toEqual({
+        seededCount: 1,
+        packIds: ["diabe-teach"],
+      });
+    } finally {
+      getConnectionSpy.mockRestore();
+    }
   });
 });

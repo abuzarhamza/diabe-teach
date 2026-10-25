@@ -58,16 +58,23 @@ export class AppRuntime {
     return AppRuntime.#cachedProductionDependencies;
   }
 
+  public static setProductionDependencies(
+    deps: ProductionDependencies | null,
+  ): void {
+    AppRuntime.#cachedProductionDependencies = deps;
+  }
+
   public static createServerlessHttpHandler(
     customDeps?: ProductionDependencies,
   ): ServerlessHttpHandler {
-    const deps = customDeps ?? AppRuntime.getProductionDependencies();
-    const app = new OpenApiHttpApp(deps);
+    const fixedApp = customDeps ? new OpenApiHttpApp(customDeps) : null;
 
     return async (
       request: Request,
       context?: ServerlessRequestContext,
     ): Promise<Response> => {
+      const app =
+        fixedApp ?? new OpenApiHttpApp(AppRuntime.getProductionDependencies());
       return app.fetch(request, {
         params: context?.params,
       });

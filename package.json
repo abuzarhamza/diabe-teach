@@ -7,7 +7,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
-    "lint:boundaries": "depcruise src netlify --config .dependency-cruiser.cjs"
+    "lint:boundaries": "depcruise src netlify --config .dependency-cruiser.cjs",
+    "db:seed": "node --experimental-strip-types scripts/seed-curriculum-packs.ts"
   },
   "dependencies": {
     "@netlify/functions": "^3.1.2",
