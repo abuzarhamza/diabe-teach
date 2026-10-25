@@ -3,28 +3,11 @@ import {
   PackNotFoundError,
   UnauthorizedTokenError,
 } from "../../../domain/errors/domain-errors.js";
-
-export interface RouteContext {
-  readonly params?: Readonly<Record<string, string | undefined>>;
-}
-
-export interface HttpRequestInput {
-  readonly request: Request;
-  readonly context?: RouteContext;
-}
-
-export type EndpointHttpHandler = (
-  request: Request,
-  context?: RouteContext,
-) => Promise<Response>;
-
-export interface HttpEndpointDefinition<TQuery, TResult> {
-  readonly transformRequest: (
-    input: HttpRequestInput,
-  ) => TQuery | Promise<TQuery>;
-  readonly execute: (query: TQuery) => Promise<TResult>;
-  readonly successStatus?: number;
-}
+import {
+  EndpointHttpHandler,
+  HttpEndpointDefinition,
+  RouteContext,
+} from "./http-handler.types.js";
 
 export function jsonResponse(body: unknown, status: number): Response {
   return new Response(JSON.stringify(body), {

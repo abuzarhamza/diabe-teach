@@ -51,9 +51,17 @@ Implement the end-to-end **`GET /api/v1/packs/{packId}`** vertical slice across 
 12. As a platform engineer deploying to either Netlify Functions v2 (`context.params.packId`) or AWS Lambda (`event.pathParameters.packId`), I want `createGetPackByIdHandler(deps)` in the HTTP Driving Adapter to read `context.params.packId` directly without coupling `src/adapters/driving/` to `@netlify/functions`.
 13. As a domain engineer, I want the `CurriculumPack` Aggregate Root to remain completely immutable when `CurriculumPackProjector` produces a redacted `PublicCurriculumPack` DTO, so that redacting fields for a learner never mutates the cached in-memory `DIABE_TEACH_PACK` instance for subsequent instructor requests.
 14. As a developer running `lint:boundaries`, I want `dependency-cruiser` to verify that Domain and Application modules never import `mongodb` or `@netlify/functions`, and that `@netlify/functions` is imported only in `netlify/functions/`.
+15. As a code reviewer, I want every module in the `GET /api/v1/packs/{packId}` vertical slice to separate interface/type definitions (`*.types.ts`, `*.port.ts`, `*.dto.ts`) from class and factory implementations (`*.ts`, `*.use-case.ts`, `*.handler.ts`, `*.factory.ts`), eliminating "god modules" that mix contracts and runtime classes in the same file.
 
 ## Implementation Decisions
 
+- **No God Modules — Dedicated Interface/Contract Files Across All Four Rings**:
+  - **Domain Ring**: Separate all Value Object and Aggregate property interfaces (`AdjacencyRule`, `BoardConfig`, `SemanticDomain`, `KeywordCard`, `GridCoord`, `CalibrationExample`, `AdjudicationRubric`, `AssessmentQuestion`, `AssessmentInstrument`, `PerceptionSurveyItem`, `PerceptionSurvey`, `CurriculumPackProps`) into `curriculum-pack.types.ts`, leaving `curriculum-pack.ts` with only the `CurriculumPack` Aggregate Root class.
+  - **Application Ring**:
+    - Separate DTO interfaces (`PublicAssessmentQuestionDto`, `PublicCurriculumPackDto`, `CurriculumPackProjectionOptions`) into `curriculum-pack.dto.ts`, leaving `curriculum-pack-projector.ts` with only the `CurriculumPackProjector` class.
+    - Separate inbound Driving Port contracts (`GetCurriculumPackByIdQuery`, `GetCurriculumPackByIdResult`, `GetCurriculumPackByIdDependencies`, `GetCurriculumPackByIdUseCasePort`) into `get-curriculum-pack-by-id.port.ts`, leaving `get-curriculum-pack-by-id.use-case.ts` with only the `GetCurriculumPackByIdUseCase` class.
+  - **Driven Adapter Ring**: Separate MongoDB collection/document contracts (`CurriculumPackDocument`, `CurriculumPackCollectionLike`, `MongoCurriculumPackRepositoryOptions`) into `mongo-curriculum-pack-repository.types.ts`, leaving `mongo-curriculum-pack-repository.ts` with only the `MongoCurriculumPackRepository` class.
+  - **Driving Adapter Ring**: Separate HTTP handler and pipeline contracts (`RouteContext`, `HttpRequestInput`, `EndpointHttpHandler`, `HttpEndpointDefinition`, `GetPackByIdHandlerDependencies`, `AppDependencies`, `HttpApp`) into `http-handler.types.ts`, leaving `endpoint-handler.factory.ts`, `get-pack-by-id.handler.ts`, and `create-app.ts` with only pure functions and factory implementations.
 - **Per-Endpoint Netlify Function (`netlify/functions/get-pack-by-id.ts`)**:
   - Uses `@netlify/functions` `Config` and `Context` types.
   - Exports `export const config: Config = { path: "/api/v1/packs/:packId", method: "GET" }`.

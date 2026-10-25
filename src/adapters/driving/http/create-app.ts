@@ -1,18 +1,9 @@
-import { CapabilityTokenPort } from "../../../application/ports/capability-token.port.js";
-import { CurriculumPackRepositoryPort } from "../../../application/ports/curriculum-pack-repository.port.js";
+import { createGetPackByIdHandler } from "./get-pack-by-id.handler.js";
 import {
-  createGetPackByIdHandler,
+  AppDependencies,
+  HttpApp,
   RouteContext,
-} from "./get-pack-by-id.handler.js";
-
-export interface AppDependencies {
-  readonly packRepo: CurriculumPackRepositoryPort;
-  readonly tokenVerifier?: CapabilityTokenPort;
-}
-
-export interface HttpApp {
-  fetch(request: Request, context?: RouteContext): Promise<Response>;
-}
+} from "./http-handler.types.js";
 
 const GET_PACK_BY_ID_PATTERN = /^\/api\/v1\/packs\/([^/]+)\/?$/;
 

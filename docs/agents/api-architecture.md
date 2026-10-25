@@ -25,7 +25,22 @@ netlify/
 - **`src/application/**`** imports only from `src/application/**` and `src/domain/**`. Defines inbound **Driving Ports** (use-case command/query handlers) and outbound **Driven Ports** (interfaces for persistence, narrative adjudication, event streaming, clock, and ID generation).
 - **`src/adapters/driving/**`** imports from `src/application/**` and `src/domain/**`. Translates HTTP `Request`, `BearerAuth` capability tokens, and JSON payloads into Application commands/queries, and maps Domain Results/Errors into OpenAPI `Response` shapes (`docs/api/openapi.yaml`).
 - **`src/adapters/driven/**`** imports from `src/application/**` and `src/domain/**` to implement Driven Ports.
-- **No cross-adapter imports**: Driving Adapters and Driven Adapters never import each other directly; only the **Composition Root** (`netlify/functions/api.ts` and test harnesses) wires them together.
+- **No cross-adapter imports**: Driving Adapters and Driven Adapters never import each other directly; only the **Composition Root** (`netlify/functions/<endpoint>.ts` and test harnesses) wires them together.
+
+### No God Modules: Separate Interface/Contract Files from Class/Implementation Files
+
+Never combine TypeScript `interface`/`type` contracts and `class`/factory implementations inside the same file. Keep every module single-purpose and easy to read and review:
+
+- **Domain Ring (`src/domain/`)**:
+  - Value Object & Aggregate contracts (`*.types.ts`, e.g., `curriculum-pack.types.ts`) live in dedicated type files.
+  - Aggregate Root and Value Object classes (`curriculum-pack.ts`, `pack-id.ts`) contain only the class implementation and private domain helpers.
+- **Application Ring (`src/application/`)**:
+  - Inbound Driving Port contracts (`*UseCasePort`, `*Query`, `*Result`, `*Dependencies`) and outbound Driven Port contracts (`*Port`) live in `src/application/ports/*.port.ts`.
+  - DTO shape contracts (`*Dto`, `*ProjectionOptions`) live in `src/application/dtos/*.dto.ts`.
+  - Use Case classes (`src/application/use-cases/*.use-case.ts`) and Projector classes (`src/application/dtos/*-projector.ts`) contain only the class implementation.
+- **Driving & Driven Adapters (`src/adapters/`)**:
+  - HTTP handler contracts (`RouteContext`, `HttpRequestInput`, `EndpointHttpHandler`, `HttpEndpointDefinition`, `*Dependencies`) live in `src/adapters/driving/http/http-handler.types.ts`.
+  - Persistence document schemas and adapter options (`CurriculumPackDocument`, `CurriculumPackCollectionLike`, `MongoCurriculumPackRepositoryOptions`) live in `src/adapters/driven/*.types.ts`, separate from repository and adapter classes.
 
 ## 2. DDD Tactical Rules in the Domain Ring
 

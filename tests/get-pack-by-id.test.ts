@@ -8,10 +8,8 @@ import {
 import { FakeCapabilityTokenAdapter } from "../src/adapters/driven/fake-capability-token-adapter.js";
 import { HmacCapabilityTokenAdapter } from "../src/adapters/driven/hmac-capability-token-adapter.js";
 import { InMemoryCurriculumPackRepository } from "../src/adapters/driven/in-memory-curriculum-pack-repository.js";
-import {
-  CurriculumPackDocument,
-  MongoCurriculumPackRepository,
-} from "../src/adapters/driven/mongo-curriculum-pack-repository.js";
+import { MongoCurriculumPackRepository } from "../src/adapters/driven/mongo-curriculum-pack-repository.js";
+import { CurriculumPackDocument } from "../src/adapters/driven/mongo-curriculum-pack-repository.types.js";
 import { DIABE_TEACH_PACK } from "../src/domain/curriculum-pack/diabe-teach-pack.js";
 import getPackByIdNetlifyHandler, {
   config as getPackByIdNetlifyConfig,

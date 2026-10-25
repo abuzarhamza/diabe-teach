@@ -34,6 +34,7 @@ Establish and enforce a **Domain-Driven Design (DDD)** and **Hexagonal Architect
 15. As a connected classroom client subscribing to `GET /api/v1/sessions/:sessionId/stream` on Netlify Functions v2, I want the HTTP Driving Adapter to return a Web `ReadableStream` (`text/event-stream`) that immediately flushes the current `session.snapshot` event and emits subsequent room events with monotonic `id:` and `retry:` directives, so that `EventSource` clients automatically reconnect when a serverless invocation reaches its execution window.
 16. As an engineer running `lint:boundaries`, I want `dependency-cruiser` to fail the build if the Domain Ring imports anything outside Domain, if the Application Ring imports Adapters or external frameworks, if Driving and Driven Adapters import each other directly, or if any module introduces a circular dependency.
 17. As a developer or CI pipeline running automated tests, I want to exercise all 14 `/api/v1/*` endpoints in milliseconds by calling `createApp(inMemoryTestDeps).fetch(request)` in-process with zero network sockets, zero external LLM calls, and zero Netlify CLI processes.
+18. As a code reviewer, I want all TypeScript interfaces, ports, DTO shapes, and adapter configuration contracts separated into dedicated contract files (`*.types.ts`, `*.port.ts`, `*.dto.ts`) distinct from class and factory implementation files, so that no module becomes a "god module" mixing type definitions with runtime logic.
 
 ## Implementation Decisions
 
@@ -47,7 +48,11 @@ Establish and enforce a **Domain-Driven Design (DDD)** and **Hexagonal Architect
     - `NarrativeAdjudicatorPort`: `LlmNarrativeAdjudicatorAdapter` (prompted strictly by the pack's `AdjudicationRubric` and `CalibrationExample`s) and `DeterministicRubricAdjudicatorAdapter` (for deterministic tests and offline fixtures).
     - `SessionEventPublisherPort`: `InMemorySessionEventBus` and MongoDB state/change-stream publisher for SSE connections.
     - `ClockPort` and `IdGeneratorPort`: production system implementations and controllable deterministic test doubles.
-  - **Composition Root**: A thin Netlify Functions v2 entry point configured with `path: "/api/v1/*"` wires production Driven Adapters into `createApp(deps)` and exports the default Web-Standard `(req: Request, context: Context) => Promise<Response>` handler.
+  - **Composition Root**: Per-endpoint Netlify Functions v2 entry points (`export const config: Config = { path, method }`) wire production Driven Adapters into the per-endpoint HTTP Driving Adapter handler and export the default Web-Standard `(req: Request, context: Context) => Promise<Response>` handler.
+- **Strict Separation of Interface/Contract Files from Class/Implementation Files (No God Modules)**:
+  - Domain Value Object and Aggregate property contracts reside in dedicated `*.types.ts` modules, while Aggregate Root and Value Object classes reside in class-only modules.
+  - Application inbound Driving Port contracts (`*UseCasePort`, `*Query`, `*Result`, `*Dependencies`) and outbound Driven Port interfaces (`*Port`) reside in dedicated `*.port.ts` modules, and DTO contracts reside in `*.dto.ts` modules—never inline inside Use Case or Projector implementation files.
+  - Driving and Driven Adapter contracts (HTTP handler types, request input wrappers, collection interfaces, document schemas, and constructor option types) reside in `*.types.ts` modules, keeping adapter classes and handler factories small, focused, and easy to review.
 - **Transactional Aggregate Mutation & Optimistic Concurrency Pattern**:
   - Every mutating Application use case executes a load-modify-save unit-of-work loop against `SessionRepositoryPort`:
     1. Load the `GameSession` Aggregate Root alongside its current storage version/ETag.

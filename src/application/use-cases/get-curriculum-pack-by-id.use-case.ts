@@ -3,30 +3,23 @@ import {
   PackNotFoundError,
   UnauthorizedTokenError,
 } from "../../domain/errors/domain-errors.js";
-import {
-  CurriculumPackProjector,
-  PublicCurriculumPackDto,
-} from "../dtos/curriculum-pack-projector.js";
+import { CurriculumPackProjector } from "../dtos/curriculum-pack-projector.js";
 import { CapabilityTokenPort } from "../ports/capability-token.port.js";
 import { CurriculumPackRepositoryPort } from "../ports/curriculum-pack-repository.port.js";
+import {
+  GetCurriculumPackByIdDependencies,
+  GetCurriculumPackByIdQuery,
+  GetCurriculumPackByIdResult,
+  GetCurriculumPackByIdUseCasePort,
+} from "../ports/get-curriculum-pack-by-id.port.js";
 
-export interface GetCurriculumPackByIdQuery {
-  readonly packId: string;
-  readonly bearerToken?: string | null;
-}
-
-export interface GetCurriculumPackByIdResult {
-  readonly pack: PublicCurriculumPackDto;
-}
-
-export class GetCurriculumPackByIdUseCase {
+export class GetCurriculumPackByIdUseCase
+  implements GetCurriculumPackByIdUseCasePort
+{
   readonly #packRepo: CurriculumPackRepositoryPort;
   readonly #tokenVerifier?: CapabilityTokenPort;
 
-  public constructor(deps: {
-    readonly packRepo: CurriculumPackRepositoryPort;
-    readonly tokenVerifier?: CapabilityTokenPort;
-  }) {
+  public constructor(deps: GetCurriculumPackByIdDependencies) {
     this.#packRepo = deps.packRepo;
     this.#tokenVerifier = deps.tokenVerifier;
   }
@@ -44,7 +37,9 @@ export class GetCurriculumPackByIdUseCase {
       }
       const verified = await this.#tokenVerifier.verifyToken(query.bearerToken);
       if (!verified) {
-        throw new UnauthorizedTokenError("Invalid or unrecognized bearer token.");
+        throw new UnauthorizedTokenError(
+          "Invalid or unrecognized bearer token.",
+        );
       }
       callerRole = verified.role;
     }

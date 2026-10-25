@@ -1,24 +1,16 @@
-import { CapabilityTokenPort } from "../../../application/ports/capability-token.port.js";
-import { CurriculumPackRepositoryPort } from "../../../application/ports/curriculum-pack-repository.port.js";
-import {
-  GetCurriculumPackByIdQuery,
-  GetCurriculumPackByIdUseCase,
-} from "../../../application/use-cases/get-curriculum-pack-by-id.use-case.js";
+import { GetCurriculumPackByIdQuery } from "../../../application/ports/get-curriculum-pack-by-id.port.js";
+import { GetCurriculumPackByIdUseCase } from "../../../application/use-cases/get-curriculum-pack-by-id.use-case.js";
 import { PackNotFoundError } from "../../../domain/errors/domain-errors.js";
 import {
   createEndpointHandler,
-  EndpointHttpHandler,
-  HttpRequestInput,
   parseBearerTokenHeader,
-  RouteContext,
 } from "./endpoint-handler.factory.js";
-
-export type { EndpointHttpHandler, RouteContext };
-
-export interface GetPackByIdHandlerDependencies {
-  readonly packRepo: CurriculumPackRepositoryPort;
-  readonly tokenVerifier?: CapabilityTokenPort;
-}
+import {
+  EndpointHttpHandler,
+  GetPackByIdHandlerDependencies,
+  HttpRequestInput,
+  RouteContext,
+} from "./http-handler.types.js";
 
 const GET_PACK_BY_ID_URL_PATTERN = /^\/api\/v1\/packs\/([^/]+)\/?$/;
 
