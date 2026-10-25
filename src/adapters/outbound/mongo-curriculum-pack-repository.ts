@@ -1,8 +1,14 @@
-import mongoose, { Connection, Model, Schema } from "mongoose";
+import { Connection, Model } from "mongoose";
 import { CurriculumPackRepositoryPort } from "../../application/ports/curriculum-pack-repository.port.js";
 import { CurriculumPack } from "../../domain/curriculum-pack/curriculum-pack.js";
 import { DIABE_TEACH_PACK } from "../../domain/curriculum-pack/diabe-teach-pack.js";
 import { PackId } from "../../domain/curriculum-pack/pack-id.js";
+import {
+  CURRICULUM_PACK_MODEL_NAME,
+  CURRICULUM_PACKS_COLLECTION,
+  curriculumPackSchema,
+  DEFAULT_MONGODB_DB_NAME,
+} from "./curriculum-pack.schema.js";
 import { MongoConnectionManager } from "./mongo-client-singleton.js";
 import {
   CurriculumPackCollectionLike,
@@ -11,28 +17,12 @@ import {
   MongoCurriculumPackRepositoryOptions,
 } from "./mongo-curriculum-pack-repository.types.js";
 
-export const DEFAULT_MONGODB_DB_NAME = "diabe_teach";
-export const CURRICULUM_PACKS_COLLECTION = "curriculum_packs";
-export const CURRICULUM_PACK_MODEL_NAME = "CurriculumPack";
-
-export const curriculumPackSchema = new Schema<CurriculumPackDocument>(
-  {
-    _id: { type: String, required: true },
-    title: { type: String, required: true },
-    version: { type: String, required: true },
-    description: { type: String },
-    boardConfig: { type: Schema.Types.Mixed, required: true },
-    domains: { type: [Schema.Types.Mixed], required: true },
-    cards: { type: [Schema.Types.Mixed], required: true },
-    adjudicationRubric: { type: Schema.Types.Mixed, required: true },
-    assessmentInstrument: { type: Schema.Types.Mixed },
-    perceptionSurvey: { type: Schema.Types.Mixed },
-  },
-  {
-    collection: CURRICULUM_PACKS_COLLECTION,
-    versionKey: false,
-  },
-);
+export {
+  CURRICULUM_PACK_MODEL_NAME,
+  CURRICULUM_PACKS_COLLECTION,
+  curriculumPackSchema,
+  DEFAULT_MONGODB_DB_NAME,
+};
 
 export class MongoCurriculumPackRepository
   implements CurriculumPackRepositoryPort
@@ -83,7 +73,7 @@ export class MongoCurriculumPackRepository
         );
         const model = MongoCurriculumPackRepository.getModel(connection);
         return {
-          findOne: async (filter: { readonly _id: string }) =>
+          findOne: async (filter) =>
             model.findOne(filter).lean<CurriculumPackDocument | null>().exec(),
         };
       },
@@ -98,10 +88,10 @@ export class MongoCurriculumPackRepository
 
     const collection = await this.#getCollection();
     const doc = await collection.findOne({ _id: packId.value });
-    if (!doc) {
-      return null;
-    }
+    return doc ? MongoCurriculumPackRepository.#toDomain(doc) : null;
+  }
 
+  static #toDomain(doc: CurriculumPackDocument): CurriculumPack {
     return CurriculumPack.create({
       id: doc._id,
       title: doc.title,
