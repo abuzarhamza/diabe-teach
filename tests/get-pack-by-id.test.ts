@@ -14,6 +14,9 @@ import { DIABE_TEACH_PACK } from "../src/domain/curriculum-pack/diabe-teach-pack
 import getPackByIdNetlifyHandler, {
   config as getPackByIdNetlifyConfig,
 } from "../netlify/functions/get-pack-by-id.js";
+import apiNetlifyHandler, {
+  config as apiNetlifyConfig,
+} from "../netlify/functions/api.js";
 import { createNetlifyFunctionHandler } from "../netlify/config/create-netlify-function-handler.js";
 import {
   defineNetlifyRouteConfig,
@@ -623,6 +626,20 @@ describe("Ticket 03 — Hybrid MongoDB Persistence & Netlify Functions v2 Compos
     const res = await wrappedNetlifyHandler(
       new Request("https://internal.netlify.local/invoke"),
       { params: { packId: "diabe-teach" } } as unknown as Context,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { pack: { id: string } };
+    expect(body.pack.id).toBe("diabe-teach");
+  });
+
+  it("routes /api/v1/* centrally via openapi-backend reading docs/api/openapi.yaml (operationId: getCurriculumPackById)", async () => {
+    expect(apiNetlifyConfig.path).toBe("/api/v1/*");
+
+    const res = await apiNetlifyHandler(
+      new Request("http://localhost:3000/api/v1/packs/diabe-teach", {
+        method: "GET",
+      }),
+      {} as unknown as Context,
     );
     expect(res.status).toBe(200);
     const body = (await res.json()) as { pack: { id: string } };
