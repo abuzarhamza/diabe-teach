@@ -30,6 +30,8 @@ Welcome to the **Diabe-Teach Knowledge Base & Research Wiki**. This repository i
 | [13](13-single-entrypoint-dead-code-audit.md) | [Single-Entrypoint Dead & Redundant Code Audit](13-single-entrypoint-dead-code-audit.md) | Line-by-line audit of files, regexes, and duplicate security checks made redundant by centralizing routing in `netlify/functions/api.ts` + `OpenApiHttpApp` (`openapi-backend`). |
 | [14](14-config-and-composition-root-in-hexagonal-architecture.md) | [Config & Composition Root in Hexagonal Architecture](14-config-and-composition-root-in-hexagonal-architecture.md) | Primary-source research (Cockburn, Seemann, Martin) on why runtime configuration and dependency wiring belong in the Composition Root (`AppRuntime`) rather than `src/adapters/inbound/`. |
 | [15](15-class-based-hexagonal-architecture-audit.md) | [100% Class-Based Hexagonal Architecture Audit](15-class-based-hexagonal-architecture-audit.md) | Audit and refactoring design replacing loose procedural helper/factory functions with cohesive classes (`AppRuntime`, `OpenApiHttpApp`, `BaseHttpHandler`, `GetPackByIdHttpHandler`, `MongoConnectionManager`). |
+| [16](16-mongoose-outbound-adapter-research.md) | [Using Mongoose for Outbound Persistence in Hexagonal DDD](16-mongoose-outbound-adapter-research.md) | Evaluation of Mongoose Schema/Model, AWS Lambda connection pooling, and `.lean()` queries for Aggregate Root rehydration. |
+| [17](17-pure-mongodb-persistence-without-in-memory-fallback.md) | [Pure MongoDB Persistence Without In-Memory Built-In Fallback](17-pure-mongodb-persistence-without-in-memory-fallback.md) | Removal of hardcoded in-memory built-in packs from `MongoCurriculumPackRepository`, establishing `DIABE_TEACH_PACK` as canonical seed/test fixture. |
 
 ---
 
