@@ -1,4 +1,4 @@
-# Spec: `GET /api/v1/packs/{packId}` — Hexagonal DDD Single-Endpoint Vertical Slice (with MongoDB)
+# Spec: `GET /api/v1/packs/{packId}` — Hexagonal DDD Single-Endpoint Vertical Slice (Netlify / AWS Lambda Native Routing + MongoDB)
 
 Status: ready-for-agent
 
@@ -6,15 +6,16 @@ Status: ready-for-agent
 
 Every workflow in the Concept-Chain Educational Game Platform—rendering the 7×7 keyword board, running the 15-minute Trial Orientation with Figure 2 Calibration Examples, administering the 10-question Pretest/Posttest Assessment Instrument, and collecting the 9-item Perception Survey—depends on fetching a **Curriculum Pack** by its `packId` via `GET /api/v1/packs/{packId}`.
 
-However, serving `GET /api/v1/packs/{packId}` in production requires satisfying four competing constraints simultaneously:
+However, serving `GET /api/v1/packs/{packId}` on **Netlify Functions v2** (and **AWS Lambda** under the hood) requires satisfying five competing constraints simultaneously:
 1. **Complete Clinical Fidelity**: The built-in `diabe-teach` Curriculum Pack must accurately expose all 49 verbatim Appendix 1 Keyword Cards, 7 Semantic Domains, the Figure 2 reference 7×7 board and Calibration Examples (Valid Chain A [9 cards], Valid Chain B [7 cards], and Invalid Chain C [non-adjacent transition]), 10 Bloom Level 2/3 multiple-choice questions, and 9 Appendix 2 Likert survey items.
 2. **Answer-Key Secrecy Across Pretest and Posttest**: Because the *Diabe-teach* RCT protocol administers the exact same 10 multiple-choice questions in the Pretest and Posttest, anonymous callers and learners holding a `participantToken` must never receive `correctIndex` or `explanation` in `GET /api/v1/packs/{packId}`, whereas an instructor holding a valid `instructorToken` must receive the full unredacted assessment key—and a caller passing a malformed or tampered `Authorization` header must receive an immediate `401 UNAUTHORIZED_TOKEN` error rather than a silent downgrade.
-3. **Hexagonal DDD Ring Isolation**: The `CurriculumPack` Aggregate Root and `PackId` Value Object in the Domain Ring must remain 100% pure and free of HTTP, OpenAPI, or MongoDB driver concerns, with role-aware redaction handled in the Application Ring and OpenAPI `Response` formatting handled in the HTTP Driving Adapter.
-4. **Hybrid Built-In + MongoDB Persistence on Netlify Serverless**: On Netlify Functions v2, requests for the built-in `diabe-teach` pack should resolve in-memory in $O(1)$ without incurring a database network round-trip, while requests for custom-registered `packId`s query the **MongoDB** `curriculum_packs` collection via a warm-cached `MongoClient` Driven Adapter (and return `404 PACK_NOT_FOUND` when absent from both).
+3. **Hexagonal DDD Ring Isolation**: The `CurriculumPack` Aggregate Root and `PackId` Value Object in the Domain Ring must remain 100% pure and free of HTTP, OpenAPI, Netlify, or MongoDB driver concerns, with role-aware redaction handled in the Application Ring and OpenAPI `Response` formatting handled in the HTTP Driving Adapter.
+4. **Native Netlify Functions v2 (`Config` + `Context.params`) & AWS Lambda (`pathParameters`) Routing**: Instead of maintaining a custom monolithic catch-all router, the endpoint must deploy as a dedicated Netlify Function (`netlify/functions/get-pack-by-id.ts`) that exports `export const config: Config = { path: "/api/v1/packs/:packId", method: "GET" }` (from `@netlify/functions`), letting Netlify's platform edge router match the URL and method before invoking the underlying AWS Lambda container and passing `context.params.packId` into a portable HTTP Driving Adapter (`(request, context?: { params?: Record<string, string | undefined> }) => Promise<Response>`).
+5. **Hybrid Built-In + MongoDB Persistence**: Requests for the built-in `diabe-teach` pack should resolve in-memory in $O(1)$ without incurring a database network round-trip, while requests for custom-registered `packId`s query the **MongoDB** `curriculum_packs` collection via a warm-cached `MongoClient` Driven Adapter (and return `404 PACK_NOT_FOUND` when absent from both).
 
 ## Solution
 
-Implement the end-to-end **`GET /api/v1/packs/{packId}`** vertical slice across all four Hexagonal DDD rings (`Domain`, `Application`, `Driving Adapters`, `Driven Adapters` with **MongoDB**) and the Netlify Functions v2 catch-all Composition Root:
+Implement the end-to-end **`GET /api/v1/packs/{packId}`** vertical slice across all four Hexagonal DDD rings (`Domain`, `Application`, `Driving Adapters`, `Driven Adapters` with **MongoDB**) and a dedicated **Netlify Functions v2** per-endpoint Composition Root (`netlify/functions/get-pack-by-id.ts`):
 
 1. **Domain Ring**:
    - Define the `PackId` Value Object and the immutable `CurriculumPack` Aggregate Root (with `BoardConfig`, `SemanticDomain`, `KeywordCard`, `AdjudicationRubric`, `CalibrationExample`, `AssessmentInstrument`, and `PerceptionSurvey` Value Objects).
@@ -23,15 +24,16 @@ Implement the end-to-end **`GET /api/v1/packs/{packId}`** vertical slice across 
 2. **Application Ring**:
    - Define outbound Driven Ports: `CurriculumPackRepositoryPort` (`findById(packId)`) and `CapabilityTokenPort` (`verifyToken(rawBearerToken)`).
    - Implement `GetCurriculumPackByIdUseCase` (inbound Driving Port) and `CurriculumPackProjector` (role-aware DTO mapper that strips `correctIndex` and `explanation` for `"anonymous"` and `"participant"` roles while preserving them for `"instructor"`, without mutating the `CurriculumPack` Aggregate Root).
-3. **Driving Adapter Ring (Web-Standard HTTP)**:
-   - Implement `createApp({ packRepo, tokenVerifier })` exposing `{ fetch(request: Request): Promise<Response> }`.
-   - Route `GET /api/v1/packs/:packId`, parse optional `Authorization: Bearer <token>` headers, invoke `GetCurriculumPackByIdUseCase`, and map outputs to OpenAPI `200 OK` (`{ pack: PublicCurriculumPack }`), `401 Unauthorized` (`UNAUTHORIZED_TOKEN`), or `404 Not Found` (`PACK_NOT_FOUND`).
-4. **Driven Adapters Ring (MongoDB + In-Memory) & Netlify Composition Root**:
+3. **Driving Adapter Ring (Portable Web-Standard + `context.params` / Lambda `pathParameters`)**:
+   - Implement `createGetPackByIdHandler({ packRepo, tokenVerifier })` returning `(request: Request, context?: { params?: Record<string, string | undefined> }) => Promise<Response>` (and keep `createApp(deps)` delegating to it).
+   - Extract `packId` directly from `context?.params?.packId` (populated natively by Netlify Functions v2 `URLPattern` routing or AWS Lambda `event.pathParameters`), falling back to URL path extraction when `context` is omitted in plain `Request` unit tests.
+   - Parse optional `Authorization: Bearer <token>` headers, invoke `GetCurriculumPackByIdUseCase`, and map outputs to OpenAPI `200 OK` (`{ pack: PublicCurriculumPack }`), `401 Unauthorized` (`UNAUTHORIZED_TOKEN`), or `404 Not Found` (`PACK_NOT_FOUND`).
+4. **Driven Adapters Ring (MongoDB + In-Memory) & Per-Endpoint Netlify Composition Root**:
    - Implement `InMemoryCurriculumPackRepository` (pre-loaded with `DIABE_TEACH_PACK` for fast zero-I/O testing).
    - Implement `MongoCurriculumPackRepository` (resolving built-in packs like `diabe-teach` in-memory first, then querying the **MongoDB** `curriculum_packs` collection by `_id: packId.value` and rehydrating the `CurriculumPack` Aggregate Root).
-   - Provide a serverless-safe MongoDB connection manager (`getMongoDatabase(uri, dbName)`) that caches the `MongoClient` promise across warm Netlify Functions v2 invocations (`maxPoolSize: 5`).
+   - Provide a serverless-safe MongoDB connection manager (`getMongoDatabase(uri, dbName)`) that caches the `MongoClient` promise across warm Netlify / Lambda invocations (`maxPoolSize: 5`).
    - Implement `HmacCapabilityTokenAdapter` (stateless HMAC-SHA256 verification of `CapabilityToken` payloads) and `FakeCapabilityTokenAdapter` (for deterministic tests).
-   - Wire the Netlify Functions v2 catch-all handler (`path: "/api/v1/*"`) as a thin Composition Root reading `MONGODB_URI`, `MONGODB_DB_NAME`, and `CAPABILITY_TOKEN_SECRET`, instantiating `MongoCurriculumPackRepository` and `HmacCapabilityTokenAdapter`, and delegating to `createApp(deps).fetch(request)`.
+   - Wire the dedicated Netlify Function (`netlify/functions/get-pack-by-id.ts`) typed with `@netlify/functions` `Config` (`{ path: "/api/v1/packs/:packId", method: "GET" }`) and `Context` (`context.params.packId`), delegating `(request, context)` to `createGetPackByIdHandler(deps)`.
 
 ## User Stories
 
@@ -45,60 +47,36 @@ Implement the end-to-end **`GET /api/v1/packs/{packId}`** vertical slice across 
 8. As a learner in the 15-minute Trial Orientation phase, I want `pack.adjudicationRubric` on `diabe-teach` to include the 7×7 `calibrationBoardCardIds` matrix from Figure 2 of the publication alongside the three `calibrationExamples` (Valid Chain A with 9 cards, Valid Chain B with 7 cards, and Invalid Chain C with 4 cards and `isValid: false` due to non-adjacent `Islet Cells` and `Pancreas`).
 9. As a game creator who has stored a custom `CurriculumPack` document (e.g., `_id: "cardio-teach"`) in the MongoDB `curriculum_packs` collection, I want `GET /api/v1/packs/cardio-teach` to load the document from MongoDB, rehydrate the `CurriculumPack` Aggregate Root, and apply the exact same role-aware answer-key projection as the built-in `diabe-teach` pack.
 10. As a player requesting `GET /api/v1/packs/diabe-teach` on Netlify Functions v2, I want `MongoCurriculumPackRepository` to serve the built-in `diabe-teach` pack directly from in-memory constants in $O(1)$ without making a MongoDB network query.
-11. As a platform engineer running on Netlify Functions v2, I want the MongoDB Driven Adapter to reuse a module-scoped cached `MongoClient` connection across warm serverless invocations with a bounded connection pool, so that serverless executions do not exhaust MongoDB Atlas connection limits.
-12. As a domain engineer, I want the `CurriculumPack` Aggregate Root to remain completely immutable when `CurriculumPackProjector` produces a redacted `PublicCurriculumPack` DTO, so that redacting fields for a learner never mutates the cached in-memory `DIABE_TEACH_PACK` instance for subsequent instructor requests.
-13. As a developer running `lint:boundaries`, I want `dependency-cruiser` to verify that Domain and Application modules never import the `mongodb` driver package directly.
+11. As a platform engineer deploying to Netlify Functions v2, I want `netlify/functions/get-pack-by-id.ts` to export `config: Config = { path: "/api/v1/packs/:packId", method: "GET" }` so Netlify's platform edge router matches the route and HTTP method natively and passes `context.params.packId` into the handler without preventing sibling routes like `POST /api/v1/packs/validate`.
+12. As a platform engineer deploying to either Netlify Functions v2 (`context.params.packId`) or AWS Lambda (`event.pathParameters.packId`), I want `createGetPackByIdHandler(deps)` in the HTTP Driving Adapter to read `context.params.packId` directly without coupling `src/adapters/driving/` to `@netlify/functions`.
+13. As a domain engineer, I want the `CurriculumPack` Aggregate Root to remain completely immutable when `CurriculumPackProjector` produces a redacted `PublicCurriculumPack` DTO, so that redacting fields for a learner never mutates the cached in-memory `DIABE_TEACH_PACK` instance for subsequent instructor requests.
+14. As a developer running `lint:boundaries`, I want `dependency-cruiser` to verify that Domain and Application modules never import `mongodb` or `@netlify/functions`, and that `@netlify/functions` is imported only in `netlify/functions/`.
 
 ## Implementation Decisions
 
-- **Hexagonal Ring Responsibilities for `GET /api/v1/packs/{packId}`**:
-  - **Domain Ring (`src/domain/`)**:
-    - `PackId`: Value Object validating non-empty trimmed slug identifier.
-    - `CurriculumPack`: Immutable Aggregate Root holding `id: PackId`, `title`, `version`, `description`, `boardConfig: BoardConfig`, `domains: readonly SemanticDomain[]`, `cards: readonly KeywordCard[]`, `adjudicationRubric: AdjudicationRubric`, `assessmentInstrument: AssessmentInstrument | null`, and `perceptionSurvey: PerceptionSurvey | null`, plus $O(1)$ card lookup helpers (`getCardById`, `resolveCardByLabelOrAlias`).
-    - `DIABE_TEACH_PACK`: Built-in `CurriculumPack` instance containing the 49 Appendix 1 keywords, 7 clinical domains, Figure 2 calibration board and chains A/B/C, 10 Bloom Level 2/3 MCQs, and 9 Appendix 2 Likert survey items.
-    - `DomainError` hierarchy: base `DomainError` class with `PackNotFoundError` and `UnauthorizedTokenError`.
-  - **Application Ring (`src/application/`)**:
-    - `CurriculumPackRepositoryPort`: `{ findById(packId: PackId): Promise<CurriculumPack | null> }`.
-    - `CapabilityTokenPort`: `{ verifyToken(token: string): Promise<VerifiedCapability | null> }` where `VerifiedCapability` has `{ role: "instructor" | "participant", sessionId: string, participantId?: string }`.
-    - `GetCurriculumPackByIdUseCase`:
-      1. If a raw `authorizationHeader` is present, parses the `Bearer <token>` format (throwing `UnauthorizedTokenError` if malformed) and verifies the token via `CapabilityTokenPort.verifyToken(token)` (throwing `UnauthorizedTokenError` if `null`).
-      2. Resolves caller role as `"anonymous"` (no header), `"participant"`, or `"instructor"`.
-      3. Queries `CurriculumPackRepositoryPort.findById(PackId.create(rawPackId))`; throws `PackNotFoundError(rawPackId)` if `null`.
-      4. Projects the `CurriculumPack` Aggregate Root via `CurriculumPackProjector.toPublicDto(pack, { includeAnswerKeys: role === "instructor" })` and returns `{ pack }`.
-  - **Driving Adapter Ring (`src/adapters/driving/http/`)**:
-    - `createApp({ packRepo, tokenVerifier })` matches `GET /api/v1/packs/:packId` (URL-decoding `packId`), delegates to `GetCurriculumPackByIdUseCase`, returns `200 OK` with `Content-Type: application/json`, and maps `UnauthorizedTokenError` $\to$ `401 UNAUTHORIZED_TOKEN` and `PackNotFoundError` $\to$ `404 PACK_NOT_FOUND` (conforming to `#/components/schemas/ApiErrorResponse` in `docs/api/openapi.yaml`).
-  - **Driven Adapters Ring (`src/adapters/driven/`)**:
-    - `InMemoryCurriculumPackRepository`: Map-backed repository pre-populated with `DIABE_TEACH_PACK`.
-    - `MongoCurriculumPackRepository`:
-      - Accepts a minimal MongoDB collection interface (`CurriculumPackCollectionLike` with `findOne(filter: { _id: string }): Promise<CurriculumPackDocument | null>`) or lazy `Db` provider so it works with the official `mongodb` Node driver in production and a lightweight collection stub in unit tests.
-      - Checks the built-in pack map (`DIABE_TEACH_PACK`) first in $O(1)$; only queries MongoDB collection `curriculum_packs` (`findOne({ _id: packId.value })`) when the requested `packId` is not a built-in pack, mapping the stored BSON/JSON document back into a validated `CurriculumPack` Aggregate Root.
-    - `mongoClientSingleton`: Module-scoped cached `MongoClient` helper configured with serverless-friendly timeouts and `maxPoolSize: 5` for Netlify Functions v2 warm container reuse.
-    - `HmacCapabilityTokenAdapter` & `FakeCapabilityTokenAdapter`: Implements `CapabilityTokenPort` using Web Crypto / Node HMAC-SHA256 in production and a deterministic token table in tests.
-  - **Composition Root (`netlify/functions/api.ts`)**:
-    - Reads `MONGODB_URI`, `MONGODB_DB_NAME` (default `"diabe_teach"`), and `CAPABILITY_TOKEN_SECRET`, instantiates `MongoCurriculumPackRepository` and `HmacCapabilityTokenAdapter`, and delegates incoming Web `Request` objects to `createApp(deps).fetch(request)` with `export const config = { path: "/api/v1/*" }`.
+- **Per-Endpoint Netlify Function (`netlify/functions/get-pack-by-id.ts`)**:
+  - Uses `@netlify/functions` `Config` and `Context` types.
+  - Exports `export const config: Config = { path: "/api/v1/packs/:packId", method: "GET" }`.
+  - Exports default handler `(request: Request, context: Context): Promise<Response>` that delegates `(request, context)` to `createGetPackByIdHandler(deps)`.
+- **Portable HTTP Driving Adapter (`src/adapters/driving/http/get-pack-by-id.handler.ts`)**:
+  - Defines a vendor-agnostic `RouteContext` interface `{ readonly params?: Readonly<Record<string, string | undefined>> }` compatible with both Netlify's `Context` (`context.params`) and AWS Lambda API Gateway v2 (`{ params: event.pathParameters }`).
+  - `createGetPackByIdHandler(deps)` extracts `rawPackId` from `context?.params?.packId` first (decoding URI components) and falls back to matching `/api/v1/packs/:packId` from `new URL(request.url).pathname` when `context?.params?.packId` is not provided.
+- **Boundary Enforcement (`.dependency-cruiser.cjs`)**:
+  - Adds a rule `netlify-sdk-isolated-to-composition-root` ensuring `@netlify/functions` is only imported inside `netlify/functions/**` and never inside `src/domain/**`, `src/application/**`, or `src/adapters/**`.
 
 ## Testing Decisions
 
-- **Primary Testing Seam (`createApp({ packRepo, tokenVerifier }).fetch(request)`)**:
-  - Integration and OpenAPI contract tests exercise `GET /api/v1/packs/{packId}` through the Web-Standard `Request` $\to$ `Response` boundary with `InMemoryCurriculumPackRepository` and `FakeCapabilityTokenAdapter`:
-    1. `GET /api/v1/packs/diabe-teach` (no `Authorization` header) $\to$ `200 OK`, returns 49 cards, 7 domains, Figure 2 Chains A/B/C, 10 MCQs with `correctIndex` and `explanation` `undefined`, and 9 Likert survey items.
-    2. `GET /api/v1/packs/diabe-teach` with `Authorization: Bearer <valid-participant-token>` $\to$ `200 OK`, `correctIndex` and `explanation` omitted.
-    3. `GET /api/v1/packs/diabe-teach` with `Authorization: Bearer <valid-instructor-token>` $\to$ `200 OK`, `correctIndex` (`0..3`) and `explanation` present on all 10 MCQs.
-    4. Immutability check: calling `GET /api/v1/packs/diabe-teach` as an instructor *after* an anonymous request still returns `correctIndex` and `explanation`, and calling as an anonymous user *after* an instructor request still omits them.
-    5. `GET /api/v1/packs/diabe-teach` with `Authorization: Basic abc`, `Authorization: Bearer `, or `Authorization: Bearer invalid-token` $\to$ `401 Unauthorized` with `{ code: "UNAUTHORIZED_TOKEN", message: "..." }`.
-    6. `GET /api/v1/packs/non-existent-pack` $\to$ `404 Not Found` with `{ code: "PACK_NOT_FOUND", message: "...", details: { packId: "non-existent-pack" } }`.
-- **Secondary Testing Seams**:
-  - **Domain Aggregate Tests**: Verify `DIABE_TEACH_PACK` contains all 49 exact Appendix 1 `verbatimLabel` strings, resolves aliases (`"Hyperglycemia"` $\to$ `"hyperglycaemia"`, `"lipodistrophy"` $\to$ `"lipo-hypertrophy"`), and represents Figure 2 Chains A, B, and C accurately.
-  - **MongoDB Driven Adapter Contract Tests**: Verify `MongoCurriculumPackRepository` returns `DIABE_TEACH_PACK` with zero MongoDB `findOne` calls, queries `curriculum_packs.findOne({ _id: "cardio-teach" })` and rehydrates the `CurriculumPack` Aggregate Root when `packId !== "diabe-teach"`, and returns `null` when the MongoDB collection returns `null`.
-  - **Boundary Lint**: Verify `dependency-cruiser` passes with zero violations across `src/domain/`, `src/application/`, `src/adapters/`, and `netlify/functions/` (ensuring `mongodb` is only imported inside `src/adapters/driven/` and `netlify/functions/`).
+- **Primary Testing Seam (`createGetPackByIdHandler(deps)` & `createApp(deps)`)**:
+  - Verify `createGetPackByIdHandler(deps)(request, { params: { packId: "diabe-teach" } })` resolves `packId` directly from `context.params.packId` (simulating Netlify Functions v2 `Context` and AWS Lambda `pathParameters`), even if `request.url` is an internal Lambda/function invocation URL.
+  - Verify `netlify/functions/get-pack-by-id.ts` exports `config = { path: "/api/v1/packs/:packId", method: "GET" }` and serves `200 OK` when invoked with a Netlify `Context` containing `params: { packId: "diabe-teach" }`.
+  - Retain all 12 existing contract and unit tests for `200` redacted/unredacted responses, `401 UNAUTHORIZED_TOKEN`, `404 PACK_NOT_FOUND`, and MongoDB hybrid lookup.
 
 ## Out of Scope
 
-- All other 13 endpoints in `docs/api/openapi.yaml` (`GET /api/v1/packs` list, `POST /api/v1/packs`, `POST /api/v1/packs/validate`, `/api/v1/sessions/*`, `/chains/*`, `/assessments/*`, `/survey`, `/analytics`) — these will be specified and implemented in subsequent vertical slices.
-- Frontend React/Next.js UI components.
+- Other endpoint function files under `netlify/functions/` (`list-packs.ts`, `validate-pack.ts`, `register-pack.ts`, `create-session.ts`, etc.), which will each get their own `netlify/functions/<endpoint>.ts` file when their vertical slices are implemented.
 
 ## Further Notes
 
-- Architecture Standard: [`docs/agents/api-architecture.md`](../../docs/agents/api-architecture.md) and [`.scratch/hexagonal-ddd-netlify-api/spec.md`](../hexagonal-ddd-netlify-api/spec.md)
-- OpenAPI 3.1 Contract: [`docs/api/openapi.yaml`](../../docs/api/openapi.yaml) (`operationId: getCurriculumPackById`) and [`.scratch/openapi-contract/spec.md`](../openapi-contract/spec.md)
-- Domain Glossary: [`GLOSSARY.md`](../../GLOSSARY.md)
+- Routing Research Note: [`wiki/10-netlify-and-lambda-routing-research.md`](../../wiki/10-netlify-and-lambda-routing-research.md)
+- Architecture Standard: [`docs/agents/api-architecture.md`](../../docs/agents/api-architecture.md) and [`docs/adr/0002-hexagonal-ddd-architecture-and-netlify-serverless-deployment.md`](../../docs/adr/0002-hexagonal-ddd-architecture-and-netlify-serverless-deployment.md)
+- OpenAPI 3.1 Contract: [`docs/api/openapi.yaml`](../../docs/api/openapi.yaml) (`operationId: getCurriculumPackById`)

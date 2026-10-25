@@ -14,4 +14,4 @@ Single-context layout (`GLOSSARY.md` and `docs/adr/` at the repo root). See `doc
 
 ### API architecture & Netlify deployment
 
-Hexagonal DDD architecture (`src/domain/`, `src/application/`, `src/adapters/`) deployed via Netlify Functions v2 (`netlify/functions/api.ts`) and MongoDB (`MongoCurriculumPackRepository`, `MongoSessionRepository`). Read `docs/agents/api-architecture.md` before designing, implementing, or reviewing API routes, domain logic, ports/adapters, or serverless deployment.
+Hexagonal DDD architecture (`src/domain/`, `src/application/`, `src/adapters/`) deployed via per-endpoint Netlify Functions v2 (`netlify/functions/<endpoint>.ts` with `export const config: Config = { path, method }` and `context.params`) and MongoDB (`MongoCurriculumPackRepository`, `MongoSessionRepository`). Read `docs/agents/api-architecture.md` before designing, implementing, or reviewing API routes, domain logic, ports/adapters, or serverless deployment.

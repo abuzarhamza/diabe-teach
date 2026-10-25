@@ -1,12 +1,13 @@
+import type { Config, Context } from "@netlify/functions";
 import { HmacCapabilityTokenAdapter } from "../../src/adapters/driven/hmac-capability-token-adapter.js";
 import { getMongoDatabase } from "../../src/adapters/driven/mongo-client-singleton.js";
 import {
   CurriculumPackDocument,
   MongoCurriculumPackRepository,
 } from "../../src/adapters/driven/mongo-curriculum-pack-repository.js";
-import { createApp } from "../../src/adapters/driving/http/create-app.js";
+import { createGetPackByIdHandler } from "../../src/adapters/driving/http/get-pack-by-id.handler.js";
 
-function buildProductionApp() {
+function buildProductionGetPackByIdHandler() {
   const mongoDbName = process.env.MONGODB_DB_NAME ?? "diabe_teach";
   const tokenSecret = process.env.CAPABILITY_TOKEN_SECRET;
 
@@ -28,21 +29,24 @@ function buildProductionApp() {
       ? new HmacCapabilityTokenAdapter(tokenSecret)
       : undefined;
 
-  return createApp({
+  return createGetPackByIdHandler({
     packRepo,
     tokenVerifier,
   });
 }
 
-const app = buildProductionApp();
+const getPackByIdHandler = buildProductionGetPackByIdHandler();
 
 export default async function handler(
   request: Request,
-  _context: unknown,
+  context: Context,
 ): Promise<Response> {
-  return app.fetch(request);
+  return getPackByIdHandler(request, {
+    params: context?.params,
+  });
 }
 
-export const config = {
-  path: "/api/v1/*",
+export const config: Config = {
+  path: "/api/v1/packs/:packId",
+  method: "GET",
 };

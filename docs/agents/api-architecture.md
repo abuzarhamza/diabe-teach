@@ -12,11 +12,11 @@ src/
 ├── application/                ← Middle Ring: Use-case orchestrators, Driving Ports & Driven Ports
 └── adapters/
     ├── driving/
-    │   └── http/               ← Primary Driving Adapter: Web-Standard Fetch (Request -> Response)
+    │   └── http/               ← Primary Driving Adapters: Per-endpoint Web-Standard handlers (Request + context.params -> Response)
     └── driven/                 ← Secondary Driven Adapters: In-Memory, MongoDB, LLM, Fake Judge
 netlify/
 └── functions/
-    └── api.ts                  ← Composition Root: Netlify Functions v2 catch-all (/api/v1/*)
+    └── <endpoint>.ts           ← Per-Endpoint Composition Roots: Netlify Functions v2 (export const config: Config = { path, method })
 ```
 
 ### Inward-Only Dependency Rule (Enforced by `dependency-cruiser`)
@@ -56,17 +56,19 @@ Use the ubiquitous language from `GLOSSARY.md` across all class, type, method, a
 
 ## 4. HTTP Driving Adapter & Error Translation
 
-- **Factory Seam (`createApp(deps)`)**:
-  - Expose `createApp(deps)` in `src/adapters/driving/http/` returning a standard Web Fetch handler (`{ fetch(request: Request): Promise<Response> }`).
+- **Per-Endpoint Handler Seam (`create<Endpoint>Handler(deps)`)**:
+  - Expose per-endpoint Driving Adapter factories in `src/adapters/driving/http/` (such as `createGetPackByIdHandler(deps)`) accepting `(request: Request, context?: { params?: Record<string, string | undefined> }) => Promise<Response>`.
+  - Read path parameters from `context?.params` (populated natively by Netlify Functions v2 `URLPattern` routing or mapped from AWS Lambda `event.pathParameters`), falling back to URL path extraction when `context` is omitted in unit tests.
 - **Single Error Translation Boundary**:
   - Domain and Application layers return typed domain results or throw typed `DomainError` subclasses—never HTTP status codes.
   - The HTTP Driving Adapter maps every error to `#/components/schemas/ApiErrorResponse` (`{ code, message, details? }`) using the 15 canonical `ApiErrorCode` values in `docs/api/openapi.yaml` (`INVALID_REQUEST_BODY`, `UNAUTHORIZED_TOKEN`, `FORBIDDEN_ROLE`, `PACK_NOT_FOUND`, `SESSION_NOT_FOUND`, `ROOM_CODE_NOT_FOUND`, `CHAIN_NOT_FOUND`, `PACK_ALREADY_EXISTS`, `INVALID_PHASE_TRANSITION`, `PHASE_CLOSED_FOR_SUBMISSIONS`, `ADJUDICATION_LOCKED_BY_INSTRUCTOR`, `ASSESSMENT_ALREADY_SUBMITTED`, `PACK_VALIDATION_FAILED`, `CHAIN_TOPOLOGY_INVALID`, `ASSESSMENT_INCOMPLETE`).
 
 ## 5. Netlify Serverless Deployment Conventions
 
-- **Single Catch-All Netlify Function v2**:
-  - `netlify/functions/api.ts` exports the default Web-Standard handler `(req: Request, context: Context) => Promise<Response>` and `export const config: Config = { path: "/api/v1/*" }`.
-  - Keep `netlify/functions/api.ts` as a pure Composition Root (reading env vars, instantiating Driven Adapters, and delegating to `createApp(deps).fetch(req)`).
+- **Per-Endpoint Native Netlify Functions v2 Routing (`Config` + `Context.params`)**:
+  - Each endpoint lives in its own function file under `netlify/functions/<endpoint>.ts` (e.g., `netlify/functions/get-pack-by-id.ts`), exporting the default Web-Standard handler `(req: Request, context: Context) => Promise<Response>` and `export const config: Config = { path: "/api/v1/...", method: "GET" | "POST" }` from `@netlify/functions`.
+  - Always declare both `path` (using `URLPattern` `:param` syntax) and `method` in `export const config` so Netlify's platform edge router enforces method matching and populates `context.params` before invoking the underlying AWS Lambda container.
+  - Keep `netlify/functions/<endpoint>.ts` as a pure Composition Root (reading env vars, instantiating Driven Adapters, and delegating `(req, context)` to the HTTP Driving Adapter handler).
 - **Stateless Persistence via MongoDB + Optimistic Concurrency Control**:
   - Production Driven Adapters for `SessionRepositoryPort` (`MongoSessionRepository`, collection `game_sessions`) and `CurriculumPackRepositoryPort` (`MongoCurriculumPackRepository`, collection `curriculum_packs`) use the official `mongodb` driver with a module-scoped cached `MongoClient` (`maxPoolSize: 5` for serverless warm-container reuse) and optimistic concurrency control (`version` field with atomic `findOneAndUpdate({ _id, version }, { $set: ..., $inc: { version: 1 } })`) so concurrent serverless invocations never silently overwrite each other's state.
 - **Server-Sent Events (`GET /api/v1/sessions/:sessionId/stream`)**:

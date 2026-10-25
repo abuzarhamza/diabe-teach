@@ -51,6 +51,18 @@ module.exports = {
       },
     },
     {
+      name: "netlify-sdk-isolated-to-composition-root",
+      comment:
+        "@netlify/functions may only be imported inside netlify/functions/** and never inside src/**.",
+      severity: "error",
+      from: {
+        path: "^src/",
+      },
+      to: {
+        path: "node_modules/@netlify/functions",
+      },
+    },
+    {
       name: "no-circular",
       comment: "Circular dependencies are forbidden across all rings.",
       severity: "error",
