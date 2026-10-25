@@ -3,87 +3,87 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Reference 0001 — Netlify-to-Domain Request Pipeline Cheat Sheet</title>
+  <title>Reference 0001 — Class-Based Netlify-to-Domain Request Pipeline Cheat Sheet</title>
   <link rel="stylesheet" href="../assets/tufte-course.css" />
 </head>
 <body>
   <main class="tufte-page">
     <header class="lesson-header">
-      <div class="eyebrow">Reference Sheet 0001 · Diabe-Teach Architecture</div>
-      <h1>Netlify-to-Domain Request Pipeline Cheat Sheet</h1>
-      <p class="subtitle">One-page quick reference for tracing requests and adding new endpoints.</p>
+      <div class="eyebrow">Reference Sheet 0001 · Diabe-Teach 100% Class-Based Architecture</div>
+      <h1>Class-Based Netlify-to-Domain Request Pipeline Cheat Sheet</h1>
+      <p class="subtitle">One-page quick reference for tracing requests across our 7 classes and adding new endpoints.</p>
       <nav class="nav-bar">
-        <a href="../lessons/0001-netlify-to-domain-request-flow.html">← Back to Lesson 0001 (Interactive Trace &amp; Quiz)</a>
+        <a href="../lessons/0001-netlify-to-domain-request-flow.html">← Back to Lesson 0001 (Interactive Class Trace &amp; Quiz)</a>
         <a href="../MISSION.md">Mission</a>
         <a href="../RESOURCES.md">Primary Resources</a>
         <a href="../GLOSSARY.md">Domain Glossary</a>
       </nav>
     </header>
 
-    <h2>1. The 6-Stage Request Pipeline at a Glance</h2>
+    <h2>1. The 6-Stage Class-to-Class Request Pipeline at a Glance</h2>
     <table class="ref-table">
       <thead>
         <tr>
           <th>Stage</th>
           <th>Hexagonal Ring</th>
-          <th>Implementation File</th>
+          <th>Class &amp; Implementation File</th>
           <th>Contract / Interface File</th>
-          <th>What Happens Here</th>
+          <th>Class Method Invoked &amp; Responsibility</th>
         </tr>
       </thead>
       <tbody>
         <tr>
-          <td><strong>1. Netlify Entrypoint &amp; Config</strong></td>
-          <td>Composition Root (<code>src/config/</code>)</td>
-          <td><code>netlify/functions/api.ts</code><br/><code>src/config/runtime.config.ts</code></td>
-          <td><code>src/config/runtime.types.ts</code></td>
-          <td>Netlify matches <code>/api/v1/*</code>, loads cached env &amp; Outbound Adapters (<code>getProductionDependencies</code> in <code>src/config/</code>), and calls <code>app.fetch(request, context)</code>.</td>
+          <td><strong>1. Netlify Entrypoint &amp; <code>AppRuntime</code></strong></td>
+          <td>Composition Root (Top-Level <code>src/</code>)</td>
+          <td><code>AppRuntime</code><br/>(<code>src/app-runtime.ts</code> + <code>netlify/functions/api.ts</code>)</td>
+          <td><code>src/app-runtime.types.ts</code></td>
+          <td><code>AppRuntime.createServerlessHttpHandler()</code> loads cached env &amp; Outbound Adapter instances via <code>AppRuntime.getProductionDependencies()</code> and calls <code>new OpenApiHttpApp(deps).fetch(request, context)</code>.</td>
         </tr>
         <tr>
           <td><strong>2. Central OpenAPI Router &amp; <code>x-api-key</code> Gate</strong></td>
           <td>Inbound HTTP Adapter</td>
-          <td><code>src/adapters/inbound/http/create-app.ts</code></td>
+          <td><code>OpenApiHttpApp</code><br/>(<code>src/adapters/inbound/http/create-app.ts</code>)</td>
           <td><code>docs/api/openapi.yaml</code><br/><code>src/adapters/inbound/http/http-handler.types.ts</code></td>
-          <td><code>openapi-backend</code> matches the URL &amp; HTTP method against <code>docs/api/openapi.yaml</code>, validates <code>x-api-key</code> via <code>securityHandlers.ApiKeyAuth</code>, extracts <code>c.request.params.packId</code>, and invokes <code>operationId: getCurriculumPackById</code>.</td>
+          <td><code>OpenApiHttpApp.fetch(request, context)</code> matches the URL in <code>docs/api/openapi.yaml</code>, validates <code>x-api-key</code> via <code>BaseHttpHandler.verifyApiKeyHeader</code>, extracts <code>c.request.params.packId</code>, and invokes <code>getPackByIdHandler.handle(request, context)</code>.</td>
         </tr>
         <tr>
-          <td><strong>3. Request Transformer &amp; Handler Factory</strong></td>
+          <td><strong>3. Endpoint Handler &amp; Template Method</strong></td>
           <td>Inbound HTTP Adapter</td>
-          <td><code>src/adapters/inbound/http/get-pack-by-id.handler.ts</code><br/><code>src/adapters/inbound/http/endpoint-handler.factory.ts</code></td>
+          <td><code>GetPackByIdHttpHandler extends BaseHttpHandler</code><br/>(<code>get-pack-by-id.handler.ts</code> + <code>endpoint-handler.factory.ts</code>)</td>
           <td><code>src/adapters/inbound/http/http-handler.types.ts</code></td>
-          <td><code>transformGetPackByIdRequest</code> reads <code>context.params.packId</code> and <code>parseBearerTokenHeader(authorization)</code> to build <code>GetCurriculumPackByIdQuery</code>.</td>
+          <td><code>BaseHttpHandler.handle()</code> calls <code>this.transformRequest({ request, context })</code> (which reads <code>context.params.packId</code> and <code>BaseHttpHandler.parseBearerTokenHeader</code>) and then calls <code>this.execute(query)</code>.</td>
         </tr>
         <tr>
           <td><strong>4. Application Use Case</strong></td>
           <td>Application Ring</td>
-          <td><code>src/application/use-cases/get-curriculum-pack-by-id.use-case.ts</code></td>
+          <td><code>GetCurriculumPackByIdUseCase</code><br/>(<code>src/application/use-cases/get-curriculum-pack-by-id.use-case.ts</code>)</td>
           <td><code>src/application/ports/get-curriculum-pack-by-id.port.ts</code><br/><code>src/application/ports/capability-token.port.ts</code><br/><code>src/application/ports/curriculum-pack-repository.port.ts</code></td>
-          <td>Verifies optional Bearer token via <code>CapabilityTokenPort</code>, creates <code>PackId</code> Value Object, and loads <code>CurriculumPack</code> via <code>CurriculumPackRepositoryPort</code>.</td>
+          <td><code>GetCurriculumPackByIdUseCase.execute(query)</code> verifies optional Bearer token via <code>CapabilityTokenPort.verifyToken</code>, validates <code>PackId.create(query.packId)</code>, and calls <code>packRepo.findById(packId)</code>.</td>
         </tr>
         <tr>
-          <td><strong>5. Outbound Persistence &amp; Domain Aggregate</strong></td>
+          <td><strong>5. Outbound Repository &amp; Domain Aggregate</strong></td>
           <td>Outbound Adapter &amp; Domain Ring</td>
-          <td><code>src/adapters/outbound/mongo-curriculum-pack-repository.ts</code><br/><code>src/domain/curriculum-pack/curriculum-pack.ts</code></td>
+          <td><code>MongoCurriculumPackRepository</code> &amp; <code>MongoConnectionManager</code><br/><code>CurriculumPack</code> &amp; <code>PackId</code></td>
           <td><code>src/adapters/outbound/mongo-curriculum-pack-repository.types.ts</code><br/><code>src/domain/curriculum-pack/curriculum-pack.types.ts</code></td>
-          <td>Returns built-in <code>DIABE_TEACH_PACK</code> in <em>O(1)</em> from memory or queries MongoDB <code>curriculum_packs</code> and rehydrates an immutable <code>CurriculumPack</code> Aggregate Root.</td>
+          <td><code>MongoCurriculumPackRepository.findById(packId)</code> returns built-in <code>DIABE_TEACH_PACK</code> in <em>O(1)</em> from memory or queries MongoDB via <code>MongoConnectionManager.getDatabase()</code> and rehydrates <code>CurriculumPack.create(doc)</code>.</td>
         </tr>
         <tr>
-          <td><strong>6. Role-Aware DTO Projection &amp; HTTP Response</strong></td>
-          <td>Application Ring &amp; Inbound HTTP Factory</td>
-          <td><code>src/application/dtos/curriculum-pack-projector.ts</code><br/><code>src/adapters/inbound/http/endpoint-handler.factory.ts</code></td>
+          <td><strong>6. Role-Aware DTO Projector &amp; HTTP Response</strong></td>
+          <td>Application Ring &amp; Inbound Base Class</td>
+          <td><code>CurriculumPackProjector</code> &amp; <code>BaseHttpHandler</code></td>
           <td><code>src/application/dtos/curriculum-pack.dto.ts</code></td>
-          <td><code>CurriculumPackProjector.toPublicDto</code> omits <code>correctIndex</code> &amp; <code>explanation</code> unless role is <code>"instructor"</code>; <code>createEndpointHandler</code> returns <code>200 OK</code> JSON (or maps <code>DomainError</code> to <code>401</code>/<code>404</code>).</td>
+          <td><code>CurriculumPackProjector.toPublicDto</code> omits <code>correctIndex</code> &amp; <code>explanation</code> unless role is <code>"instructor"</code>; <code>BaseHttpHandler.jsonResponse</code> returns <code>200 OK</code> JSON (or <code>BaseHttpHandler.mapDomainErrorToResponse</code> maps <code>DomainError</code> to <code>401</code>/<code>404</code>).</td>
         </tr>
       </tbody>
     </table>
 
-    <h2>2. Checklist: How to Add Any New Endpoint</h2>
+    <h2>2. Checklist: How to Add Any New Endpoint (100% Class-Based)</h2>
     <ol>
       <li><strong>Confirm the <code>operationId</code> in <code>docs/api/openapi.yaml</code></strong> (e.g., <code>listCurriculumPacks</code> or <code>createGameSession</code>). Do <em>not</em> create a new file in <code>netlify/functions/</code>.</li>
       <li><strong>Define the Inbound Port contract</strong> in <code>src/application/ports/&lt;use-case&gt;.port.ts</code> (<code>*Query</code>, <code>*Result</code>, <code>*UseCasePort</code>).</li>
       <li><strong>Implement the Use Case class</strong> in <code>src/application/use-cases/&lt;use-case&gt;.use-case.ts</code>.</li>
-      <li><strong>Write the Request Transformer &amp; Handler Factory</strong> in <code>src/adapters/inbound/http/&lt;endpoint&gt;.handler.ts</code> using <code>createEndpointHandler({ transformRequest, execute })</code>.</li>
-      <li><strong>Register the <code>operationId</code> in <code>src/adapters/inbound/http/create-app.ts</code></strong> inside the <code>OpenAPIBackend</code> <code>handlers</code> map.</li>
+      <li><strong>Create the Handler class extending <code>BaseHttpHandler&lt;TQuery, TResult&gt;</code></strong> in <code>src/adapters/inbound/http/&lt;endpoint&gt;.handler.ts</code>, implementing <code>transformRequest(input)</code> and <code>protected execute(query)</code>.</li>
+      <li><strong>Register the handler class on <code>OpenApiHttpApp</code></strong> in <code>src/adapters/inbound/http/create-app.ts</code> inside the <code>OpenAPIBackend</code> <code>handlers</code> map.</li>
     </ol>
   </main>
 </body>

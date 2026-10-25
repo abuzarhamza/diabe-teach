@@ -1,0 +1,7 @@
+# 100% Class-Based Hexagonal Pipeline & Top-Level `AppRuntime` Composition Root
+
+The learner identified two sources of cognitive friction in the earlier implementation: (1) MongoDB collection setup and runtime configuration were split or hidden inside `netlify/config/` and `src/config/`, and (2) the Inbound HTTP and configuration layers were written as 15+ loose procedural functions (`createApp`, `createEndpointHandler`, `transformGetPackByIdRequest`, `loadRuntimeEnvConfig`, etc.) while the Domain, Application, and Outbound layers were written as classes.
+
+We established two architectural principles that govern all future endpoints:
+1. **Top-Level `AppRuntime` Composition Root (`src/app-runtime.ts`) & Outbound MongoDB Encapsulation**: Because runtime configuration wires both Inbound (`OpenApiHttpApp`) and Outbound (`MongoCurriculumPackRepository`, `HmacCapabilityTokenAdapter`) classes together, it is the **Composition Root** (not an Inbound Adapter) and lives visibly at `src/app-runtime.ts`, while `MongoCurriculumPackRepository.fromConfig` and `MongoConnectionManager` keep 100% of MongoDB details inside `src/adapters/outbound/`.
+2. **100% Class-Based Object-Oriented Pipeline**: Every step of a request flows through a named class (`AppRuntime` $\to$ `OpenApiHttpApp` $\to$ `GetPackByIdHttpHandler extends BaseHttpHandler` $\to$ `GetCurriculumPackByIdUseCase` $\to$ `MongoCurriculumPackRepository` / `CurriculumPack` $\to$ `CurriculumPackProjector`), eliminating scattered procedural functions.

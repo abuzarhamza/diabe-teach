@@ -1,6 +1,6 @@
 /**
- * Shared Interactive Components for the Diabe-Teach Hexagonal Architecture Course:
- * 1. Step-by-Step Request Pipeline Simulator (`initPipelineSimulator`)
+ * Shared Interactive Components for the Diabe-Teach 100% Class-Based Hexagonal Course:
+ * 1. Step-by-Step Class Request Pipeline Simulator (`initPipelineSimulator`)
  * 2. Retrieval-Practice Quiz Widget (`initRetrievalQuiz`)
  */
 
@@ -22,21 +22,21 @@ function initPipelineSimulator(containerId) {
     const steps = [];
     let finalResponse = {};
 
-    // Step 1: Netlify Entrypoint
+    // Step 1: Netlify Entrypoint & AppRuntime Class
     steps.push({
       status: "pass",
-      label: "Step 1 — Netlify Entrypoint (netlify/functions/api.ts)",
+      label: "Step 1 — Netlify Entrypoint & AppRuntime Class (netlify/functions/api.ts → src/app-runtime.ts)",
       detail:
-        "Matches path '/api/v1/*' and forwards (request, context) into createNetlifyFunctionHandler() -> app.fetch(request, context).",
+        "Matches '/api/v1/*' -> AppRuntime.createServerlessHttpHandler() loads AppRuntime.getProductionDependencies() and invokes openApiHttpApp.fetch(request, context).",
     });
 
-    // Step 2: OpenAPI-Backend Route Match
+    // Step 2: OpenApiHttpApp Class Route Match
     if (routeState === "unknown-route") {
       steps.push({
         status: "stop",
-        label: "Step 2 — OpenAPI-Backend Router (src/adapters/inbound/http/create-app.ts)",
+        label: "Step 2 — OpenApiHttpApp Class (src/adapters/inbound/http/create-app.ts)",
         detail:
-          "Checks docs/api/openapi.yaml -> path '/api/v1/unknown' not in spec -> invokes handlers.notFound (404).",
+          "OpenApiHttpApp.fetch() checks docs/api/openapi.yaml -> path '/api/v1/unknown' not in spec -> invokes handlers.notFound -> BaseHttpHandler.jsonResponse(..., 404).",
       });
       finalResponse = {
         status: 404,
@@ -48,9 +48,9 @@ function initPipelineSimulator(containerId) {
     } else if (routeState === "unimplemented-op") {
       steps.push({
         status: "stop",
-        label: "Step 2 — OpenAPI-Backend Router (src/adapters/inbound/http/create-app.ts)",
+        label: "Step 2 — OpenApiHttpApp Class (src/adapters/inbound/http/create-app.ts)",
         detail:
-          "Matches GET /api/v1/packs -> operationId 'listCurriculumPacks' has no handler registered yet -> invokes handlers.notImplemented (501).",
+          "OpenApiHttpApp.fetch() matches GET /api/v1/packs -> operationId 'listCurriculumPacks' has no handler class registered yet -> invokes handlers.notImplemented (501).",
       });
       finalResponse = {
         status: 501,
@@ -62,24 +62,24 @@ function initPipelineSimulator(containerId) {
     } else {
       steps.push({
         status: "pass",
-        label: "Step 2 — OpenAPI-Backend Router (src/adapters/inbound/http/create-app.ts)",
-        detail: `Matches GET /api/v1/packs/${routeState} in docs/api/openapi.yaml -> operationId: 'getCurriculumPackById', extracts c.request.params.packId = '${routeState}'.`,
+        label: "Step 2 — OpenApiHttpApp Class (src/adapters/inbound/http/create-app.ts)",
+        detail: `OpenApiHttpApp.fetch() matches GET /api/v1/packs/${routeState} in docs/api/openapi.yaml -> operationId: 'getCurriculumPackById', extracts c.request.params.packId = '${routeState}'.`,
       });
     }
 
-    // Step 3: x-api-key Security Gate
+    // Step 3: BaseHttpHandler.verifyApiKeyHeader Security Gate
     if (finalResponse.status) {
       steps.push({
         status: "skip",
-        label: "Step 3 — ApiKeyAuth Security Gate (securityHandlers.ApiKeyAuth)",
+        label: "Step 3 — ApiKeyAuth Security Gate (BaseHttpHandler.verifyApiKeyHeader)",
         detail: "Skipped because routing stopped at Step 2.",
       });
     } else if (apiKeyState === "invalid") {
       steps.push({
         status: "stop",
-        label: "Step 3 — ApiKeyAuth Security Gate (securityHandlers.ApiKeyAuth)",
+        label: "Step 3 — ApiKeyAuth Security Gate (BaseHttpHandler.verifyApiKeyHeader)",
         detail:
-          "verifyApiKeyHeader('x-api-key') fails timingSafeEqual check -> invokes handlers.unauthorizedHandler (401).",
+          "BaseHttpHandler.verifyApiKeyHeader('x-api-key', deps) fails timingSafeEqual check -> OpenApiHttpApp invokes handlers.unauthorizedHandler (401).",
       });
       finalResponse = {
         status: 401,
@@ -91,25 +91,25 @@ function initPipelineSimulator(containerId) {
     } else {
       steps.push({
         status: "pass",
-        label: "Step 3 — ApiKeyAuth Security Gate (securityHandlers.ApiKeyAuth)",
+        label: "Step 3 — ApiKeyAuth Security Gate (BaseHttpHandler.verifyApiKeyHeader)",
         detail:
-          "verifyApiKeyHeader('x-api-key') passes -> proceeds to operationId handler 'getCurriculumPackById'.",
+          "BaseHttpHandler.verifyApiKeyHeader('x-api-key', deps) passes -> OpenApiHttpApp invokes getPackByIdHandler.handle(request, context).",
       });
     }
 
-    // Step 4: Inbound Request Transformer
+    // Step 4: GetPackByIdHttpHandler (extends BaseHttpHandler)
     if (finalResponse.status) {
       steps.push({
         status: "skip",
-        label: "Step 4 — Request Transformer (transformGetPackByIdRequest)",
+        label: "Step 4 — GetPackByIdHttpHandler.transformRequest (extends BaseHttpHandler)",
         detail: "Skipped because request stopped earlier.",
       });
     } else if (bearerState === "malformed") {
       steps.push({
         status: "stop",
-        label: "Step 4 — Request Transformer (transformGetPackByIdRequest)",
+        label: "Step 4 — GetPackByIdHttpHandler.transformRequest (extends BaseHttpHandler)",
         detail:
-          "parseBearerTokenHeader throws UnauthorizedTokenError -> caught by createEndpointHandler -> mapDomainErrorToResponse returns 401.",
+          "BaseHttpHandler.parseBearerTokenHeader throws UnauthorizedTokenError -> caught by BaseHttpHandler.handle() -> BaseHttpHandler.mapDomainErrorToResponse returns 401.",
       });
       finalResponse = {
         status: 401,
@@ -121,24 +121,24 @@ function initPipelineSimulator(containerId) {
     } else {
       steps.push({
         status: "pass",
-        label: "Step 4 — Request Transformer (transformGetPackByIdRequest)",
-        detail: `Produces typed query: { packId: "${routeState}", bearerToken: ${bearerState === "none" ? "null" : `"${bearerState}-token"`} }.`,
+        label: "Step 4 — GetPackByIdHttpHandler.transformRequest (extends BaseHttpHandler)",
+        detail: `BaseHttpHandler.handle() calls this.transformRequest({ request, context }) -> returns { packId: "${routeState}", bearerToken: ${bearerState === "none" ? "null" : `"${bearerState}-token"`} }.`,
       });
     }
 
-    // Step 5: Application Use Case & Outbound Repository
+    // Step 5: GetCurriculumPackByIdUseCase & MongoCurriculumPackRepository
     if (finalResponse.status) {
       steps.push({
         status: "skip",
-        label: "Step 5 — Application Use Case & Outbound Repository (GetCurriculumPackByIdUseCase)",
+        label: "Step 5 — GetCurriculumPackByIdUseCase & MongoCurriculumPackRepository Classes",
         detail: "Skipped because request stopped earlier.",
       });
     } else if (routeState === "missing-pack") {
       steps.push({
         status: "stop",
-        label: "Step 5 — Application Use Case & Outbound Repository (GetCurriculumPackByIdUseCase)",
+        label: "Step 5 — GetCurriculumPackByIdUseCase & MongoCurriculumPackRepository Classes",
         detail:
-          "MongoCurriculumPackRepository checks in-memory DIABE_TEACH_PACK then MongoDB 'curriculum_packs' -> returns null -> throws PackNotFoundError (404).",
+          "MongoCurriculumPackRepository.findById(PackId.create('missing-pack')) checks in-memory DIABE_TEACH_PACK then MongoDB via MongoConnectionManager.getDatabase() -> returns null -> throws PackNotFoundError (404).",
       });
       finalResponse = {
         status: 404,
@@ -151,28 +151,28 @@ function initPipelineSimulator(containerId) {
     } else {
       const storageNote =
         routeState === "diabe-teach"
-          ? "Resolved in O(1) from built-in in-memory DIABE_TEACH_PACK (0 MongoDB queries)"
-          : "Loaded from MongoDB 'curriculum_packs' collection and rehydrated into CurriculumPack Aggregate Root";
+          ? "MongoCurriculumPackRepository.findById() resolves in O(1) from built-in in-memory DIABE_TEACH_PACK (0 MongoDB queries)"
+          : "MongoCurriculumPackRepository.findById() queries MongoDB via MongoConnectionManager.getDatabase() and rehydrates CurriculumPack.create(doc)";
       steps.push({
         status: "pass",
-        label: "Step 5 — Application Use Case & Outbound Repository (GetCurriculumPackByIdUseCase)",
+        label: "Step 5 — GetCurriculumPackByIdUseCase & MongoCurriculumPackRepository Classes",
         detail: `${storageNote}. Caller role resolved as '${bearerState === "none" ? "anonymous" : bearerState}'.`,
       });
     }
 
-    // Step 6: Role-Aware DTO Projector & JSON Response
+    // Step 6: CurriculumPackProjector & BaseHttpHandler.jsonResponse
     if (finalResponse.status) {
       steps.push({
         status: "skip",
-        label: "Step 6 — Role-Aware Projector & JSON Response (CurriculumPackProjector)",
+        label: "Step 6 — CurriculumPackProjector & BaseHttpHandler.jsonResponse",
         detail: "Skipped because an error response was already produced.",
       });
     } else {
       const includeKeys = bearerState === "instructor";
       steps.push({
         status: "pass",
-        label: "Step 6 — Role-Aware Projector & JSON Response (CurriculumPackProjector)",
-        detail: `CurriculumPackProjector.toPublicDto(pack, { includeAnswerKeys: ${includeKeys} }) -> createEndpointHandler wraps in 200 OK JSON Response.`,
+        label: "Step 6 — CurriculumPackProjector & BaseHttpHandler.jsonResponse",
+        detail: `CurriculumPackProjector.toPublicDto(pack, { includeAnswerKeys: ${includeKeys} }) -> BaseHttpHandler.jsonResponse(result, 200) returns 200 OK JSON Response.`,
       });
       finalResponse = {
         status: 200,

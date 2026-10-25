@@ -3,17 +3,18 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Lesson 0001 — How Code Flows Step-by-Step from Netlify to Domain</title>
+  <title>Lesson 0001 — How Code Flows Step-by-Step Across Our 7 Hexagonal Classes</title>
   <link rel="stylesheet" href="../assets/tufte-course.css" />
 </head>
 <body>
   <main class="tufte-page">
     <header class="lesson-header">
-      <div class="eyebrow">Lesson 0001 · Diabe-Teach Hexagonal Serverless Course</div>
-      <h1>How a Request Flows Step-by-Step from Netlify to the Domain Ring</h1>
+      <div class="eyebrow">Lesson 0001 · Diabe-Teach 100% Class-Based Hexagonal Course</div>
+      <h1>How a Request Flows Step-by-Step Across Our 7 Hexagonal Classes</h1>
       <p class="subtitle">
-        Tracing <code>GET /api/v1/packs/diabe-teach</code> through our single Netlify entrypoint,
-        <code>openapi-backend</code> YAML router, Request Transformer, Application Use Case, and MongoDB Outbound Adapter.
+        Tracing <code>GET /api/v1/packs/diabe-teach</code> from <code>netlify/functions/api.ts</code> through
+        <code>AppRuntime</code>, <code>OpenApiHttpApp</code>, <code>GetPackByIdHttpHandler</code> (<code>BaseHttpHandler</code>),
+        <code>GetCurriculumPackByIdUseCase</code>, <code>MongoCurriculumPackRepository</code>, and <code>CurriculumPackProjector</code>.
       </p>
       <nav class="nav-bar">
         <a href="../reference/0001-request-pipeline-cheatsheet.html">📄 Open Printable Cheat Sheet (Reference 0001)</a>
@@ -24,86 +25,91 @@
     </header>
 
     <section>
-      <h2>The Big Picture: One Entrypoint, Four Clean Rings</h2>
+      <h2>The Big Picture: One Entrypoint, 100% Cohesive Classes, Zero Loose Functions</h2>
       <p>
-        In our architecture, there is <strong>only one serverless entrypoint</strong>
-        (<code>netlify/functions/api.ts</code>) and <strong>only one routing table</strong>
-        (<code>docs/api/openapi.yaml</code>, powered by the official
-        <a href="https://github.com/openapistack/openapi-backend#readme" target="_blank" rel="noopener"><code>openapi-backend</code></a>
-        framework). Every file strictly separates <strong>interfaces/contracts</strong>
-        (<code>*.types.ts</code>, <code>*.port.ts</code>, <code>*.dto.ts</code>) from
-        <strong>classes and functions</strong> (<code>*.ts</code>).
+        Every implementation file in <code>src/</code> is now a <strong>cohesive class</strong>, and every
+        TypeScript interface/contract lives in its own dedicated <code>*.types.ts</code>, <code>*.port.ts</code>,
+        or <code>*.dto.ts</code> file. Runtime configuration lives right at the top of <code>src/</code> in
+        <code>src/app-runtime.ts</code> (<code>AppRuntime</code>) so nothing is hidden inside a subfolder, and
+        all MongoDB connection/collection logic is encapsulated inside <code>src/adapters/outbound/</code>.
       </p>
       <pre><code>[Browser / Client HTTP Request: GET /api/v1/packs/diabe-teach]
        │
        ▼
-┌──────────────────────────────────────────────────────────────────────────┐
-│ STEP 1: Netlify Entrypoint &amp; Runtime Config                              │
-│         netlify/functions/api.ts ──► src/config/runtime.config.ts        │
-└────────────────────────────────────┬─────────────────────────────────────┘
-                                     │ calls app.fetch(request, context)
+┌────────────────────────────────────────────────────────────────────────────┐
+│ STEP 1: Single Netlify Entrypoint &amp; Top-Level AppRuntime Class             │
+│         netlify/functions/api.ts ──► AppRuntime (src/app-runtime.ts)       │
+│         • AppRuntime.createServerlessHttpHandler()                         │
+│         • AppRuntime.getProductionDependencies() wires Outbound classes    │
+└────────────────────────────────────┬───────────────────────────────────────┘
+                                     │ calls openApiHttpApp.fetch(req, ctx)
                                      ▼
-┌──────────────────────────────────────────────────────────────────────────┐
-│ STEP 2: Central OpenAPI YAML Router &amp; x-api-key Security Gate (Inbound)  │
-│         src/adapters/inbound/http/create-app.ts (OpenAPIBackend)         │
-│         • Matches path in docs/api/openapi.yaml ──► getCurriculumPackById│
-│         • Runs securityHandlers.ApiKeyAuth (checks x-api-key header)     │
-│         • Extracts { packId: "diabe-teach" } into context.params.packId  │
-└────────────────────────────────────┬─────────────────────────────────────┘
-                                     │ invokes createGetPackByIdHandler
+┌────────────────────────────────────────────────────────────────────────────┐
+│ STEP 2: OpenApiHttpApp Class &amp; x-api-key Security Gate (Inbound)           │
+│         src/adapters/inbound/http/create-app.ts (class OpenApiHttpApp)     │
+│         • Matches path in docs/api/openapi.yaml ──► getCurriculumPackById  │
+│         • Runs ApiKeyAuth ──► BaseHttpHandler.verifyApiKeyHeader()         │
+│         • Extracts { packId: "diabe-teach" } into context.params.packId    │
+└────────────────────────────────────┬───────────────────────────────────────┘
+                                     │ calls getPackByIdHandler.handle(req, ctx)
                                      ▼
-┌──────────────────────────────────────────────────────────────────────────┐
-│ STEP 3: Inbound Request Transformer &amp; Handler Factory                    │
-│         src/adapters/inbound/http/get-pack-by-id.handler.ts              │
-│         • transformGetPackByIdRequest({ request, context })              │
-│         • Produces { packId: "diabe-teach", bearerToken: "..." | null }  │
-└────────────────────────────────────┬─────────────────────────────────────┘
-                                     │ calls useCase.execute(query)
+┌────────────────────────────────────────────────────────────────────────────┐
+│ STEP 3: GetPackByIdHttpHandler extends BaseHttpHandler (Template Method)   │
+│         src/adapters/inbound/http/get-pack-by-id.handler.ts                │
+│         • BaseHttpHandler.handle() calls this.transformRequest(input)      │
+│         • Calls BaseHttpHandler.parseBearerTokenHeader(authorization)      │
+│         • Calls this.execute(query)                                        │
+└────────────────────────────────────┬───────────────────────────────────────┘
+                                     │ calls this.#useCase.execute(query)
                                      ▼
-┌──────────────────────────────────────────────────────────────────────────┐
-│ STEP 4: Application Use Case (Orchestration Ring)                        │
-│         src/application/use-cases/get-curriculum-pack-by-id.use-case.ts  │
-│         • Verifies optional bearerToken via CapabilityTokenPort          │
-│         • Validates PackId.create(query.packId)                          │
-│         • Calls packRepo.findById(packId)                                │
-└────────────────────────────────────┬─────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────────────────┐
+│ STEP 4: GetCurriculumPackByIdUseCase Class (Application Ring)              │
+│         src/application/use-cases/get-curriculum-pack-by-id.use-case.ts    │
+│         • Verifies optional bearerToken via CapabilityTokenPort            │
+│         • Validates PackId.create(query.packId)                            │
+│         • Calls this.#packRepo.findById(packId)                            │
+└────────────────────────────────────┬───────────────────────────────────────┘
                                      │ calls Outbound Port
                                      ▼
-┌──────────────────────────────────────────────────────────────────────────┐
-│ STEP 5: Outbound Repository &amp; Pure Domain Aggregate Root                 │
-│         src/adapters/outbound/mongo-curriculum-pack-repository.ts        │
-│         • Built-in "diabe-teach" ──► returns in-memory DIABE_TEACH_PACK  │
-│         • Custom packId ──► queries MongoDB "curriculum_packs"           │
-└────────────────────────────────────┬─────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────────────────┐
+│ STEP 5: MongoCurriculumPackRepository &amp; CurriculumPack Classes             │
+│         src/adapters/outbound/mongo-curriculum-pack-repository.ts          │
+│         • Built-in "diabe-teach" ──► returns in-memory DIABE_TEACH_PACK    │
+│         • Custom packId ──► MongoConnectionManager.getDatabase()           │
+└────────────────────────────────────┬───────────────────────────────────────┘
                                      │ returns immutable CurriculumPack
                                      ▼
-┌──────────────────────────────────────────────────────────────────────────┐
-│ STEP 6: Role-Aware DTO Projector &amp; JSON Response                         │
-│         src/application/dtos/curriculum-pack-projector.ts                │
-│         • Strips correctIndex &amp; explanation unless role === "instructor" │
-│         • createEndpointHandler returns 200 OK JSON (or 401/404 on error)│
-└──────────────────────────────────────────────────────────────────────────┘</code></pre>
+┌────────────────────────────────────────────────────────────────────────────┐
+│ STEP 6: CurriculumPackProjector &amp; BaseHttpHandler.jsonResponse             │
+│         src/application/dtos/curriculum-pack-projector.ts                  │
+│         • CurriculumPackProjector.toPublicDto(pack, { includeAnswerKeys }) │
+│         • BaseHttpHandler.jsonResponse returns 200 OK (or maps DomainError)│
+└────────────────────────────────────────────────────────────────────────────┘</code></pre>
     </section>
 
     <section>
-      <h2>Step-by-Step Code Walkthrough</h2>
+      <h2>Step-by-Step Class Walkthrough</h2>
       <div class="pipeline-list">
         <article class="step-card ring-inbound">
           <div class="step-header">
-            <span class="step-badge">Step 1 · Netlify Entrypoint &amp; src/config/</span>
-            <span class="step-file">netlify/functions/api.ts → src/config/runtime.config.ts</span>
+            <span class="step-badge">Step 1 · Top-Level AppRuntime Class</span>
+            <span class="step-file">netlify/functions/api.ts → src/app-runtime.ts (class AppRuntime)</span>
           </div>
           <p>
             When a request hits <code>/api/v1/*</code> on <a href="https://docs.netlify.com/functions/overview/" target="_blank" rel="noopener">Netlify Functions v2</a>,
-            Netlify invokes the default export in <code>netlify/functions/api.ts</code>. That file delegates to
-            <code>createServerlessHttpHandler()</code> in <code>src/config/runtime.config.ts</code>, which loads environment variables (<code>MONGODB_URI</code>,
-            <code>CAPABILITY_TOKEN_SECRET</code>, <code>API_KEY</code>) once per warm container via
-            <code>getProductionDependencies()</code> and calls <code>app.fetch(request, context)</code>.
+            Netlify invokes <code>netlify/functions/api.ts</code>. That file delegates to the visible top-level
+            <code>AppRuntime</code> class in <code>src/app-runtime.ts</code>, which reads environment variables
+            (<code>AppRuntime.loadEnvConfig()</code>), wires <code>MongoCurriculumPackRepository.fromConfig(...)</code>
+            and <code>HmacCapabilityTokenAdapter</code> once per warm container (<code>AppRuntime.getProductionDependencies()</code>),
+            and instantiates <code>new OpenApiHttpApp(deps)</code>:
           </p>
           <pre><code>// netlify/functions/api.ts
-export default createServerlessHttpHandler();
+import type { Config } from "@netlify/functions";
+import { AppRuntime } from "../../src/app-runtime.js";
 
-export const config: Config = defineServerlessRouteConfig({
+export default AppRuntime.createServerlessHttpHandler();
+
+export const config: Config = AppRuntime.defineServerlessRouteConfig({
   path: "/api/v1/*",
   method: ["GET", "POST", "PUT", "PATCH", "DELETE"],
 });</code></pre>
@@ -111,97 +117,106 @@ export const config: Config = defineServerlessRouteConfig({
 
         <article class="step-card ring-inbound">
           <div class="step-header">
-            <span class="step-badge">Step 2 · Central OpenAPI YAML Router &amp; x-api-key Gate</span>
-            <span class="step-file">src/adapters/inbound/http/create-app.ts + docs/api/openapi.yaml</span>
+            <span class="step-badge">Step 2 · OpenApiHttpApp Class &amp; x-api-key Gate</span>
+            <span class="step-file">src/adapters/inbound/http/create-app.ts (class OpenApiHttpApp)</span>
           </div>
           <p>
-            Inside <code>createApp(deps)</code>, <a href="https://github.com/openapistack/openapi-backend#readme" target="_blank" rel="noopener"><code>OpenAPIBackend</code></a>
-            reads <code>docs/api/openapi.yaml</code>. For <code>GET /api/v1/packs/diabe-teach</code>, it:
+            Inside <code>OpenApiHttpApp</code> (which implements <code>HttpApp</code>),
+            <a href="https://github.com/openapistack/openapi-backend#readme" target="_blank" rel="noopener"><code>OpenAPIBackend</code></a>
+            reads <code>docs/api/openapi.yaml</code>. When <code>openApiHttpApp.fetch(request, context)</code> runs:
           </p>
           <ol>
-            <li>Matches the path template <code>/api/v1/packs/{packId}</code> and identifies <code>operationId: getCurriculumPackById</code>.</li>
-            <li>Runs <code>securityHandlers.ApiKeyAuth</code>, which calls <code>verifyApiKeyHeader(request.headers.get("x-api-key"), deps)</code> using timing-safe comparison. If invalid, <code>unauthorizedHandler</code> immediately returns <code>401 UNAUTHORIZED_TOKEN</code>.</li>
-            <li>Extracts <code>c.request.params.packId</code> (<code>"diabe-teach"</code>) and passes it in <code>context.params</code> to <code>getPackByIdHandler</code>.</li>
+            <li>It matches the path template <code>/api/v1/packs/{packId}</code> and resolves <code>operationId: getCurriculumPackById</code>.</li>
+            <li>It executes <code>securityHandlers.ApiKeyAuth</code>, which calls <code>BaseHttpHandler.verifyApiKeyHeader(request.headers.get("x-api-key"), deps)</code> using timing-safe comparison. If invalid, <code>unauthorizedHandler</code> returns <code>401 UNAUTHORIZED_TOKEN</code> via <code>BaseHttpHandler.jsonResponse</code>.</li>
+            <li>It extracts <code>c.request.params.packId</code> (<code>"diabe-teach"</code>) and calls <code>getPackByIdHandler.handle(request, context)</code>.</li>
           </ol>
         </article>
 
         <article class="step-card ring-inbound">
           <div class="step-header">
-            <span class="step-badge">Step 3 · Inbound Request Transformer &amp; Handler Factory</span>
+            <span class="step-badge">Step 3 · GetPackByIdHttpHandler extends BaseHttpHandler</span>
             <span class="step-file">src/adapters/inbound/http/get-pack-by-id.handler.ts + endpoint-handler.factory.ts</span>
           </div>
           <p>
-            <code>createGetPackByIdHandler(deps)</code> uses our 3-step factory
-            <code>createEndpointHandler({ transformRequest, execute })</code>:
+            Instead of loose procedural functions, every endpoint is a class extending the abstract
+            <code>BaseHttpHandler&lt;TQuery, TResult&gt;</code> class. Calling <code>getPackByIdHandler.handle(request, context)</code>
+            runs the template method:
           </p>
-          <pre><code>// 1. Pure Request Transformer: HTTP Request + RouteContext ──► Typed Query
-export function transformGetPackByIdRequest({
-  request,
-  context,
-}: HttpRequestInput): GetCurriculumPackByIdQuery {
-  return {
-    packId: resolvePackIdFromContext(context),
-    bearerToken: parseBearerTokenHeader(request.headers.get("authorization")),
-  };
+          <pre><code>export class GetPackByIdHttpHandler extends BaseHttpHandler&lt;
+  GetCurriculumPackByIdQuery,
+  GetCurriculumPackByIdResult
+&gt; {
+  readonly #useCase: GetCurriculumPackByIdUseCase;
+
+  public constructor(deps: GetPackByIdHandlerDependencies) {
+    super(200);
+    this.#useCase = new GetCurriculumPackByIdUseCase(deps);
+  }
+
+  public transformRequest({ request, context }: HttpRequestInput): GetCurriculumPackByIdQuery {
+    return {
+      packId: this.#resolvePackIdFromContext(context),
+      bearerToken: BaseHttpHandler.parseBearerTokenHeader(request.headers.get("authorization")),
+    };
+  }
+
+  protected async execute(query: GetCurriculumPackByIdQuery): Promise&lt;GetCurriculumPackByIdResult&gt; {
+    return this.#useCase.execute(query);
+  }
 }</code></pre>
-          <p>
-            Notice there is <strong>zero URL regex</strong> here—<code>openapi-backend</code> already extracted
-            <code>context.params.packId</code>!
-          </p>
         </article>
 
         <article class="step-card ring-application">
           <div class="step-header">
-            <span class="step-badge">Step 4 · Application Use Case</span>
+            <span class="step-badge">Step 4 · GetCurriculumPackByIdUseCase Class</span>
             <span class="step-file">src/application/use-cases/get-curriculum-pack-by-id.use-case.ts</span>
           </div>
           <p>
-            <code>GetCurriculumPackByIdUseCase.execute(query)</code> is 100% transport-agnostic (it knows nothing about
-            HTTP headers, <code>x-api-key</code>, or Netlify):
+            <code>GetCurriculumPackByIdUseCase.execute(query)</code> orchestrates the business rule using only
+            Application Ports and Domain classes:
           </p>
           <ol>
-            <li>If <code>query.bearerToken</code> is present, it asks <code>CapabilityTokenPort.verifyToken</code> whether the caller is an <code>"instructor"</code> or <code>"participant"</code> (throwing <code>UnauthorizedTokenError</code> if tampered).</li>
-            <li>Validates the slug via <code>PackId.create(query.packId)</code> (throwing <code>PackNotFoundError</code> on invalid slugs).</li>
-            <li>Calls <code>this.#packRepo.findById(packId)</code> on <code>CurriculumPackRepositoryPort</code>.</li>
+            <li>If <code>query.bearerToken</code> is present, it verifies the token via <code>CapabilityTokenPort.verifyToken</code> to determine whether <code>callerRole</code> is <code>"instructor"</code> or <code>"participant"</code>.</li>
+            <li>It validates the slug via <code>PackId.create(query.packId)</code>.</li>
+            <li>It queries <code>this.#packRepo.findById(packId)</code> on <code>CurriculumPackRepositoryPort</code>.</li>
           </ol>
         </article>
 
         <article class="step-card ring-outbound">
           <div class="step-header">
-            <span class="step-badge">Step 5 · Outbound Repository &amp; Pure Domain Aggregate</span>
-            <span class="step-file">src/adapters/outbound/mongo-curriculum-pack-repository.ts + src/domain/curriculum-pack/curriculum-pack.ts</span>
+            <span class="step-badge">Step 5 · MongoCurriculumPackRepository, MongoConnectionManager &amp; CurriculumPack Classes</span>
+            <span class="step-file">src/adapters/outbound/mongo-curriculum-pack-repository.ts + mongo-client-singleton.ts</span>
           </div>
           <p>
-            <code>MongoCurriculumPackRepository.findById(packId)</code> checks its in-memory built-in map first:
+            All MongoDB logic lives inside classes in <code>src/adapters/outbound/</code>:
           </p>
           <ul>
-            <li><strong>Fast path (<code>"diabe-teach"</code>)</strong>: Returns the frozen 49-card <code>DIABE_TEACH_PACK</code> Aggregate Root in <em>O(1)</em> with <strong>zero MongoDB network queries</strong>.</li>
-            <li><strong>Custom pack path (e.g., <code>"cardio-teach"</code>)</strong>: Queries MongoDB's <code>curriculum_packs</code> collection via the warm-cached <code>getMongoDatabase</code> client and rehydrates <code>CurriculumPack.create(doc)</code>.</li>
+            <li><strong>Built-in fast path (<code>"diabe-teach"</code>)</strong>: <code>MongoCurriculumPackRepository.findById(packId)</code> returns the frozen 49-card <code>DIABE_TEACH_PACK</code> (<code>CurriculumPack</code> class) in <em>O(1)</em> from memory with <strong>zero MongoDB queries</strong>.</li>
+            <li><strong>Custom pack path (e.g., <code>"cardio-teach"</code>)</strong>: <code>MongoCurriculumPackRepository.fromConfig</code> calls <code>MongoConnectionManager.getDatabase(uri, dbName)</code>, queries the <code>curriculum_packs</code> collection, and rehydrates <code>CurriculumPack.create(doc)</code>.</li>
           </ul>
         </article>
 
         <article class="step-card ring-domain">
           <div class="step-header">
-            <span class="step-badge">Step 6 · Role-Aware DTO Projection &amp; JSON Response</span>
+            <span class="step-badge">Step 6 · CurriculumPackProjector Class &amp; BaseHttpHandler Response Mapping</span>
             <span class="step-file">src/application/dtos/curriculum-pack-projector.ts → endpoint-handler.factory.ts</span>
           </div>
           <p>
-            Because the Diabe-Teach RCT uses the exact same 10 multiple-choice questions for both the Pretest and Posttest,
             <code>CurriculumPackProjector.toPublicDto(pack, { includeAnswerKeys: callerRole === "instructor" })</code>
-            projects a new DTO that omits <code>correctIndex</code> and <code>explanation</code> for anonymous/participant
-            callers without mutating the immutable <code>CurriculumPack</code> Aggregate Root. Finally,
-            <code>createEndpointHandler</code> serializes the result as a <code>200 OK</code> JSON <code>Response</code>
-            (or catches any <code>DomainError</code> and maps it via <code>mapDomainErrorToResponse</code>).
+            projects an immutable <code>PublicCurriculumPackDto</code> that strips <code>correctIndex</code> and
+            <code>explanation</code> for anonymous/participant callers. Finally, <code>BaseHttpHandler.handle()</code>
+            returns <code>BaseHttpHandler.jsonResponse(result, 200)</code>—or catches any <code>DomainError</code>
+            and converts it via <code>BaseHttpHandler.mapDomainErrorToResponse(error)</code>.
           </p>
         </article>
       </div>
     </section>
 
     <section>
-      <h2>Interactive Sandbox: Simulate a Request Through All 6 Stages</h2>
+      <h2>Interactive Sandbox: Simulate a Request Across All 6 Class Stages</h2>
       <p>
-        Change any of the three inputs below to see exactly which stage handles or rejects the request and what
-        HTTP JSON payload is returned:
+        Change any of the three inputs below to watch how each class in the pipeline handles or short-circuits
+        the request:
       </p>
       <div class="simulator-box" id="pipeline-simulator">
         <div class="sim-controls">
@@ -239,10 +254,9 @@ export function transformGetPackByIdRequest({
     </section>
 
     <section>
-      <h2>Retrieval Practice: Test Your Mental Model</h2>
+      <h2>Retrieval Practice: Test Your Mental Model of the Class Hierarchy</h2>
       <p>
-        Answer each question from memory before checking the code above. Immediate feedback will confirm whether
-        the boundary between each ring is clear:
+        Answer each question from memory to lock in which class owns each responsibility:
       </p>
       <div class="quiz-container" id="lesson-quiz"></div>
     </section>
@@ -251,16 +265,16 @@ export function transformGetPackByIdRequest({
       <h3>Recommended Primary Source &amp; Next Steps</h3>
       <p>
         <strong>Primary Source to Read Next:</strong>
-        <a href="https://github.com/openapistack/openapi-backend/blob/main/SECURITY.md" target="_blank" rel="noopener">
-          OpenAPI-Backend Security Handlers &amp; <code>unauthorizedHandler</code> Specification
+        <a href="https://alistair.cockburn.us/hexagonal-architecture/" target="_blank" rel="noopener">
+          Alistair Cockburn — Hexagonal Architecture (Ports and Adapters)
         </a>
-        — explains how <code>securityHandlers</code> in <code>create-app.ts</code> evaluate OpenAPI <code>security</code>
-        arrays.
+        &amp; our repo research note
+        <a href="../wiki/15-class-based-hexagonal-architecture-audit.md"><code>wiki/15-class-based-hexagonal-architecture-audit.md</code></a>.
       </p>
       <p>
         <strong>Have a follow-up question?</strong> Ask me in chat! As your pair-programming teacher, I can walk through
-        any step in deeper detail or guide you through wiring the next endpoint (such as <code>GET /api/v1/packs</code>)
-        into <code>create-app.ts</code>.
+        any class in deeper detail or guide you through creating the next endpoint handler class extending
+        <code>BaseHttpHandler</code>.
       </p>
     </section>
   </main>
@@ -271,52 +285,52 @@ export function transformGetPackByIdRequest({
 
     initRetrievalQuiz("lesson-quiz", [
       {
-        prompt: "Where is the x-api-key header validated during an incoming API request?",
+        prompt: "Which top-level class wires environment variables and Outbound Adapters into OpenApiHttpApp?",
         options: [
-          "Inside the GetCurriculumPackByIdUseCase execute method before loading packs",
-          "Inside the OpenAPIBackend ApiKeyAuth security handler in createApp",
-          "Inside the MongoCurriculumPackRepository findById method before querying MongoDB",
-          "Inside the CurriculumPack Aggregate Root constructor during creation"
+          "GetCurriculumPackByIdUseCase inside the Application Ring use-cases directory",
+          "AppRuntime located directly at the root of src",
+          "MongoConnectionManager inside the Outbound Adapters directory",
+          "CurriculumPackProjector inside the Application Ring dtos directory"
         ],
         correctIndex: 1,
-        explanation: "createApp registers securityHandlers.ApiKeyAuth on OpenAPIBackend so x-api-key is checked once at the HTTP Inbound gateway.",
-        hint: "Remember that Domain, Application, and Outbound layers never touch transport API key headers."
+        explanation: "AppRuntime in src/app-runtime.ts is the visible top-level Composition Root class that loads env config and wires Outbound Adapters into OpenApiHttpApp.",
+        hint: "Look at Step 1: which class sits right at the root of src/ (src/app-runtime.ts)?"
       },
       {
-        prompt: "How does transformGetPackByIdRequest obtain the packId parameter without a URL regex?",
+        prompt: "Which base class provides the handle(request, context) template method for endpoint classes?",
         options: [
-          "The handler parses the URL pathname using RegExp",
-          "The Netlify runtime config reads it from environment",
-          "OpenAPIBackend extracts packId into context params for transformGetPackByIdRequest",
-          "MongoCurriculumPackRepository extracts packId directly from the Request headers"
+          "OpenApiHttpApp inside the Inbound HTTP create-app module",
+          "CurriculumPack inside the Domain Ring curriculum-pack module",
+          "BaseHttpHandler inside the Inbound HTTP endpoint-handler.factory module",
+          "MongoCurriculumPackRepository inside the Outbound Adapters repository module"
         ],
         correctIndex: 2,
-        explanation: "OpenAPIBackend matches /api/v1/packs/{packId} from docs/api/openapi.yaml and passes c.request.params.packId into context.params.",
-        hint: "Look at Step 2 and Step 3: who parses the URL template /api/v1/packs/{packId}?"
+        explanation: "BaseHttpHandler<TQuery, TResult> defines handle(request, context) -> transformRequest -> execute -> jsonResponse / mapDomainErrorToResponse.",
+        hint: "Check Step 3: what abstract class does GetPackByIdHttpHandler extend?"
       },
       {
-        prompt: "How are assessment answer keys hidden from anonymous callers without mutating DIABE_TEACH_PACK?",
+        prompt: "Where is all MongoDB connection pooling and collection wiring encapsulated?",
         options: [
-          "CurriculumPackProjector omits correctIndex and explanation for non-instructor callers",
-          "CurriculumPack deletes correctIndex and explanation from memory permanently",
-          "MongoCurriculumPackRepository strips correctIndex and explanation during database queries",
-          "OpenAPIBackend removes correctIndex and explanation using response validation"
+          "Inside MongoCurriculumPackRepository and MongoConnectionManager in src/adapters/outbound",
+          "Inside OpenApiHttpApp and GetPackByIdHttpHandler in src/adapters/inbound",
+          "Inside GetCurriculumPackByIdUseCase and CurriculumPackProjector in src/application",
+          "Inside CurriculumPack and PackId in src/domain/curriculum-pack"
         ],
         correctIndex: 0,
-        explanation: "CurriculumPackProjector.toPublicDto builds a new PublicCurriculumPackDto and only includes correctIndex and explanation when includeAnswerKeys is true.",
-        hint: "Check Step 6 in the Application Ring DTO projection layer."
+        explanation: "MongoCurriculumPackRepository.fromConfig and MongoConnectionManager.getDatabase keep 100% of MongoDB details inside src/adapters/outbound/.",
+        hint: "Check Step 5: which adapter ring owns all database driver and collection logic?"
       },
       {
-        prompt: "When adding a second endpoint from openapi.yaml, where do you wire its route?",
+        prompt: "When adding a new endpoint, what two methods do you implement on its BaseHttpHandler subclass?",
         options: [
-          "Create a new Netlify function file under netlify/functions",
-          "Add a new URL regular expression inside create-app.ts",
-          "Add a new database connection client inside netlify/config",
-          "Register the operationId handler inside createApp in create-app.ts"
+          "You implement loadEnvConfig and buildProductionDependencies on AppRuntime",
+          "You implement getDatabase and findOne on MongoConnectionManager",
+          "You implement verifyToken and signToken on HmacCapabilityTokenAdapter",
+          "You implement transformRequest and execute on your BaseHttpHandler subclass"
         ],
         correctIndex: 3,
-        explanation: "Because netlify/functions/api.ts and docs/api/openapi.yaml already route all /api/v1/* endpoints, you simply register the operationId handler in create-app.ts.",
-        hint: "We have a single Netlify entrypoint and a single openapi.yaml routing file."
+        explanation: "Every endpoint handler class extends BaseHttpHandler<TQuery, TResult> and implements transformRequest(input) and protected execute(query).",
+        hint: "Look at GetPackByIdHttpHandler in Step 3."
       }
     ]);
   </script>
