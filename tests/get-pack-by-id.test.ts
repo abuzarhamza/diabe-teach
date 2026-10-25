@@ -656,9 +656,118 @@ describe("Ticket 03 — Hybrid MongoDB Persistence & Netlify Functions v2 Compos
     const notImplementedRes = await apiNetlifyHandler(
       new Request("http://localhost:3000/api/v1/packs", {
         method: "GET",
+        headers: { "x-api-key": "netlify-prod-key" },
       }),
       {} as unknown as Context,
     );
     expect(notImplementedRes.status).toBe(501);
+  });
+});
+
+describe("Ticket 07 — x-api-key Header Validation (ApiKeyAuth) & Fail-Closed Production Security", () => {
+  it("rejects missing or invalid x-api-key with 401 UNAUTHORIZED_TOKEN when apiKey is configured on createApp", async () => {
+    const packRepo = new InMemoryCurriculumPackRepository([DIABE_TEACH_PACK]);
+    const app = createApp({
+      packRepo,
+      apiKey: "valid-client-api-key-123",
+    });
+
+    const missingKeyRes = await app.fetch(
+      new Request("http://localhost:3000/api/v1/packs/diabe-teach"),
+    );
+    expect(missingKeyRes.status).toBe(401);
+    expect(await missingKeyRes.json()).toEqual({
+      code: "UNAUTHORIZED_TOKEN",
+      message: "Missing or invalid x-api-key header.",
+    });
+
+    const wrongKeyRes = await app.fetch(
+      new Request("http://localhost:3000/api/v1/packs/diabe-teach", {
+        headers: { "x-api-key": "wrong-key" },
+      }),
+    );
+    expect(wrongKeyRes.status).toBe(401);
+    expect(await wrongKeyRes.json()).toEqual({
+      code: "UNAUTHORIZED_TOKEN",
+      message: "Missing or invalid x-api-key header.",
+    });
+  });
+
+  it("allows requests with valid x-api-key and composes with Authorization: Bearer role redaction", async () => {
+    const packRepo = new InMemoryCurriculumPackRepository([DIABE_TEACH_PACK]);
+    const tokenVerifier = new FakeCapabilityTokenAdapter({
+      "inst-token": {
+        role: "instructor",
+        sessionId: "sess-1",
+      },
+    });
+    const app = createApp({
+      packRepo,
+      tokenVerifier,
+      apiKey: "valid-client-api-key-123",
+    });
+
+    const anonWithKeyRes = await app.fetch(
+      new Request("http://localhost:3000/api/v1/packs/diabe-teach", {
+        headers: { "x-api-key": "valid-client-api-key-123" },
+      }),
+    );
+    expect(anonWithKeyRes.status).toBe(200);
+    const anonBody = (await anonWithKeyRes.json()) as {
+      pack: {
+        assessmentInstrument: {
+          questions: Array<{ correctIndex?: number }>;
+        };
+      };
+    };
+    expect(
+      anonBody.pack.assessmentInstrument.questions[0]?.correctIndex,
+    ).toBeUndefined();
+
+    const instWithKeyRes = await app.fetch(
+      new Request("http://localhost:3000/api/v1/packs/diabe-teach", {
+        headers: {
+          "x-api-key": "valid-client-api-key-123",
+          Authorization: "Bearer inst-token",
+        },
+      }),
+    );
+    expect(instWithKeyRes.status).toBe(200);
+    const instBody = (await instWithKeyRes.json()) as {
+      pack: {
+        assessmentInstrument: {
+          questions: Array<{ correctIndex?: number }>;
+        };
+      };
+    };
+    expect(
+      instBody.pack.assessmentInstrument.questions[0]?.correctIndex,
+    ).toBeDefined();
+  });
+
+  it("enforces fail-closed x-api-key validation in Netlify runtime config when requireApiKey is true", async () => {
+    const packRepo = new InMemoryCurriculumPackRepository([DIABE_TEACH_PACK]);
+    const failClosedApp = createApp({
+      packRepo,
+      requireApiKey: true,
+      apiKey: undefined,
+    });
+
+    const res = await failClosedApp.fetch(
+      new Request("http://localhost:3000/api/v1/packs/diabe-teach", {
+        headers: { "x-api-key": "any-key" },
+      }),
+    );
+    expect(res.status).toBe(401);
+    expect(await res.json()).toEqual({
+      code: "UNAUTHORIZED_TOKEN",
+      message: "Missing or invalid x-api-key header.",
+    });
+
+    const envConfig = loadNetlifyRuntimeEnvConfig({
+      MONGODB_URI: "mongodb+srv://cluster.example.net",
+      API_KEY: "  prod-api-key-999  ",
+    });
+    expect(envConfig.apiKey).toBe("prod-api-key-999");
   });
 });

@@ -1,13 +1,17 @@
+import { timingSafeEqual } from "node:crypto";
 import {
   DomainError,
   PackNotFoundError,
   UnauthorizedTokenError,
 } from "../../../domain/errors/domain-errors.js";
 import {
+  ApiKeyValidationConfig,
   EndpointHttpHandler,
   HttpEndpointDefinition,
   RouteContext,
 } from "./http-handler.types.js";
+
+export const INVALID_API_KEY_MESSAGE = "Missing or invalid x-api-key header.";
 
 export function jsonResponse(body: unknown, status: number): Response {
   return new Response(JSON.stringify(body), {
@@ -16,6 +20,44 @@ export function jsonResponse(body: unknown, status: number): Response {
       "content-type": "application/json; charset=utf-8",
     },
   });
+}
+
+export function verifyApiKeyHeader(
+  providedHeader: string | null,
+  config: ApiKeyValidationConfig,
+): boolean {
+  const shouldEnforce =
+    config.requireApiKey === true ||
+    (typeof config.apiKey === "string" && config.apiKey.length > 0);
+
+  if (!shouldEnforce) {
+    return true;
+  }
+
+  if (
+    !config.apiKey ||
+    config.apiKey.trim().length === 0 ||
+    !providedHeader
+  ) {
+    return false;
+  }
+
+  const actualBuf = Buffer.from(providedHeader.trim(), "utf8");
+  const expectedBuf = Buffer.from(config.apiKey.trim(), "utf8");
+
+  return (
+    actualBuf.length === expectedBuf.length &&
+    timingSafeEqual(actualBuf, expectedBuf)
+  );
+}
+
+export function assertValidApiKeyHeader(
+  request: Request,
+  config: ApiKeyValidationConfig,
+): void {
+  if (!verifyApiKeyHeader(request.headers.get("x-api-key"), config)) {
+    throw new UnauthorizedTokenError(INVALID_API_KEY_MESSAGE);
+  }
 }
 
 export function parseBearerTokenHeader(
@@ -59,6 +101,7 @@ export function createEndpointHandler<TQuery, TResult>(
     context?: RouteContext,
   ): Promise<Response> {
     try {
+      assertValidApiKeyHeader(request, definition);
       const query = await definition.transformRequest({ request, context });
       const result = await definition.execute(query);
       return jsonResponse(result, successStatus);

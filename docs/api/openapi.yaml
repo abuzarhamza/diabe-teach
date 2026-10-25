@@ -112,8 +112,9 @@ paths:
       tags: [Packs]
       summary: Fetch a Curriculum Pack by ID (redacts assessment answer keys unless instructorToken is supplied)
       security:
-        - {}
-        - BearerAuth: []
+        - ApiKeyAuth: []
+        - ApiKeyAuth: []
+          BearerAuth: []
       parameters:
         - name: packId
           in: path
@@ -482,6 +483,13 @@ paths:
 
 components:
   securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: x-api-key
+      description: >
+        Global client API key required on `/api/v1/*` requests when `API_KEY`
+        is configured.
     BearerAuth:
       type: http
       scheme: bearer

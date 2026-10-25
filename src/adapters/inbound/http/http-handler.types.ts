@@ -15,7 +15,13 @@ export type EndpointHttpHandler = (
   context?: RouteContext,
 ) => Promise<Response>;
 
-export interface HttpEndpointDefinition<TQuery, TResult> {
+export interface ApiKeyValidationConfig {
+  readonly apiKey?: string;
+  readonly requireApiKey?: boolean;
+}
+
+export interface HttpEndpointDefinition<TQuery, TResult>
+  extends ApiKeyValidationConfig {
   readonly transformRequest: (
     input: HttpRequestInput,
   ) => TQuery | Promise<TQuery>;
@@ -23,12 +29,12 @@ export interface HttpEndpointDefinition<TQuery, TResult> {
   readonly successStatus?: number;
 }
 
-export interface GetPackByIdHandlerDependencies {
+export interface GetPackByIdHandlerDependencies extends ApiKeyValidationConfig {
   readonly packRepo: CurriculumPackRepositoryPort;
   readonly tokenVerifier?: CapabilityTokenPort;
 }
 
-export interface AppDependencies {
+export interface AppDependencies extends ApiKeyValidationConfig {
   readonly packRepo: CurriculumPackRepositoryPort;
   readonly tokenVerifier?: CapabilityTokenPort;
 }

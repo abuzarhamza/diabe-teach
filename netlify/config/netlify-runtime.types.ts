@@ -9,11 +9,14 @@ export interface NetlifyRuntimeEnvConfig {
   readonly mongoUri?: string;
   readonly mongoDbName: string;
   readonly capabilityTokenSecret?: string;
+  readonly apiKey?: string;
 }
 
 export interface NetlifyProductionDependencies {
   readonly packRepo: CurriculumPackRepositoryPort;
   readonly tokenVerifier?: CapabilityTokenPort;
+  readonly apiKey?: string;
+  readonly requireApiKey?: boolean;
 }
 
 export interface NetlifyEndpointRouteConfig {

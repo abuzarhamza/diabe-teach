@@ -1,6 +1,10 @@
 import { resolve } from "node:path";
 import { OpenAPIBackend, type Context as OpenApiContext } from "openapi-backend";
-import { jsonResponse } from "./endpoint-handler.factory.js";
+import {
+  INVALID_API_KEY_MESSAGE,
+  jsonResponse,
+  verifyApiKeyHeader,
+} from "./endpoint-handler.factory.js";
 import { createGetPackByIdHandler } from "./get-pack-by-id.handler.js";
 import {
   AppDependencies,
@@ -17,6 +21,11 @@ export function createApp(deps: AppDependencies): HttpApp {
     definition: OPENAPI_YAML_PATH,
     quick: true,
     validate: false,
+    securityHandlers: {
+      ApiKeyAuth: (_c: OpenApiContext, request: Request): boolean =>
+        verifyApiKeyHeader(request.headers.get("x-api-key"), deps),
+      BearerAuth: (): boolean => true,
+    },
     handlers: {
       getCurriculumPackById: (
         c: OpenApiContext,
@@ -29,6 +38,14 @@ export function createApp(deps: AppDependencies): HttpApp {
             ...(context?.params ?? {}),
           },
         }),
+      unauthorizedHandler: (): Response =>
+        jsonResponse(
+          {
+            code: "UNAUTHORIZED_TOKEN",
+            message: INVALID_API_KEY_MESSAGE,
+          },
+          401,
+        ),
       notFound: (_c: OpenApiContext, request: Request): Response => {
         const url = new URL(request.url);
         return jsonResponse(

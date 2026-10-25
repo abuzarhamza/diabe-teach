@@ -20,6 +20,7 @@ export function loadNetlifyRuntimeEnvConfig(
   const rawMongoUri = env.MONGODB_URI?.trim();
   const rawDbName = env.MONGODB_DB_NAME?.trim();
   const rawTokenSecret = env.CAPABILITY_TOKEN_SECRET?.trim();
+  const rawApiKey = env.API_KEY?.trim();
 
   return {
     mongoUri: rawMongoUri && rawMongoUri.length > 0 ? rawMongoUri : undefined,
@@ -27,6 +28,7 @@ export function loadNetlifyRuntimeEnvConfig(
       rawDbName && rawDbName.length > 0 ? rawDbName : DEFAULT_MONGODB_DB_NAME,
     capabilityTokenSecret:
       rawTokenSecret && rawTokenSecret.length > 0 ? rawTokenSecret : undefined,
+    apiKey: rawApiKey && rawApiKey.length > 0 ? rawApiKey : undefined,
   };
 }
 
@@ -58,6 +60,8 @@ export function buildNetlifyProductionDependencies(
   return {
     packRepo,
     tokenVerifier,
+    apiKey: runtimeConfig.apiKey,
+    requireApiKey: runtimeConfig.apiKey !== undefined,
   };
 }
 

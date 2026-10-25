@@ -51,11 +51,13 @@ Implement the end-to-end **`GET /api/v1/packs/{packId}`** vertical slice across 
 13. As a platform engineer deploying to Netlify Functions v2, I want a shared Netlify runtime configuration (`netlify/config/`) and `netlify.toml` (`included_files = ["docs/api/openapi.yaml"]`) that wires production Outbound Adapters into `netlify/functions/api.ts` via `createNetlifyFunctionHandler`.
 14. As a code reviewer, I want every module in the codebase to separate interface/contract definitions (`*.types.ts`, `*.port.ts`, `*.dto.ts`) from class and factory implementations (`*.ts`, `*.use-case.ts`, `*.handler.ts`, `*.factory.ts`), and use intuitive `src/adapters/inbound/` and `src/adapters/outbound/` directories.
 15. As a developer running `lint:boundaries`, I want `dependency-cruiser` to verify that Domain and Application modules never import `mongodb`, `openapi-backend`, or `@netlify/functions`, and that Inbound and Outbound Adapters never import each other directly.
+16. As a platform operator protecting `/api/v1/*` routes with a client API key, when `apiKey` (or `requireApiKey: true` in Netlify production via `process.env.API_KEY`) is configured, I want requests with a missing or mismatched `x-api-key` header (or when `API_KEY` is unset in production) to be rejected at the HTTP Inbound Adapter / `openapi-backend` `ApiKeyAuth` security handler with `401 Unauthorized` (`{ code: "UNAUTHORIZED_TOKEN", message: "Missing or invalid x-api-key header." }`), while valid `x-api-key` requests proceed to `Authorization: Bearer` session role evaluation without leaking `x-api-key` concerns into the Domain or Application rings.
 
 ## Implementation Decisions
 
-- **Central YAML Routing via `openapi-backend` (`src/adapters/inbound/http/create-app.ts`)**:
+- **Central YAML Routing & `ApiKeyAuth` Security via `openapi-backend` (`src/adapters/inbound/http/create-app.ts`)**:
   - Uses `OpenAPIBackend` from `openapi-backend` pointed at `docs/api/openapi.yaml` with `quick: true` and `validate: false` (since domain/application validation produces canonical `DomainError` codes).
+  - Registers the `ApiKeyAuth` security handler (`securityHandlers.ApiKeyAuth`) and `unauthorizedHandler` in `OpenAPIBackend` (and enforces `validateApiKeyHeader` in `createEndpointHandler`) using timing-safe comparison against `deps.apiKey` when `deps.apiKey !== undefined` or `deps.requireApiKey === true`, returning `401 Unauthorized` (`{ code: "UNAUTHORIZED_TOKEN", message: "Missing or invalid x-api-key header." }`) on failure.
   - Maps `operationId: getCurriculumPackById` to `createGetPackByIdHandler(deps)`, forwarding extracted path parameters (`c.request.params.packId`) via `RouteContext`.
   - Registers `notFound` and `notImplemented` handlers so both unknown URLs and not-yet-implemented OpenAPI operations return structured JSON `Response` objects.
 - **Request Transformer + Endpoint Handler Factory Pipeline (`src/adapters/inbound/http/`)**:

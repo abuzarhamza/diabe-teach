@@ -55,6 +55,8 @@ export function createGetPackByIdHandler(
   const useCase = new GetCurriculumPackByIdUseCase(deps);
 
   return createEndpointHandler({
+    apiKey: deps.apiKey,
+    requireApiKey: deps.requireApiKey,
     transformRequest: transformGetPackByIdRequest,
     execute: (query) => useCase.execute(query),
   });

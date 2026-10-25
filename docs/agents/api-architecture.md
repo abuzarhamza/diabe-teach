@@ -72,9 +72,9 @@ Use the ubiquitous language from `GLOSSARY.md` across all class, type, method, a
 
 ## 4. HTTP Inbound Adapter & Central OpenAPI YAML Routing (`openapi-backend`)
 
-- **Central YAML Routing via `openapi-backend` (`src/adapters/inbound/http/create-app.ts`)**:
-  - `docs/api/openapi.yaml` is the single source of truth for all API routes, HTTP methods, path parameters, and `operationId`s.
-  - `createApp(deps)` initializes `OpenAPIBackend` (`openapi-backend`) with `docs/api/openapi.yaml` (`quick: true`) and maps each `operationId` (e.g., `getCurriculumPackById`) to its per-endpoint handler, forwarding `c.request.params` into `context.params`.
+- **Central YAML Routing & `x-api-key` Security via `openapi-backend` (`src/adapters/inbound/http/create-app.ts`)**:
+  - `docs/api/openapi.yaml` is the single source of truth for all API routes, HTTP methods, path parameters, security schemes (`ApiKeyAuth` for `x-api-key` and `BearerAuth` for session capability tokens), and `operationId`s.
+  - `createApp(deps)` initializes `OpenAPIBackend` (`openapi-backend`) with `docs/api/openapi.yaml` (`quick: true`), registers the `ApiKeyAuth` security handler + `unauthorizedHandler` (returning `401 UNAUTHORIZED_TOKEN` with `"Missing or invalid x-api-key header."` when `apiKey` or `requireApiKey` is active), and maps each `operationId` (e.g., `getCurriculumPackById`) to its per-endpoint handler.
 - **Request Transformer + Endpoint Handler Factory Pipeline (`createEndpointHandler`)**:
   - Each HTTP Inbound Adapter in `src/adapters/inbound/http/` separates transport parsing from use-case execution using two pure building blocks:
     1. **Request Transformer (`transform<Endpoint>Request`)**: Pure function `(input: HttpRequestInput) => TQuery` that extracts path parameters from `context?.params` (populated by `openapi-backend`, Netlify Functions v2 `URLPattern`, or AWS Lambda `event.pathParameters`) and parses `Authorization: Bearer <token>` headers via `parseBearerTokenHeader`.
