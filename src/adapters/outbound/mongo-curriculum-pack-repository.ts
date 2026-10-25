@@ -1,3 +1,4 @@
+import mongoose, { Connection, Model, Schema } from "mongoose";
 import { CurriculumPackRepositoryPort } from "../../application/ports/curriculum-pack-repository.port.js";
 import { CurriculumPack } from "../../domain/curriculum-pack/curriculum-pack.js";
 import { DIABE_TEACH_PACK } from "../../domain/curriculum-pack/diabe-teach-pack.js";
@@ -12,10 +13,33 @@ import {
 
 export const DEFAULT_MONGODB_DB_NAME = "diabe_teach";
 export const CURRICULUM_PACKS_COLLECTION = "curriculum_packs";
+export const CURRICULUM_PACK_MODEL_NAME = "CurriculumPack";
+
+export const curriculumPackSchema = new Schema<CurriculumPackDocument>(
+  {
+    _id: { type: String, required: true },
+    title: { type: String, required: true },
+    version: { type: String, required: true },
+    description: { type: String },
+    boardConfig: { type: Schema.Types.Mixed, required: true },
+    domains: { type: [Schema.Types.Mixed], required: true },
+    cards: { type: [Schema.Types.Mixed], required: true },
+    adjudicationRubric: { type: Schema.Types.Mixed, required: true },
+    assessmentInstrument: { type: Schema.Types.Mixed },
+    perceptionSurvey: { type: Schema.Types.Mixed },
+  },
+  {
+    collection: CURRICULUM_PACKS_COLLECTION,
+    versionKey: false,
+  },
+);
 
 export class MongoCurriculumPackRepository
   implements CurriculumPackRepositoryPort
 {
+  public static readonly modelName = CURRICULUM_PACK_MODEL_NAME;
+  public static readonly collectionName = CURRICULUM_PACKS_COLLECTION;
+
   readonly #builtInPacks = new Map<string, CurriculumPack>();
   readonly #getCollection: () => Promise<CurriculumPackCollectionLike>;
 
@@ -25,6 +49,21 @@ export class MongoCurriculumPackRepository
       this.#builtInPacks.set(pack.id.value, pack);
     }
     this.#getCollection = options.getCollection;
+  }
+
+  public static getModel(
+    connection: Connection,
+  ): Model<CurriculumPackDocument> {
+    return (
+      (connection.models[CURRICULUM_PACK_MODEL_NAME] as
+        | Model<CurriculumPackDocument>
+        | undefined) ??
+      connection.model<CurriculumPackDocument>(
+        CURRICULUM_PACK_MODEL_NAME,
+        curriculumPackSchema,
+        CURRICULUM_PACKS_COLLECTION,
+      )
+    );
   }
 
   public static fromConfig(
@@ -38,13 +77,15 @@ export class MongoCurriculumPackRepository
             "MONGODB_URI environment variable is required to query custom Curriculum Packs.",
           );
         }
-        const db = await MongoConnectionManager.getDatabase(
+        const connection = await MongoConnectionManager.getConnection(
           config.mongoUri,
           config.mongoDbName ?? DEFAULT_MONGODB_DB_NAME,
         );
-        return db.collection<CurriculumPackDocument>(
-          CURRICULUM_PACKS_COLLECTION,
-        );
+        const model = MongoCurriculumPackRepository.getModel(connection);
+        return {
+          findOne: async (filter: { readonly _id: string }) =>
+            model.findOne(filter).lean<CurriculumPackDocument | null>().exec(),
+        };
       },
     });
   }

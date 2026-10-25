@@ -40,13 +40,13 @@ module.exports = {
     {
       name: "mongodb-isolated-to-outbound-adapters",
       comment:
-        "The mongodb driver and mongo-client-singleton may only be imported inside Outbound Adapters (src/adapters/outbound).",
+        "The mongodb/mongoose driver and mongo-client-singleton may only be imported inside Outbound Adapters (src/adapters/outbound).",
       severity: "error",
       from: {
         pathNot: "^src/adapters/outbound/",
       },
       to: {
-        path: "(node_modules/mongodb|^src/adapters/outbound/mongo-client-singleton)",
+        path: "(node_modules/(mongodb|mongoose)|^src/adapters/outbound/mongo-client-singleton)",
       },
     },
     {

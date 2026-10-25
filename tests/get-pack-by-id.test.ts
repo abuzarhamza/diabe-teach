@@ -609,6 +609,9 @@ describe("Ticket 03 — Hybrid MongoDB Persistence & Netlify Functions v2 Compos
       (await directConfigRepo.findById(DIABE_TEACH_PACK.id))?.id.value,
     ).toBe("diabe-teach");
 
+    expect(MongoCurriculumPackRepository.modelName).toBe("CurriculumPack");
+    expect(MongoCurriculumPackRepository.collectionName).toBe("curriculum_packs");
+
     expect(HmacCapabilityTokenAdapter.fromSecret(undefined)).toBeUndefined();
     expect(HmacCapabilityTokenAdapter.fromSecret("   ")).toBeUndefined();
     expect(

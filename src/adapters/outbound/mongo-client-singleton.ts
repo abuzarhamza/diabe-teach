@@ -1,25 +1,26 @@
-import { Db, MongoClient } from "mongodb";
+import mongoose, { Connection } from "mongoose";
 
 export class MongoConnectionManager {
-  static readonly #cachedClientsByUri = new Map<string, Promise<MongoClient>>();
+  static readonly #cachedConnections = new Map<string, Promise<Connection>>();
 
-  public static async getDatabase(
+  public static async getConnection(
     uri: string,
     dbName = "diabe_teach",
-  ): Promise<Db> {
-    let clientPromise = MongoConnectionManager.#cachedClientsByUri.get(uri);
-    if (!clientPromise) {
-      const client = new MongoClient(uri, {
+  ): Promise<Connection> {
+    const cacheKey = `${uri}::${dbName}`;
+    let connPromise = MongoConnectionManager.#cachedConnections.get(cacheKey);
+    if (!connPromise) {
+      const connection = mongoose.createConnection(uri, {
+        dbName,
         maxPoolSize: 5,
         serverSelectionTimeoutMS: 5000,
       });
-      clientPromise = client.connect().catch((err: unknown) => {
-        MongoConnectionManager.#cachedClientsByUri.delete(uri);
+      connPromise = connection.asPromise().catch((err: unknown) => {
+        MongoConnectionManager.#cachedConnections.delete(cacheKey);
         throw err;
       });
-      MongoConnectionManager.#cachedClientsByUri.set(uri, clientPromise);
+      MongoConnectionManager.#cachedConnections.set(cacheKey, connPromise);
     }
-    const connectedClient = await clientPromise;
-    return connectedClient.db(dbName);
+    return connPromise;
   }
 }
