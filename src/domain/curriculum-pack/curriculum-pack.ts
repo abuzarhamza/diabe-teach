@@ -9,6 +9,11 @@ import {
 } from "./curriculum-pack.types.js";
 import { PackId } from "./pack-id.js";
 
+interface CardIndices {
+  readonly byId: ReadonlyMap<string, KeywordCard>;
+  readonly byLookup: ReadonlyMap<string, KeywordCard>;
+}
+
 export class CurriculumPack {
   public readonly id: PackId;
   public readonly title: string;
@@ -25,8 +30,7 @@ export class CurriculumPack {
   readonly #cardsByLookupKey: ReadonlyMap<string, KeywordCard>;
 
   private constructor(props: CurriculumPackProps) {
-    this.id =
-      props.id instanceof PackId ? props.id : PackId.create(props.id);
+    this.id = props.id instanceof PackId ? props.id : PackId.create(props.id);
     this.title = props.title;
     this.version = props.version;
     this.description = props.description;
@@ -35,64 +39,17 @@ export class CurriculumPack {
       props.domains.map((d) => ({ ...d })),
     );
     this.cards = CurriculumPack.#deepFreeze(
-      props.cards.map((c) => ({
-        ...c,
-        aliases: [...c.aliases],
-      })),
+      props.cards.map((c) => ({ ...c, aliases: [...c.aliases] })),
     );
-    this.adjudicationRubric = CurriculumPack.#deepFreeze({
-      evaluatorPersona: props.adjudicationRubric.evaluatorPersona,
-      subjectDomain: props.adjudicationRubric.subjectDomain,
-      chainContinuityCriteria: [
-        ...props.adjudicationRubric.chainContinuityCriteria,
-      ],
-      ...(props.adjudicationRubric.calibrationBoardCardIds
-        ? {
-            calibrationBoardCardIds:
-              props.adjudicationRubric.calibrationBoardCardIds.map((row) => [
-                ...row,
-              ]),
-          }
-        : {}),
-      calibrationExamples: props.adjudicationRubric.calibrationExamples.map(
-        (ex) => ({
-          ...ex,
-          path: ex.path.map((coord) => ({ ...coord })),
-          keywordIds: [...ex.keywordIds],
-        }),
-      ),
-    });
-    this.assessmentInstrument = props.assessmentInstrument
-      ? CurriculumPack.#deepFreeze({
-          questions: props.assessmentInstrument.questions.map((q) => ({
-            ...q,
-            options: [...q.options] as const,
-            relatedKeywordIds: [...q.relatedKeywordIds],
-          })),
-        })
-      : null;
-    this.perceptionSurvey = props.perceptionSurvey
-      ? CurriculumPack.#deepFreeze({
-          items: props.perceptionSurvey.items.map((item) => ({ ...item })),
-        })
-      : null;
+    this.adjudicationRubric = CurriculumPack.#cloneRubric(
+      props.adjudicationRubric,
+    );
+    this.assessmentInstrument = CurriculumPack.#cloneAssessment(
+      props.assessmentInstrument,
+    );
+    this.perceptionSurvey = CurriculumPack.#cloneSurvey(props.perceptionSurvey);
 
-    const byId = new Map<string, KeywordCard>();
-    const byLookup = new Map<string, KeywordCard>();
-
-    for (const card of this.cards) {
-      byId.set(card.id, card);
-      byLookup.set(CurriculumPack.#normalizeLookupKey(card.id), card);
-      byLookup.set(
-        CurriculumPack.#normalizeLookupKey(card.verbatimLabel),
-        card,
-      );
-      byLookup.set(CurriculumPack.#normalizeLookupKey(card.displayLabel), card);
-      for (const alias of card.aliases) {
-        byLookup.set(CurriculumPack.#normalizeLookupKey(alias), card);
-      }
-    }
-
+    const { byId, byLookup } = CurriculumPack.#buildCardIndices(this.cards);
     this.#cardsById = byId;
     this.#cardsByLookupKey = byLookup;
     Object.freeze(this);
@@ -111,6 +68,68 @@ export class CurriculumPack {
       this.#cardsById.get(query) ??
       this.#cardsByLookupKey.get(CurriculumPack.#normalizeLookupKey(query))
     );
+  }
+
+  static #cloneRubric(rubric: AdjudicationRubric): AdjudicationRubric {
+    return CurriculumPack.#deepFreeze({
+      evaluatorPersona: rubric.evaluatorPersona,
+      subjectDomain: rubric.subjectDomain,
+      chainContinuityCriteria: [...rubric.chainContinuityCriteria],
+      ...(rubric.calibrationBoardCardIds
+        ? {
+            calibrationBoardCardIds: rubric.calibrationBoardCardIds.map(
+              (row) => [...row],
+            ),
+          }
+        : {}),
+      calibrationExamples: rubric.calibrationExamples.map((ex) => ({
+        ...ex,
+        path: ex.path.map((coord) => ({ ...coord })),
+        keywordIds: [...ex.keywordIds],
+      })),
+    });
+  }
+
+  static #cloneAssessment(
+    instrument: AssessmentInstrument | null,
+  ): AssessmentInstrument | null {
+    if (!instrument) return null;
+    return CurriculumPack.#deepFreeze({
+      questions: instrument.questions.map((q) => ({
+        ...q,
+        options: [...q.options] as const,
+        relatedKeywordIds: [...q.relatedKeywordIds],
+      })),
+    });
+  }
+
+  static #cloneSurvey(
+    survey: PerceptionSurvey | null,
+  ): PerceptionSurvey | null {
+    if (!survey) return null;
+    return CurriculumPack.#deepFreeze({
+      items: survey.items.map((item) => ({ ...item })),
+    });
+  }
+
+  static #buildCardIndices(cards: readonly KeywordCard[]): CardIndices {
+    const byId = new Map<string, KeywordCard>();
+    const byLookup = new Map<string, KeywordCard>();
+
+    for (const card of cards) {
+      byId.set(card.id, card);
+      const keys = [
+        card.id,
+        card.verbatimLabel,
+        card.displayLabel,
+        ...card.aliases,
+      ];
+      for (const key of keys) {
+        byLookup.set(CurriculumPack.#normalizeLookupKey(key), card);
+      }
+    }
+
+    return { byId, byLookup };
   }
 
   static #normalizeLookupKey(text: string): string {
