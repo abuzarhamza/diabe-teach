@@ -70,11 +70,14 @@ Use the ubiquitous language from `GLOSSARY.md` across all class, type, method, a
 - **Role-Aware Schema Projection**:
   - Strip `correctIndex` and `explanation` from `CurriculumPack` and Pretest `AssessmentAttempt` responses inside Application/DTO projection mappers unless caller holds a verified `instructorToken` or has completed the Posttest. Never mutate the `CurriculumPack` Aggregate to hide fields.
 
-## 4. HTTP Inbound Adapter & Error Translation
+## 4. HTTP Inbound Adapter & Central OpenAPI YAML Routing (`openapi-backend`)
 
+- **Central YAML Routing via `openapi-backend` (`src/adapters/inbound/http/create-app.ts`)**:
+  - `docs/api/openapi.yaml` is the single source of truth for all API routes, HTTP methods, path parameters, and `operationId`s.
+  - `createApp(deps)` initializes `OpenAPIBackend` (`openapi-backend`) with `docs/api/openapi.yaml` (`quick: true`) and maps each `operationId` (e.g., `getCurriculumPackById`) to its per-endpoint handler, forwarding `c.request.params` into `context.params`.
 - **Request Transformer + Endpoint Handler Factory Pipeline (`createEndpointHandler`)**:
   - Each HTTP Inbound Adapter in `src/adapters/inbound/http/` separates transport parsing from use-case execution using two pure building blocks:
-    1. **Request Transformer (`transform<Endpoint>Request`)**: Pure function `(input: HttpRequestInput) => TQuery` that extracts path parameters from `context?.params` (populated natively by Netlify Functions v2 `URLPattern` routing or mapped from AWS Lambda `event.pathParameters`, with URL path fallback for plain `Request` unit tests) and parses `Authorization: Bearer <token>` headers via `parseBearerTokenHeader`.
+    1. **Request Transformer (`transform<Endpoint>Request`)**: Pure function `(input: HttpRequestInput) => TQuery` that extracts path parameters from `context?.params` (populated by `openapi-backend`, Netlify Functions v2 `URLPattern`, or AWS Lambda `event.pathParameters`) and parses `Authorization: Bearer <token>` headers via `parseBearerTokenHeader`.
     2. **Endpoint Handler Factory (`create<Endpoint>Handler(deps)`)**: Instantiates the Application Use Case with injected Outbound Ports (`deps`) and delegates `{ transformRequest, execute }` to `createEndpointHandler` (`src/adapters/inbound/http/endpoint-handler.factory.ts`), returning `(request: Request, context?: RouteContext) => Promise<Response>`.
 - **Single Error Translation Boundary**:
   - Domain and Application layers return typed domain results or throw typed `DomainError` subclasses—never HTTP status codes.

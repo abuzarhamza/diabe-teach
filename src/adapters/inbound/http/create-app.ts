@@ -39,6 +39,14 @@ export function createApp(deps: AppDependencies): HttpApp {
           404,
         );
       },
+      notImplemented: (c: OpenApiContext): Response =>
+        jsonResponse(
+          {
+            code: "INVALID_REQUEST_BODY",
+            message: `Operation '${c.operation.operationId ?? "unknown"}' is not implemented yet.`,
+          },
+          501,
+        ),
     },
   });
 

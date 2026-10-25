@@ -644,5 +644,21 @@ describe("Ticket 03 — Hybrid MongoDB Persistence & Netlify Functions v2 Compos
     expect(res.status).toBe(200);
     const body = (await res.json()) as { pack: { id: string } };
     expect(body.pack.id).toBe("diabe-teach");
+
+    const notFoundRes = await apiNetlifyHandler(
+      new Request("http://localhost:3000/api/v1/non-existent-route", {
+        method: "GET",
+      }),
+      {} as unknown as Context,
+    );
+    expect(notFoundRes.status).toBe(404);
+
+    const notImplementedRes = await apiNetlifyHandler(
+      new Request("http://localhost:3000/api/v1/packs", {
+        method: "GET",
+      }),
+      {} as unknown as Context,
+    );
+    expect(notImplementedRes.status).toBe(501);
   });
 });
