@@ -12,28 +12,16 @@ import {
   RouteContext,
 } from "./http-handler.types.js";
 
-const GET_PACK_BY_ID_URL_PATTERN = /^\/api\/v1\/packs\/([^/]+)\/?$/;
-
-function resolvePackIdFromContextOrUrl(
-  request: Request,
-  context?: RouteContext,
-): string {
+function resolvePackIdFromContext(context?: RouteContext): string {
   const paramPackId = context?.params?.packId;
-  if (typeof paramPackId === "string") {
+  if (typeof paramPackId === "string" && paramPackId.length > 0) {
     return decodeURIComponent(paramPackId);
   }
-
-  const url = new URL(request.url);
-  const match = GET_PACK_BY_ID_URL_PATTERN.exec(url.pathname);
-  if (match && match[1]) {
-    return decodeURIComponent(match[1]);
-  }
-
   throw new PackNotFoundError("");
 }
 
 /**
- * Pure Request Transformer: converts raw HTTP (Request + Netlify/Lambda Context)
+ * Pure Request Transformer: converts raw HTTP (Request + OpenAPI RouteContext)
  * into the typed Application/Domain query.
  */
 export function transformGetPackByIdRequest({
@@ -41,7 +29,7 @@ export function transformGetPackByIdRequest({
   context,
 }: HttpRequestInput): GetCurriculumPackByIdQuery {
   return {
-    packId: resolvePackIdFromContextOrUrl(request, context),
+    packId: resolvePackIdFromContext(context),
     bearerToken: parseBearerTokenHeader(request.headers.get("authorization")),
   };
 }
@@ -55,8 +43,6 @@ export function createGetPackByIdHandler(
   const useCase = new GetCurriculumPackByIdUseCase(deps);
 
   return createEndpointHandler({
-    apiKey: deps.apiKey,
-    requireApiKey: deps.requireApiKey,
     transformRequest: transformGetPackByIdRequest,
     execute: (query) => useCase.execute(query),
   });

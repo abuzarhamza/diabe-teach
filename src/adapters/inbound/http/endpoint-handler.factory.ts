@@ -51,15 +51,6 @@ export function verifyApiKeyHeader(
   );
 }
 
-export function assertValidApiKeyHeader(
-  request: Request,
-  config: ApiKeyValidationConfig,
-): void {
-  if (!verifyApiKeyHeader(request.headers.get("x-api-key"), config)) {
-    throw new UnauthorizedTokenError(INVALID_API_KEY_MESSAGE);
-  }
-}
-
 export function parseBearerTokenHeader(
   authorizationHeader: string | null,
 ): string | null {
@@ -101,7 +92,6 @@ export function createEndpointHandler<TQuery, TResult>(
     context?: RouteContext,
   ): Promise<Response> {
     try {
-      assertValidApiKeyHeader(request, definition);
       const query = await definition.transformRequest({ request, context });
       const result = await definition.execute(query);
       return jsonResponse(result, successStatus);

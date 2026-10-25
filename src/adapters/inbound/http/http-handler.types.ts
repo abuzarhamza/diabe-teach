@@ -20,8 +20,7 @@ export interface ApiKeyValidationConfig {
   readonly requireApiKey?: boolean;
 }
 
-export interface HttpEndpointDefinition<TQuery, TResult>
-  extends ApiKeyValidationConfig {
+export interface HttpEndpointDefinition<TQuery, TResult> {
   readonly transformRequest: (
     input: HttpRequestInput,
   ) => TQuery | Promise<TQuery>;
@@ -29,7 +28,7 @@ export interface HttpEndpointDefinition<TQuery, TResult>
   readonly successStatus?: number;
 }
 
-export interface GetPackByIdHandlerDependencies extends ApiKeyValidationConfig {
+export interface GetPackByIdHandlerDependencies {
   readonly packRepo: CurriculumPackRepositoryPort;
   readonly tokenVerifier?: CapabilityTokenPort;
 }

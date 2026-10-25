@@ -27,6 +27,7 @@ Welcome to the **Diabe-Teach Knowledge Base & Research Wiki**. This repository i
 | [10](10-netlify-and-lambda-routing-research.md) | [Netlify Functions v2 & AWS Lambda Routing Research](10-netlify-and-lambda-routing-research.md) | Primary-source breakdown of Netlify Functions v2 (`config.path`, `config.method`, `context.params` URLPattern routing) vs. catch-all routing and AWS Lambda API Gateway `pathParameters`. |
 | [11](11-simple-factory-and-transformer-handler-pattern.md) | [Simple Factory & Request-Transformer Pattern](11-simple-factory-and-transformer-handler-pattern.md) | Pattern guide for structuring HTTP Driving Adapters as a 3-step `transformRequest -> execute -> presentResponse` factory pipeline. |
 | [12](12-serverless-function-and-endpoint-frameworks-research.md) | [Existing Serverless & YAML Routing Frameworks Research](12-serverless-function-and-endpoint-frameworks-research.md) | Comparison of existing open-source frameworks: `openapi-backend` (routes directly from `openapi.yaml`), Serverless Framework (`serverless.yml`), `hono`, and `@middy/http-router`. |
+| [13](13-single-entrypoint-dead-code-audit.md) | [Single-Entrypoint Dead & Redundant Code Audit](13-single-entrypoint-dead-code-audit.md) | Line-by-line audit of files, regexes, and duplicate security checks made redundant by centralizing routing in `netlify/functions/api.ts` + `createApp` (`openapi-backend`). |
 
 ---
 

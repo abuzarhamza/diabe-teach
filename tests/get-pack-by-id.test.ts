@@ -11,9 +11,6 @@ import { InMemoryCurriculumPackRepository } from "../src/adapters/outbound/in-me
 import { MongoCurriculumPackRepository } from "../src/adapters/outbound/mongo-curriculum-pack-repository.js";
 import { CurriculumPackDocument } from "../src/adapters/outbound/mongo-curriculum-pack-repository.types.js";
 import { DIABE_TEACH_PACK } from "../src/domain/curriculum-pack/diabe-teach-pack.js";
-import getPackByIdNetlifyHandler, {
-  config as getPackByIdNetlifyConfig,
-} from "../netlify/functions/get-pack-by-id.js";
 import apiNetlifyHandler, {
   config as apiNetlifyConfig,
 } from "../netlify/functions/api.js";
@@ -574,28 +571,7 @@ describe("Ticket 03 — Hybrid MongoDB Persistence & Netlify Functions v2 Compos
     expect(body.pack.id).toBe("diabe-teach");
   });
 
-  it("wires netlify/functions/get-pack-by-id.ts with native config = { path: '/api/v1/packs/:packId', method: 'GET' } and context.params.packId", async () => {
-    expect(getPackByIdNetlifyConfig).toEqual({
-      path: "/api/v1/packs/:packId",
-      method: "GET",
-    });
-
-    const mockNetlifyContext = {
-      params: { packId: "diabe-teach" },
-    } as unknown as Context;
-
-    const res = await getPackByIdNetlifyHandler(
-      new Request("http://localhost:3000/api/v1/packs/diabe-teach", {
-        method: "GET",
-      }),
-      mockNetlifyContext,
-    );
-    expect(res.status).toBe(200);
-    const body = (await res.json()) as { pack: { id: string } };
-    expect(body.pack.id).toBe("diabe-teach");
-  });
-
-  it("loads Netlify runtime config defaults and adapts any Driving Handler via createNetlifyFunctionHandler", async () => {
+  it("loads Netlify runtime config defaults and adapts createApp via createNetlifyFunctionHandler", async () => {
     const envConfig = loadNetlifyRuntimeEnvConfig({
       MONGODB_URI: "  mongodb+srv://cluster.example.net  ",
       MONGODB_DB_NAME: "",
@@ -609,23 +585,20 @@ describe("Ticket 03 — Hybrid MongoDB Persistence & Netlify Functions v2 Compos
     });
 
     const routeConfig = defineNetlifyRouteConfig({
-      path: "/api/v1/packs/:packId",
+      path: "/api/v1/*",
       method: "GET",
     });
     expect(routeConfig).toEqual({
-      path: "/api/v1/packs/:packId",
+      path: "/api/v1/*",
       method: "GET",
     });
 
     const packRepo = new InMemoryCurriculumPackRepository([DIABE_TEACH_PACK]);
-    const wrappedNetlifyHandler = createNetlifyFunctionHandler(
-      createGetPackByIdHandler,
-      { packRepo },
-    );
+    const wrappedNetlifyHandler = createNetlifyFunctionHandler({ packRepo });
 
     const res = await wrappedNetlifyHandler(
-      new Request("https://internal.netlify.local/invoke"),
-      { params: { packId: "diabe-teach" } } as unknown as Context,
+      new Request("http://localhost:3000/api/v1/packs/diabe-teach"),
+      {} as unknown as Context,
     );
     expect(res.status).toBe(200);
     const body = (await res.json()) as { pack: { id: string } };
