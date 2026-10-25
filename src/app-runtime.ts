@@ -38,25 +38,15 @@ export class AppRuntime {
   public static buildProductionDependencies(
     env: NodeJS.ProcessEnv = process.env,
   ): ProductionDependencies {
-    const runtimeConfig = AppRuntime.loadEnvConfig(env);
-
-    const packRepo = MongoCurriculumPackRepository.fromConfig(() => {
-      const currentConfig = AppRuntime.loadEnvConfig(env);
-      return {
-        mongoUri: currentConfig.mongoUri,
-        mongoDbName: currentConfig.mongoDbName,
-      };
-    });
-
-    const tokenVerifier = runtimeConfig.capabilityTokenSecret
-      ? new HmacCapabilityTokenAdapter(runtimeConfig.capabilityTokenSecret)
-      : undefined;
+    const config = AppRuntime.loadEnvConfig(env);
 
     return {
-      packRepo,
-      tokenVerifier,
-      apiKey: runtimeConfig.apiKey,
-      requireApiKey: runtimeConfig.apiKey !== undefined,
+      packRepo: MongoCurriculumPackRepository.fromConfig(config),
+      tokenVerifier: HmacCapabilityTokenAdapter.fromSecret(
+        config.capabilityTokenSecret,
+      ),
+      apiKey: config.apiKey,
+      requireApiKey: Boolean(config.apiKey),
     };
   }
 
@@ -69,8 +59,9 @@ export class AppRuntime {
   }
 
   public static createServerlessHttpHandler(
-    deps: ProductionDependencies = AppRuntime.getProductionDependencies(),
+    customDeps?: ProductionDependencies,
   ): ServerlessHttpHandler {
+    const deps = customDeps ?? AppRuntime.getProductionDependencies();
     const app = new OpenApiHttpApp(deps);
 
     return async (

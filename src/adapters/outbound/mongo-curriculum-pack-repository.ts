@@ -28,21 +28,19 @@ export class MongoCurriculumPackRepository
   }
 
   public static fromConfig(
-    getConfig: () => MongoCurriculumPackConnectionConfig,
+    config: MongoCurriculumPackConnectionConfig,
   ): MongoCurriculumPackRepository {
-    const initial = getConfig();
     return new MongoCurriculumPackRepository({
-      builtInPacks: initial.builtInPacks,
+      builtInPacks: config.builtInPacks,
       getCollection: async () => {
-        const current = getConfig();
-        if (!current.mongoUri) {
+        if (!config.mongoUri) {
           throw new Error(
             "MONGODB_URI environment variable is required to query custom Curriculum Packs.",
           );
         }
         const db = await MongoConnectionManager.getDatabase(
-          current.mongoUri,
-          current.mongoDbName ?? DEFAULT_MONGODB_DB_NAME,
+          config.mongoUri,
+          config.mongoDbName ?? DEFAULT_MONGODB_DB_NAME,
         );
         return db.collection<CurriculumPackDocument>(
           CURRICULUM_PACKS_COLLECTION,

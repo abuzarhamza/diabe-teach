@@ -14,6 +14,16 @@ export class HmacCapabilityTokenAdapter implements CapabilityTokenPort {
     this.#secret = secret;
   }
 
+  public static fromSecret(
+    secret: string | undefined,
+  ): HmacCapabilityTokenAdapter | undefined {
+    const trimmed = secret?.trim();
+    if (!trimmed) {
+      return undefined;
+    }
+    return new HmacCapabilityTokenAdapter(trimmed);
+  }
+
   public async signToken(capability: VerifiedCapability): Promise<string> {
     const payloadJson = JSON.stringify({
       role: capability.role,

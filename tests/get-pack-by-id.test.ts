@@ -600,6 +600,30 @@ describe("Ticket 03 — Hybrid MongoDB Persistence & Netlify Functions v2 Compos
     expect(res.status).toBe(200);
     const body = (await res.json()) as { pack: { id: string } };
     expect(body.pack.id).toBe("diabe-teach");
+
+    const directConfigRepo = MongoCurriculumPackRepository.fromConfig({
+      mongoUri: undefined,
+      mongoDbName: "diabe_teach",
+    });
+    expect(
+      (await directConfigRepo.findById(DIABE_TEACH_PACK.id))?.id.value,
+    ).toBe("diabe-teach");
+
+    expect(HmacCapabilityTokenAdapter.fromSecret(undefined)).toBeUndefined();
+    expect(HmacCapabilityTokenAdapter.fromSecret("   ")).toBeUndefined();
+    expect(
+      HmacCapabilityTokenAdapter.fromSecret("valid-secret"),
+    ).toBeInstanceOf(HmacCapabilityTokenAdapter);
+
+    const builtDeps = AppRuntime.buildProductionDependencies({
+      MONGODB_URI: "mongodb+srv://cluster.example.net",
+      CAPABILITY_TOKEN_SECRET: "secret-123",
+      API_KEY: "api-key-456",
+    });
+    expect(builtDeps.packRepo).toBeInstanceOf(MongoCurriculumPackRepository);
+    expect(builtDeps.tokenVerifier).toBeInstanceOf(HmacCapabilityTokenAdapter);
+    expect(builtDeps.apiKey).toBe("api-key-456");
+    expect(builtDeps.requireApiKey).toBe(true);
   });
 
   it("routes /api/v1/* centrally via openapi-backend reading docs/api/openapi.yaml (operationId: getCurriculumPackById)", async () => {
