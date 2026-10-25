@@ -9,11 +9,11 @@ Organize code into four explicit hexagonal rings plus a thin Netlify composition
 ```
 src/
 ├── domain/                     ← Inner Ring: Pure DDD tactical model (zero I/O, zero async infra)
-├── application/                ← Middle Ring: Use-case orchestrators, Driving Ports & Driven Ports
+├── application/                ← Middle Ring: Use-case orchestrators, Inbound & Outbound Ports
 └── adapters/
-    ├── driving/
-    │   └── http/               ← Primary Driving Adapters: Per-endpoint Web-Standard handlers (Request + context.params -> Response)
-    └── driven/                 ← Secondary Driven Adapters: In-Memory, MongoDB, LLM, Fake Judge
+    ├── inbound/
+    │   └── http/               ← Inbound Adapters (Driving): Per-endpoint Web-Standard handlers (Request + context.params -> Response)
+    └── outbound/               ← Outbound Adapters (Driven): In-Memory, MongoDB, LLM, HMAC Token
 netlify/
 ├── config/                     ← Shared Netlify Composition Root Config & Handler Adapter (netlify-runtime.types.ts, netlify-runtime.config.ts, create-netlify-function-handler.ts)
 └── functions/
@@ -23,10 +23,10 @@ netlify/
 ### Inward-Only Dependency Rule (Enforced by `dependency-cruiser`)
 
 - **`src/domain/**`** imports only from `src/domain/**`. Pure, synchronous, deterministic computation. Inject time and randomness as values (`nowMs`, `seed`) rather than calling `Date.now()`, `Math.random()`, `crypto`, `fetch`, or `node:*`.
-- **`src/application/**`** imports only from `src/application/**` and `src/domain/**`. Defines inbound **Driving Ports** (use-case command/query handlers) and outbound **Driven Ports** (interfaces for persistence, narrative adjudication, event streaming, clock, and ID generation).
-- **`src/adapters/driving/**`** imports from `src/application/**` and `src/domain/**`. Translates HTTP `Request`, `BearerAuth` capability tokens, and JSON payloads into Application commands/queries, and maps Domain Results/Errors into OpenAPI `Response` shapes (`docs/api/openapi.yaml`).
-- **`src/adapters/driven/**`** imports from `src/application/**` and `src/domain/**` to implement Driven Ports.
-- **No cross-adapter imports**: Driving Adapters and Driven Adapters never import each other directly; only the **Composition Root** (`netlify/functions/<endpoint>.ts` and test harnesses) wires them together.
+- **`src/application/**`** imports only from `src/application/**` and `src/domain/**`. Defines **Inbound Ports** (use-case command/query handlers) and **Outbound Ports** (interfaces for persistence, narrative adjudication, event streaming, clock, and ID generation).
+- **`src/adapters/inbound/**`** imports from `src/application/**` and `src/domain/**`. Translates HTTP `Request`, `BearerAuth` capability tokens, and JSON payloads into Application commands/queries, and maps Domain Results/Errors into OpenAPI `Response` shapes (`docs/api/openapi.yaml`).
+- **`src/adapters/outbound/**`** imports from `src/application/**` and `src/domain/**` to implement Outbound Ports.
+- **No cross-adapter imports**: Inbound Adapters (`src/adapters/inbound/`) and Outbound Adapters (`src/adapters/outbound/`) never import each other directly; only the **Composition Root** (`netlify/functions/<endpoint>.ts` and test harnesses) wires them together.
 
 ### No God Modules: Separate Interface/Contract Files from Class/Implementation Files
 
@@ -36,12 +36,12 @@ Never combine TypeScript `interface`/`type` contracts and `class`/factory implem
   - Value Object & Aggregate contracts (`*.types.ts`, e.g., `curriculum-pack.types.ts`) live in dedicated type files.
   - Aggregate Root and Value Object classes (`curriculum-pack.ts`, `pack-id.ts`) contain only the class implementation and private domain helpers.
 - **Application Ring (`src/application/`)**:
-  - Inbound Driving Port contracts (`*UseCasePort`, `*Query`, `*Result`, `*Dependencies`) and outbound Driven Port contracts (`*Port`) live in `src/application/ports/*.port.ts`.
+  - Inbound Port contracts (`*UseCasePort`, `*Query`, `*Result`, `*Dependencies`) and Outbound Port contracts (`*Port`) live in `src/application/ports/*.port.ts`.
   - DTO shape contracts (`*Dto`, `*ProjectionOptions`) live in `src/application/dtos/*.dto.ts`.
   - Use Case classes (`src/application/use-cases/*.use-case.ts`) and Projector classes (`src/application/dtos/*-projector.ts`) contain only the class implementation.
-- **Driving & Driven Adapters (`src/adapters/`)**:
-  - HTTP handler contracts (`RouteContext`, `HttpRequestInput`, `EndpointHttpHandler`, `HttpEndpointDefinition`, `*Dependencies`) live in `src/adapters/driving/http/http-handler.types.ts`.
-  - Persistence document schemas and adapter options (`CurriculumPackDocument`, `CurriculumPackCollectionLike`, `MongoCurriculumPackRepositoryOptions`) live in `src/adapters/driven/*.types.ts`, separate from repository and adapter classes.
+- **Inbound & Outbound Adapters (`src/adapters/inbound/` & `src/adapters/outbound/`)**:
+  - HTTP handler contracts (`RouteContext`, `HttpRequestInput`, `EndpointHttpHandler`, `HttpEndpointDefinition`, `*Dependencies`) live in `src/adapters/inbound/http/http-handler.types.ts`.
+  - Persistence document schemas and adapter options (`CurriculumPackDocument`, `CurriculumPackCollectionLike`, `MongoCurriculumPackRepositoryOptions`) live in `src/adapters/outbound/*.types.ts`, separate from repository and adapter classes.
 
 ## 2. DDD Tactical Rules in the Domain Ring
 
@@ -70,12 +70,12 @@ Use the ubiquitous language from `GLOSSARY.md` across all class, type, method, a
 - **Role-Aware Schema Projection**:
   - Strip `correctIndex` and `explanation` from `CurriculumPack` and Pretest `AssessmentAttempt` responses inside Application/DTO projection mappers unless caller holds a verified `instructorToken` or has completed the Posttest. Never mutate the `CurriculumPack` Aggregate to hide fields.
 
-## 4. HTTP Driving Adapter & Error Translation
+## 4. HTTP Inbound Adapter & Error Translation
 
 - **Request Transformer + Endpoint Handler Factory Pipeline (`createEndpointHandler`)**:
-  - Each HTTP Driving Adapter in `src/adapters/driving/http/` separates transport parsing from use-case execution using two pure building blocks:
+  - Each HTTP Inbound Adapter in `src/adapters/inbound/http/` separates transport parsing from use-case execution using two pure building blocks:
     1. **Request Transformer (`transform<Endpoint>Request`)**: Pure function `(input: HttpRequestInput) => TQuery` that extracts path parameters from `context?.params` (populated natively by Netlify Functions v2 `URLPattern` routing or mapped from AWS Lambda `event.pathParameters`, with URL path fallback for plain `Request` unit tests) and parses `Authorization: Bearer <token>` headers via `parseBearerTokenHeader`.
-    2. **Endpoint Handler Factory (`create<Endpoint>Handler(deps)`)**: Instantiates the Application Use Case with injected Driven Ports (`deps`) and delegates `{ transformRequest, execute }` to `createEndpointHandler` (`src/adapters/driving/http/endpoint-handler.factory.ts`), returning `(request: Request, context?: RouteContext) => Promise<Response>`.
+    2. **Endpoint Handler Factory (`create<Endpoint>Handler(deps)`)**: Instantiates the Application Use Case with injected Outbound Ports (`deps`) and delegates `{ transformRequest, execute }` to `createEndpointHandler` (`src/adapters/inbound/http/endpoint-handler.factory.ts`), returning `(request: Request, context?: RouteContext) => Promise<Response>`.
 - **Single Error Translation Boundary**:
   - Domain and Application layers return typed domain results or throw typed `DomainError` subclasses—never HTTP status codes.
   - `mapDomainErrorToResponse` in `endpoint-handler.factory.ts` maps every `DomainError` to `#/components/schemas/ApiErrorResponse` (`{ code, message, details? }`) using the 15 canonical `ApiErrorCode` values in `docs/api/openapi.yaml` (`INVALID_REQUEST_BODY`, `UNAUTHORIZED_TOKEN`, `FORBIDDEN_ROLE`, `PACK_NOT_FOUND`, `SESSION_NOT_FOUND`, `ROOM_CODE_NOT_FOUND`, `CHAIN_NOT_FOUND`, `PACK_ALREADY_EXISTS`, `INVALID_PHASE_TRANSITION`, `PHASE_CLOSED_FOR_SUBMISSIONS`, `ADJUDICATION_LOCKED_BY_INSTRUCTOR`, `ASSESSMENT_ALREADY_SUBMITTED`, `PACK_VALIDATION_FAILED`, `CHAIN_TOPOLOGY_INVALID`, `ASSESSMENT_INCOMPLETE`).

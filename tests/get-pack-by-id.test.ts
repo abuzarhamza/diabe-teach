@@ -1,15 +1,15 @@
 import { describe, expect, it, vi } from "vitest";
 import type { Context } from "@netlify/functions";
-import { createApp } from "../src/adapters/driving/http/create-app.js";
+import { createApp } from "../src/adapters/inbound/http/create-app.js";
 import {
   createGetPackByIdHandler,
   transformGetPackByIdRequest,
-} from "../src/adapters/driving/http/get-pack-by-id.handler.js";
-import { FakeCapabilityTokenAdapter } from "../src/adapters/driven/fake-capability-token-adapter.js";
-import { HmacCapabilityTokenAdapter } from "../src/adapters/driven/hmac-capability-token-adapter.js";
-import { InMemoryCurriculumPackRepository } from "../src/adapters/driven/in-memory-curriculum-pack-repository.js";
-import { MongoCurriculumPackRepository } from "../src/adapters/driven/mongo-curriculum-pack-repository.js";
-import { CurriculumPackDocument } from "../src/adapters/driven/mongo-curriculum-pack-repository.types.js";
+} from "../src/adapters/inbound/http/get-pack-by-id.handler.js";
+import { FakeCapabilityTokenAdapter } from "../src/adapters/outbound/fake-capability-token-adapter.js";
+import { HmacCapabilityTokenAdapter } from "../src/adapters/outbound/hmac-capability-token-adapter.js";
+import { InMemoryCurriculumPackRepository } from "../src/adapters/outbound/in-memory-curriculum-pack-repository.js";
+import { MongoCurriculumPackRepository } from "../src/adapters/outbound/mongo-curriculum-pack-repository.js";
+import { CurriculumPackDocument } from "../src/adapters/outbound/mongo-curriculum-pack-repository.types.js";
 import { DIABE_TEACH_PACK } from "../src/domain/curriculum-pack/diabe-teach-pack.js";
 import getPackByIdNetlifyHandler, {
   config as getPackByIdNetlifyConfig,

@@ -22,29 +22,29 @@ module.exports = {
       },
     },
     {
-      name: "no-driving-to-driven-adapter-imports",
+      name: "no-inbound-to-outbound-adapter-imports",
       comment:
-        "Driving Adapters (src/adapters/driving) must not import Driven Adapters (src/adapters/driven) directly.",
+        "Inbound Adapters (src/adapters/inbound) must not import Outbound Adapters (src/adapters/outbound) directly.",
       severity: "error",
-      from: { path: "^src/adapters/driving/" },
-      to: { path: "^src/adapters/driven/" },
+      from: { path: "^src/adapters/inbound/" },
+      to: { path: "^src/adapters/outbound/" },
     },
     {
-      name: "no-driven-to-driving-adapter-imports",
+      name: "no-outbound-to-inbound-adapter-imports",
       comment:
-        "Driven Adapters (src/adapters/driven) must not import Driving Adapters (src/adapters/driving) directly.",
+        "Outbound Adapters (src/adapters/outbound) must not import Inbound Adapters (src/adapters/inbound) directly.",
       severity: "error",
-      from: { path: "^src/adapters/driven/" },
-      to: { path: "^src/adapters/driving/" },
+      from: { path: "^src/adapters/outbound/" },
+      to: { path: "^src/adapters/inbound/" },
     },
     {
-      name: "mongodb-isolated-to-driven-adapters-and-composition-root",
+      name: "mongodb-isolated-to-outbound-adapters-and-composition-root",
       comment:
-        "The mongodb driver may only be imported inside Driven Adapters or the Netlify Composition Root.",
+        "The mongodb driver may only be imported inside Outbound Adapters or the Netlify Composition Root.",
       severity: "error",
       from: {
         path: "^src/",
-        pathNot: "^src/adapters/driven/",
+        pathNot: "^src/adapters/outbound/",
       },
       to: {
         path: "node_modules/mongodb",

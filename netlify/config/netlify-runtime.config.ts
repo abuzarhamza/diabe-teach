@@ -1,7 +1,7 @@
-import { HmacCapabilityTokenAdapter } from "../../src/adapters/driven/hmac-capability-token-adapter.js";
-import { getMongoDatabase } from "../../src/adapters/driven/mongo-client-singleton.js";
-import { MongoCurriculumPackRepository } from "../../src/adapters/driven/mongo-curriculum-pack-repository.js";
-import { CurriculumPackDocument } from "../../src/adapters/driven/mongo-curriculum-pack-repository.types.js";
+import { HmacCapabilityTokenAdapter } from "../../src/adapters/outbound/hmac-capability-token-adapter.js";
+import { getMongoDatabase } from "../../src/adapters/outbound/mongo-client-singleton.js";
+import { MongoCurriculumPackRepository } from "../../src/adapters/outbound/mongo-curriculum-pack-repository.js";
+import { CurriculumPackDocument } from "../../src/adapters/outbound/mongo-curriculum-pack-repository.types.js";
 import {
   NetlifyEndpointRouteConfig,
   NetlifyFunctionConfig,

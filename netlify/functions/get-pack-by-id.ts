@@ -1,4 +1,4 @@
-import { createGetPackByIdHandler } from "../../src/adapters/driving/http/get-pack-by-id.handler.js";
+import { createGetPackByIdHandler } from "../../src/adapters/inbound/http/get-pack-by-id.handler.js";
 import { createNetlifyFunctionHandler } from "../config/create-netlify-function-handler.js";
 import { defineNetlifyRouteConfig } from "../config/netlify-runtime.config.js";
 

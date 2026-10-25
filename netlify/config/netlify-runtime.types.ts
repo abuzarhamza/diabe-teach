@@ -1,7 +1,7 @@
 import type { Config, Context } from "@netlify/functions";
 import { CapabilityTokenPort } from "../../src/application/ports/capability-token.port.js";
 import { CurriculumPackRepositoryPort } from "../../src/application/ports/curriculum-pack-repository.port.js";
-import { EndpointHttpHandler } from "../../src/adapters/driving/http/http-handler.types.js";
+import { EndpointHttpHandler } from "../../src/adapters/inbound/http/http-handler.types.js";
 
 export type NetlifyHttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 
