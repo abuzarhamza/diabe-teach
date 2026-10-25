@@ -1,0 +1,1441 @@
+openapi: 3.1.0
+info:
+  title: Concept-Chain Educational Game Platform API (Diabe-teach)
+  version: 1.0.0
+  description: >
+    Subject-agnostic HTTP REST + Server-Sent Events (SSE) API for running
+    associative concept-chaining board games (with **Diabe-teach** as the
+    inaugural built-in Curriculum Pack).
+  license:
+    name: CC-BY-NC-ND-4.0
+    url: https://creativecommons.org/licenses/by-nc-nd/4.0/
+
+servers:
+  - url: http://localhost:3000
+    description: Local development server
+
+tags:
+  - name: Packs
+    description: Curriculum Pack discovery, validation, and registration
+  - name: Sessions
+    description: Game Session creation, classroom room join, phase transitions, and SSE stream
+  - name: Chains
+    description: Concept Chain submission, peer/AI/instructor adjudication, and round standings
+  - name: Assessments & Analytics
+    description: Pretest/Posttest Assessment Attempts, Likert perception survey, and metacognitive analytics
+
+paths:
+  /api/v1/packs:
+    get:
+      operationId: listCurriculumPacks
+      tags: [Packs]
+      summary: List all registered Curriculum Packs
+      responses:
+        "200":
+          description: List of registered Curriculum Pack summaries
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [packs]
+                properties:
+                  packs:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/CurriculumPackSummary"
+    post:
+      operationId: registerCurriculumPack
+      tags: [Packs]
+      summary: Validate and register a new Curriculum Pack
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CurriculumPackInput"
+      responses:
+        "201":
+          description: Curriculum Pack validated and registered
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [pack]
+                properties:
+                  pack:
+                    $ref: "#/components/schemas/CurriculumPackSummary"
+        "400":
+          $ref: "#/components/responses/BadRequestError"
+        "409":
+          description: A Curriculum Pack with the given id already exists
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "422":
+          description: Curriculum Pack failed structural or topological validation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+
+  /api/v1/packs/validate:
+    post:
+      operationId: validateCurriculumPack
+      tags: [Packs]
+      summary: Validate a draft Curriculum Pack payload without registering it
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CurriculumPackInput"
+      responses:
+        "200":
+          description: Validation result with any structural or topological issues
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [valid, issues]
+                properties:
+                  valid:
+                    type: boolean
+                  issues:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/PackValidationIssue"
+
+  /api/v1/packs/{packId}:
+    get:
+      operationId: getCurriculumPackById
+      tags: [Packs]
+      summary: Fetch a Curriculum Pack by ID (redacts assessment answer keys unless instructorToken is supplied)
+      security:
+        - {}
+        - BearerAuth: []
+      parameters:
+        - name: packId
+          in: path
+          required: true
+          schema:
+            type: string
+          examples:
+            diabeTeach:
+              value: diabe-teach
+      responses:
+        "200":
+          description: Curriculum Pack details
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [pack]
+                properties:
+                  pack:
+                    $ref: "#/components/schemas/PublicCurriculumPack"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+
+  /api/v1/sessions:
+    post:
+      operationId: createGameSession
+      tags: [Sessions]
+      summary: Create a new Game Session (auto-joins and starts Round 1 when mode is "solo")
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateSessionRequest"
+      responses:
+        "201":
+          description: Game Session created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateSessionResponse"
+        "400":
+          $ref: "#/components/responses/BadRequestError"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+
+  /api/v1/sessions/join:
+    post:
+      operationId: joinGameSession
+      tags: [Sessions]
+      summary: Join an active Game Session via roomCode and receive a participantToken
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/JoinSessionRequest"
+      responses:
+        "200":
+          description: Joined Game Session
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JoinSessionResponse"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+
+  /api/v1/sessions/{sessionId}:
+    get:
+      operationId: getGameSessionState
+      tags: [Sessions]
+      summary: Get current Game Session state snapshot
+      parameters:
+        - $ref: "#/components/parameters/SessionIdParam"
+      responses:
+        "200":
+          description: Current Game Session state snapshot
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [state]
+                properties:
+                  state:
+                    $ref: "#/components/schemas/PublicSessionState"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+
+  /api/v1/sessions/{sessionId}/stream:
+    get:
+      operationId: streamGameSessionEvents
+      tags: [Sessions]
+      summary: Subscribe to real-time Server-Sent Events (SSE) for a Game Session
+      parameters:
+        - $ref: "#/components/parameters/SessionIdParam"
+      responses:
+        "200":
+          description: Server-Sent Events stream emitting typed session updates
+          content:
+            text/event-stream:
+              schema:
+                $ref: "#/components/schemas/SseEventEnvelope"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+
+  /api/v1/sessions/{sessionId}/phase:
+    post:
+      operationId: transitionSessionPhase
+      tags: [Sessions]
+      summary: Advance or transition the Game Session phase (shuffles a fresh board on Round 1 & Round 2 entry)
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/SessionIdParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TransitionPhaseRequest"
+      responses:
+        "200":
+          description: Phase transitioned
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [state]
+                properties:
+                  state:
+                    $ref: "#/components/schemas/PublicSessionState"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "403":
+          $ref: "#/components/responses/ForbiddenError"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+        "409":
+          $ref: "#/components/responses/ConflictError"
+
+  /api/v1/sessions/{sessionId}/rounds/{roundNumber}/chains:
+    post:
+      operationId: submitConceptChain
+      tags: [Chains]
+      summary: Submit a Concept Chain during the chain-mapping sub-phase
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/SessionIdParam"
+        - $ref: "#/components/parameters/RoundNumberParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SubmitChainRequest"
+      responses:
+        "201":
+          description: Concept Chain passed topological validation and was recorded
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [chain]
+                properties:
+                  chain:
+                    $ref: "#/components/schemas/SubmittedChain"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+        "409":
+          description: Round is not in the chain-mapping sub-phase (PHASE_CLOSED_FOR_SUBMISSIONS)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "422":
+          description: Concept Chain failed topological validation (CHAIN_TOPOLOGY_INVALID)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+
+  /api/v1/sessions/{sessionId}/rounds/{roundNumber}/chains/{chainId}/adjudicate:
+    post:
+      operationId: adjudicateConceptChain
+      tags: [Chains]
+      summary: Cast a peer vote, trigger AI evaluation, or record an Instructor Final Ruling on a Concept Chain
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/SessionIdParam"
+        - $ref: "#/components/parameters/RoundNumberParam"
+        - name: chainId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdjudicateChainRequest"
+      responses:
+        "200":
+          description: Updated Concept Chain with latest votes and adjudication verdict
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [chain]
+                properties:
+                  chain:
+                    $ref: "#/components/schemas/SubmittedChain"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "403":
+          $ref: "#/components/responses/ForbiddenError"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+        "409":
+          description: Chain verdict is locked by an Instructor Final Ruling (ADJUDICATION_LOCKED_BY_INSTRUCTOR)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+
+  /api/v1/sessions/{sessionId}/rounds/{roundNumber}/standings:
+    get:
+      operationId: getRoundStandings
+      tags: [Chains]
+      summary: Get ranked round standings (longest approved chain primary, total distinct approved chains tie-breaker)
+      parameters:
+        - $ref: "#/components/parameters/SessionIdParam"
+        - $ref: "#/components/parameters/RoundNumberParam"
+      responses:
+        "200":
+          description: Ranked standings for the specified round
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [roundNumber, isFinalized, standings]
+                properties:
+                  roundNumber:
+                    type: integer
+                    enum: [1, 2]
+                  isFinalized:
+                    type: boolean
+                  standings:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/PlayerRoundStanding"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+
+  /api/v1/sessions/{sessionId}/assessments/{stage}:
+    post:
+      operationId: submitAssessmentAttempt
+      tags: [Assessments & Analytics]
+      summary: Submit a one-shot Pretest or Posttest Assessment Attempt (with explicit I_DONT_KNOW support)
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/SessionIdParam"
+        - name: stage
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [pretest, posttest]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SubmitAssessmentRequest"
+      responses:
+        "201":
+          description: >
+            Assessment Attempt recorded. Pretest returns an ungraded receipt to preserve
+            answer-key secrecy; Posttest returns the full LearnerMetacognitiveReport and answer key review.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AssessmentSubmissionResponse"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+        "409":
+          description: Participant has already submitted this assessment stage (ASSESSMENT_ALREADY_SUBMITTED)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "422":
+          description: Missing answer choices for one or more questions (ASSESSMENT_INCOMPLETE)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+
+  /api/v1/sessions/{sessionId}/survey:
+    post:
+      operationId: submitPerceptionSurvey
+      tags: [Assessments & Analytics]
+      summary: Submit 5-point Likert perception survey ratings
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/SessionIdParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SubmitSurveyRequest"
+      responses:
+        "201":
+          description: Perception survey recorded
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [participantId, recordedItemCount, submittedAt]
+                properties:
+                  participantId:
+                    type: string
+                  recordedItemCount:
+                    type: integer
+                  submittedAt:
+                    type: string
+                    format: date-time
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+        "422":
+          $ref: "#/components/responses/UnprocessableEntityError"
+
+  /api/v1/sessions/{sessionId}/analytics:
+    get:
+      operationId: getSessionAnalytics
+      tags: [Assessments & Analytics]
+      summary: Fetch individual learner or full cohort metacognitive and gameplay analytics
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/SessionIdParam"
+      responses:
+        "200":
+          description: Learner or cohort analytics report depending on caller role token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionAnalyticsResponse"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: SessionCapabilityToken
+      description: >
+        Pass either an `instructorToken` (returned on session creation) or a
+        `participantToken` (returned on session join or solo session creation).
+
+  parameters:
+    SessionIdParam:
+      name: sessionId
+      in: path
+      required: true
+      schema:
+        type: string
+    RoundNumberParam:
+      name: roundNumber
+      in: path
+      required: true
+      schema:
+        type: integer
+        enum: [1, 2]
+
+  responses:
+    BadRequestError:
+      description: Malformed request payload
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiErrorResponse"
+    UnauthorizedError:
+      description: Missing or invalid bearer token
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiErrorResponse"
+    ForbiddenError:
+      description: Valid token does not have required role for this operation
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiErrorResponse"
+    NotFoundError:
+      description: Requested resource was not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiErrorResponse"
+    ConflictError:
+      description: Operation conflicts with current state machine phase or lock
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiErrorResponse"
+    UnprocessableEntityError:
+      description: Semantic or domain validation failed
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiErrorResponse"
+
+  schemas:
+    ApiErrorCode:
+      type: string
+      enum:
+        - INVALID_REQUEST_BODY
+        - UNAUTHORIZED_TOKEN
+        - FORBIDDEN_ROLE
+        - PACK_NOT_FOUND
+        - SESSION_NOT_FOUND
+        - ROOM_CODE_NOT_FOUND
+        - CHAIN_NOT_FOUND
+        - PACK_ALREADY_EXISTS
+        - INVALID_PHASE_TRANSITION
+        - PHASE_CLOSED_FOR_SUBMISSIONS
+        - ADJUDICATION_LOCKED_BY_INSTRUCTOR
+        - ASSESSMENT_ALREADY_SUBMITTED
+        - PACK_VALIDATION_FAILED
+        - CHAIN_TOPOLOGY_INVALID
+        - ASSESSMENT_INCOMPLETE
+
+    ApiErrorResponse:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          $ref: "#/components/schemas/ApiErrorCode"
+        message:
+          type: string
+        details:
+          type: object
+          additionalProperties: true
+
+    BoardConfig:
+      type: object
+      required: [rows, cols, minChainLength, adjacencyRule]
+      properties:
+        rows:
+          type: integer
+          minimum: 3
+          maximum: 12
+          default: 7
+        cols:
+          type: integer
+          minimum: 3
+          maximum: 12
+          default: 7
+        minChainLength:
+          type: integer
+          minimum: 2
+          default: 4
+        adjacencyRule:
+          type: string
+          enum: [chebyshev-8, orthogonal-4]
+          default: chebyshev-8
+
+    SemanticDomain:
+      type: object
+      required: [id, label, description]
+      properties:
+        id:
+          type: string
+        label:
+          type: string
+        description:
+          type: string
+
+    KeywordCard:
+      type: object
+      required: [id, verbatimLabel, displayLabel, aliases, domainId, summary]
+      properties:
+        id:
+          type: string
+        verbatimLabel:
+          type: string
+        displayLabel:
+          type: string
+        aliases:
+          type: array
+          items:
+            type: string
+        domainId:
+          type: string
+        summary:
+          type: string
+
+    GridCoord:
+      type: object
+      required: [row, col]
+      properties:
+        row:
+          type: integer
+          minimum: 0
+        col:
+          type: integer
+          minimum: 0
+
+    CalibrationExample:
+      type: object
+      required: [id, title, path, keywordIds, narrativeExplanation, isValid]
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        path:
+          type: array
+          items:
+            $ref: "#/components/schemas/GridCoord"
+        keywordIds:
+          type: array
+          items:
+            type: string
+        narrativeExplanation:
+          type: string
+        isValid:
+          type: boolean
+        invalidReason:
+          type: [string, "null"]
+
+    AdjudicationRubric:
+      type: object
+      required: [evaluatorPersona, subjectDomain, chainContinuityCriteria, calibrationExamples]
+      properties:
+        evaluatorPersona:
+          type: string
+        subjectDomain:
+          type: string
+        chainContinuityCriteria:
+          type: array
+          minItems: 1
+          items:
+            type: string
+        calibrationBoardCardIds:
+          type: array
+          description: Optional fixed 2D matrix of card IDs (e.g., Figure 2 of the Diabe-teach paper)
+          items:
+            type: array
+            items:
+              type: string
+        calibrationExamples:
+          type: array
+          items:
+            $ref: "#/components/schemas/CalibrationExample"
+
+    PublicAssessmentQuestion:
+      type: object
+      required: [id, bloomLevel, stem, options, relatedKeywordIds]
+      properties:
+        id:
+          type: string
+        bloomLevel:
+          type: integer
+          enum: [2, 3]
+        stem:
+          type: string
+        options:
+          type: array
+          minItems: 4
+          maxItems: 4
+          items:
+            type: string
+        relatedKeywordIds:
+          type: array
+          items:
+            type: string
+        correctIndex:
+          type: integer
+          minimum: 0
+          maximum: 3
+          description: Present only when requested with a valid instructorToken
+        explanation:
+          type: string
+          description: Present only when requested with a valid instructorToken
+
+    PerceptionSurveyItem:
+      type: object
+      required: [id, prompt]
+      properties:
+        id:
+          type: string
+        prompt:
+          type: string
+
+    CurriculumPackSummary:
+      type: object
+      required:
+        - id
+        - title
+        - version
+        - subjectDomain
+        - boardConfig
+        - cardCount
+        - domainCount
+        - hasAssessmentInstrument
+        - hasPerceptionSurvey
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        version:
+          type: string
+        subjectDomain:
+          type: string
+        boardConfig:
+          $ref: "#/components/schemas/BoardConfig"
+        cardCount:
+          type: integer
+        domainCount:
+          type: integer
+        hasAssessmentInstrument:
+          type: boolean
+        hasPerceptionSurvey:
+          type: boolean
+
+    PublicCurriculumPack:
+      type: object
+      required: [id, title, version, description, boardConfig, domains, cards, adjudicationRubric]
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        version:
+          type: string
+        description:
+          type: string
+        boardConfig:
+          $ref: "#/components/schemas/BoardConfig"
+        domains:
+          type: array
+          items:
+            $ref: "#/components/schemas/SemanticDomain"
+        cards:
+          type: array
+          items:
+            $ref: "#/components/schemas/KeywordCard"
+        adjudicationRubric:
+          $ref: "#/components/schemas/AdjudicationRubric"
+        assessmentInstrument:
+          type: [object, "null"]
+          required: [questions]
+          properties:
+            questions:
+              type: array
+              items:
+                $ref: "#/components/schemas/PublicAssessmentQuestion"
+        perceptionSurvey:
+          type: [object, "null"]
+          required: [items]
+          properties:
+            items:
+              type: array
+              items:
+                $ref: "#/components/schemas/PerceptionSurveyItem"
+
+    CurriculumPackInput:
+      allOf:
+        - $ref: "#/components/schemas/PublicCurriculumPack"
+
+    PackValidationIssue:
+      type: object
+      required: [jsonPointer, rule, message]
+      properties:
+        jsonPointer:
+          type: string
+        rule:
+          type: string
+        message:
+          type: string
+
+    SessionMode:
+      type: string
+      enum: [solo, classroom, study-rct]
+
+    AdjudicationMode:
+      type: string
+      enum: [ai, peer-instructor, hybrid]
+
+    PhaseIdentifier:
+      type: string
+      enum:
+        - pretest
+        - trial-orientation
+        - round-1:chain-mapping
+        - round-1:peer-adjudication
+        - round-1:round-summary
+        - round-2:chain-mapping
+        - round-2:peer-adjudication
+        - round-2:round-summary
+        - posttest
+        - feedback-survey
+        - completed
+
+    SessionTimerConfig:
+      type: object
+      properties:
+        pretestSec:
+          type: integer
+          default: 900
+        trialOrientationSec:
+          type: integer
+          default: 900
+        roundMappingSec:
+          type: integer
+          default: 1200
+        roundAdjudicationSec:
+          type: integer
+          default: 600
+        posttestSec:
+          type: integer
+          default: 900
+        feedbackSurveySec:
+          type: integer
+          default: 900
+
+    CreateSessionRequest:
+      type: object
+      required: [packId, mode, adjudicationMode]
+      properties:
+        packId:
+          type: string
+          default: diabe-teach
+        mode:
+          $ref: "#/components/schemas/SessionMode"
+        adjudicationMode:
+          $ref: "#/components/schemas/AdjudicationMode"
+        timerConfig:
+          $ref: "#/components/schemas/SessionTimerConfig"
+        seed:
+          type: string
+        creatorDisplayName:
+          type: string
+
+    CreateSessionResponse:
+      type: object
+      required: [sessionId, roomCode, instructorToken, state]
+      properties:
+        sessionId:
+          type: string
+        roomCode:
+          type: string
+        instructorToken:
+          type: string
+        participantId:
+          type: [string, "null"]
+          description: Auto-populated when mode is "solo"
+        participantToken:
+          type: [string, "null"]
+          description: Auto-populated when mode is "solo"
+        state:
+          $ref: "#/components/schemas/PublicSessionState"
+
+    JoinSessionRequest:
+      type: object
+      required: [roomCode]
+      properties:
+        roomCode:
+          type: string
+        displayName:
+          type: string
+
+    JoinSessionResponse:
+      type: object
+      required: [sessionId, participantId, participantToken, state]
+      properties:
+        sessionId:
+          type: string
+        participantId:
+          type: string
+        participantToken:
+          type: string
+        state:
+          $ref: "#/components/schemas/PublicSessionState"
+
+    BoardCellView:
+      type: object
+      required: [row, col, card]
+      properties:
+        row:
+          type: integer
+        col:
+          type: integer
+        card:
+          $ref: "#/components/schemas/KeywordCard"
+
+    BoardGridView:
+      type: object
+      required: [seed, rows, cols, cells]
+      properties:
+        seed:
+          type: string
+        rows:
+          type: integer
+        cols:
+          type: integer
+        cells:
+          type: array
+          items:
+            type: array
+            items:
+              $ref: "#/components/schemas/BoardCellView"
+
+    PublicSessionState:
+      type: object
+      required:
+        - sessionId
+        - roomCode
+        - packId
+        - mode
+        - adjudicationMode
+        - currentPhase
+        - phaseStartedAt
+        - phaseEndsAt
+        - participantCount
+      properties:
+        sessionId:
+          type: string
+        roomCode:
+          type: string
+        packId:
+          type: string
+        mode:
+          $ref: "#/components/schemas/SessionMode"
+        adjudicationMode:
+          $ref: "#/components/schemas/AdjudicationMode"
+        currentPhase:
+          $ref: "#/components/schemas/PhaseIdentifier"
+        activeRoundNumber:
+          type: [integer, "null"]
+          enum: [1, 2, null]
+        phaseStartedAt:
+          type: string
+          format: date-time
+        phaseEndsAt:
+          type: string
+          format: date-time
+        activeBoard:
+          oneOf:
+            - $ref: "#/components/schemas/BoardGridView"
+            - type: "null"
+        participantCount:
+          type: integer
+
+    TransitionPhaseRequest:
+      type: object
+      required: [action]
+      properties:
+        action:
+          type: string
+          enum: [advance, jump]
+          default: advance
+        targetPhase:
+          $ref: "#/components/schemas/PhaseIdentifier"
+        seed:
+          type: string
+
+    StepRationale:
+      type: object
+      required: [fromCoord, toCoord, rationale]
+      properties:
+        fromCoord:
+          $ref: "#/components/schemas/GridCoord"
+        toCoord:
+          $ref: "#/components/schemas/GridCoord"
+        rationale:
+          type: string
+
+    SubmitChainRequest:
+      type: object
+      required: [path, narrativeExplanation]
+      properties:
+        path:
+          type: array
+          minItems: 2
+          items:
+            $ref: "#/components/schemas/GridCoord"
+        narrativeExplanation:
+          type: string
+          minLength: 1
+        stepRationales:
+          type: array
+          items:
+            $ref: "#/components/schemas/StepRationale"
+
+    TransitionEvaluation:
+      type: object
+      required: [fromKeywordId, toKeywordId, isSound, commentary]
+      properties:
+        fromKeywordId:
+          type: string
+        toKeywordId:
+          type: string
+        isSound:
+          type: boolean
+        commentary:
+          type: string
+
+    AdjudicationVerdict:
+      type: object
+      required:
+        - isApproved
+        - adjudicatorType
+        - isLocked
+        - qualityScore
+        - transitionEvaluations
+        - overallFeedback
+      properties:
+        isApproved:
+          type: boolean
+        adjudicatorType:
+          type: string
+          enum: [ai-specialist, peer-consensus, instructor-final]
+        isLocked:
+          type: boolean
+        qualityScore:
+          type: number
+          minimum: 1
+          maximum: 10
+        transitionEvaluations:
+          type: array
+          items:
+            $ref: "#/components/schemas/TransitionEvaluation"
+        overallFeedback:
+          type: string
+        suggestedRefinements:
+          type: [string, "null"]
+
+    PeerVoteRecord:
+      type: object
+      required: [voterParticipantId, decision, votedAt]
+      properties:
+        voterParticipantId:
+          type: string
+        decision:
+          type: string
+          enum: [approve, challenge]
+        comment:
+          type: [string, "null"]
+        votedAt:
+          type: string
+          format: date-time
+
+    SubmittedChain:
+      type: object
+      required:
+        - chainId
+        - sessionId
+        - roundNumber
+        - participantId
+        - path
+        - keywordIds
+        - narrativeExplanation
+        - status
+        - peerVotes
+        - submittedAt
+      properties:
+        chainId:
+          type: string
+        sessionId:
+          type: string
+        roundNumber:
+          type: integer
+          enum: [1, 2]
+        participantId:
+          type: string
+        path:
+          type: array
+          items:
+            $ref: "#/components/schemas/GridCoord"
+        keywordIds:
+          type: array
+          items:
+            type: string
+        narrativeExplanation:
+          type: string
+        stepRationales:
+          type: array
+          items:
+            $ref: "#/components/schemas/StepRationale"
+        status:
+          type: string
+          enum: [pending-review, approved, rejected]
+        verdict:
+          oneOf:
+            - $ref: "#/components/schemas/AdjudicationVerdict"
+            - type: "null"
+        peerVotes:
+          type: array
+          items:
+            $ref: "#/components/schemas/PeerVoteRecord"
+        submittedAt:
+          type: string
+          format: date-time
+
+    AdjudicateChainRequest:
+      oneOf:
+        - $ref: "#/components/schemas/PeerVoteActionRequest"
+        - $ref: "#/components/schemas/AiEvaluateActionRequest"
+        - $ref: "#/components/schemas/InstructorRulingActionRequest"
+      discriminator:
+        propertyName: action
+        mapping:
+          peer-approve: "#/components/schemas/PeerVoteActionRequest"
+          peer-challenge: "#/components/schemas/PeerVoteActionRequest"
+          ai-evaluate: "#/components/schemas/AiEvaluateActionRequest"
+          instructor-approve: "#/components/schemas/InstructorRulingActionRequest"
+          instructor-reject: "#/components/schemas/InstructorRulingActionRequest"
+
+    PeerVoteActionRequest:
+      type: object
+      required: [action]
+      properties:
+        action:
+          type: string
+          enum: [peer-approve, peer-challenge]
+        comment:
+          type: string
+
+    AiEvaluateActionRequest:
+      type: object
+      required: [action]
+      properties:
+        action:
+          type: string
+          const: ai-evaluate
+
+    InstructorRulingActionRequest:
+      type: object
+      required: [action, feedback]
+      properties:
+        action:
+          type: string
+          enum: [instructor-approve, instructor-reject]
+        feedback:
+          type: string
+          minLength: 1
+        qualityScore:
+          type: number
+          minimum: 1
+          maximum: 10
+
+    PlayerRoundStanding:
+      type: object
+      required:
+        - rank
+        - participantId
+        - longestValidChainLength
+        - totalValidChainsCount
+        - cumulativeRationaleScore
+        - approvedChainIds
+      properties:
+        rank:
+          type: integer
+          minimum: 1
+        participantId:
+          type: string
+        displayName:
+          type: [string, "null"]
+        longestValidChainLength:
+          type: integer
+          minimum: 0
+        totalValidChainsCount:
+          type: integer
+          minimum: 0
+        cumulativeRationaleScore:
+          type: number
+          minimum: 0
+        approvedChainIds:
+          type: array
+          items:
+            type: string
+
+    McqAnswerChoice:
+      oneOf:
+        - type: integer
+          enum: [0, 1, 2, 3]
+        - type: string
+          const: I_DONT_KNOW
+
+    SubmitAssessmentRequest:
+      type: object
+      required: [answers]
+      properties:
+        answers:
+          type: object
+          additionalProperties:
+            $ref: "#/components/schemas/McqAnswerChoice"
+
+    AssessmentStageSummary:
+      type: object
+      required:
+        - stage
+        - totalQuestions
+        - correctCount
+        - wrongGuessCount
+        - iDontKnowCount
+        - correctPercentage
+        - wrongGuessPercentage
+        - iDontKnowPercentage
+        - uncertaintyCalibrationRatio
+      properties:
+        stage:
+          type: string
+          enum: [pretest, posttest]
+        totalQuestions:
+          type: integer
+        correctCount:
+          type: integer
+        wrongGuessCount:
+          type: integer
+        iDontKnowCount:
+          type: integer
+        correctPercentage:
+          type: number
+        wrongGuessPercentage:
+          type: number
+        iDontKnowPercentage:
+          type: number
+        uncertaintyCalibrationRatio:
+          type: number
+          description: iDontKnowCount / (iDontKnowCount + wrongGuessCount), or 1.0 when both are 0
+
+    LearnerMetacognitiveReport:
+      type: object
+      required:
+        - participantId
+        - chainDiversityIndex
+        - neglectedKeywordIds
+      properties:
+        participantId:
+          type: string
+        pretest:
+          oneOf:
+            - $ref: "#/components/schemas/AssessmentStageSummary"
+            - type: "null"
+        posttest:
+          oneOf:
+            - $ref: "#/components/schemas/AssessmentStageSummary"
+            - type: "null"
+        knowledgeGainDelta:
+          type: [number, "null"]
+        guessingReductionDelta:
+          type: [number, "null"]
+        chainDiversityIndex:
+          type: number
+          minimum: 0
+          maximum: 1
+        neglectedKeywordIds:
+          type: array
+          items:
+            type: string
+
+    QuestionReviewItem:
+      type: object
+      required: [questionId, stem, options, correctIndex, pretestChoice, posttestChoice]
+      properties:
+        questionId:
+          type: string
+        stem:
+          type: string
+        options:
+          type: array
+          items:
+            type: string
+        correctIndex:
+          type: integer
+        explanation:
+          type: [string, "null"]
+        pretestChoice:
+          oneOf:
+            - $ref: "#/components/schemas/McqAnswerChoice"
+            - type: "null"
+        posttestChoice:
+          $ref: "#/components/schemas/McqAnswerChoice"
+
+    AssessmentSubmissionResponse:
+      oneOf:
+        - $ref: "#/components/schemas/PretestSubmissionReceipt"
+        - $ref: "#/components/schemas/PosttestSubmissionResult"
+      discriminator:
+        propertyName: stage
+        mapping:
+          pretest: "#/components/schemas/PretestSubmissionReceipt"
+          posttest: "#/components/schemas/PosttestSubmissionResult"
+
+    PretestSubmissionReceipt:
+      type: object
+      required: [stage, participantId, recordedCount, submittedAt]
+      properties:
+        stage:
+          type: string
+          const: pretest
+        participantId:
+          type: string
+        recordedCount:
+          type: integer
+        submittedAt:
+          type: string
+          format: date-time
+
+    PosttestSubmissionResult:
+      type: object
+      required: [stage, participantId, submittedAt, report, answerKeyReview]
+      properties:
+        stage:
+          type: string
+          const: posttest
+        participantId:
+          type: string
+        submittedAt:
+          type: string
+          format: date-time
+        report:
+          $ref: "#/components/schemas/LearnerMetacognitiveReport"
+        answerKeyReview:
+          type: array
+          items:
+            $ref: "#/components/schemas/QuestionReviewItem"
+
+    SubmitSurveyRequest:
+      type: object
+      required: [responses]
+      properties:
+        responses:
+          type: object
+          additionalProperties:
+            type: integer
+            enum: [1, 2, 3, 4, 5]
+        comments:
+          type: string
+
+    CohortAnalyticsReport:
+      type: object
+      required:
+        - sessionId
+        - participantCount
+        - pretestCohortMeanPercentage
+        - posttestCohortMeanPercentage
+        - posttestWrongGuessMeanPercentage
+        - posttestIDontKnowMeanPercentage
+        - meanChainDiversityIndex
+        - boardNeglectHeatmap
+      properties:
+        sessionId:
+          type: string
+        participantCount:
+          type: integer
+        pretestCohortMeanPercentage:
+          type: [number, "null"]
+        posttestCohortMeanPercentage:
+          type: [number, "null"]
+        posttestWrongGuessMeanPercentage:
+          type: [number, "null"]
+        posttestIDontKnowMeanPercentage:
+          type: [number, "null"]
+        meanChainDiversityIndex:
+          type: number
+        boardNeglectHeatmap:
+          type: array
+          description: 2D matrix of usage frequencies per (row, col) cell
+          items:
+            type: array
+            items:
+              type: number
+
+    SessionAnalyticsResponse:
+      type: object
+      required: [role, cohortSummary]
+      properties:
+        role:
+          type: string
+          enum: [participant, instructor]
+        participantReport:
+          oneOf:
+            - $ref: "#/components/schemas/LearnerMetacognitiveReport"
+            - type: "null"
+        cohortSummary:
+          $ref: "#/components/schemas/CohortAnalyticsReport"
+
+    SseEventEnvelope:
+      type: object
+      required: [event, data]
+      properties:
+        event:
+          type: string
+          enum:
+            - session.snapshot
+            - participant.joined
+            - phase.changed
+            - chain.submitted
+            - chain.adjudicated
+            - standings.updated
+        data:
+          type: object
+          additionalProperties: true
