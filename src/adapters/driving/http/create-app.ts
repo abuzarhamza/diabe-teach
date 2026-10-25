@@ -27,6 +27,21 @@ function jsonResponse(body: unknown, status: number): Response {
   });
 }
 
+function parseBearerTokenHeader(
+  authorizationHeader: string | null,
+): string | null {
+  if (authorizationHeader === null) {
+    return null;
+  }
+  const match = /^Bearer\s+(\S+)$/.exec(authorizationHeader.trim());
+  if (!match || !match[1]) {
+    throw new UnauthorizedTokenError(
+      "Malformed Authorization header. Expected 'Bearer <token>'.",
+    );
+  }
+  return match[1];
+}
+
 function mapDomainErrorToResponse(error: DomainError): Response {
   const payload: {
     code: string;
@@ -62,10 +77,12 @@ export function createApp(deps: AppDependencies): HttpApp {
         if (match && match[1]) {
           try {
             const packId = decodeURIComponent(match[1]);
-            const authorizationHeader = request.headers.get("authorization");
+            const bearerToken = parseBearerTokenHeader(
+              request.headers.get("authorization"),
+            );
             const result = await getPackByIdUseCase.execute({
               packId,
-              authorizationHeader,
+              bearerToken,
             });
             return jsonResponse(result, 200);
           } catch (error) {
@@ -79,8 +96,8 @@ export function createApp(deps: AppDependencies): HttpApp {
 
       return jsonResponse(
         {
-          code: "PACK_NOT_FOUND",
-          message: `Route ${request.method} ${url.pathname} not found.`,
+          code: "INVALID_REQUEST_BODY",
+          message: `Route ${request.method} ${url.pathname} is not supported.`,
         },
         404,
       );

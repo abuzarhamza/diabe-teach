@@ -172,6 +172,20 @@ describe("Ticket 01 — Walking Skeleton: GET /api/v1/packs/{packId}", () => {
         packId: "unknown-pack",
       },
     });
+
+    const whitespaceRes = await app.fetch(
+      new Request("http://localhost:3000/api/v1/packs/%20", {
+        method: "GET",
+      }),
+    );
+    expect(whitespaceRes.status).toBe(404);
+    expect(await whitespaceRes.json()).toEqual({
+      code: "PACK_NOT_FOUND",
+      message: "Curriculum Pack ' ' was not found.",
+      details: {
+        packId: " ",
+      },
+    });
   });
 
   it("resolves KeywordCards on the CurriculumPack Aggregate Root by id, verbatimLabel, displayLabel, and clinical aliases in O(1)", () => {

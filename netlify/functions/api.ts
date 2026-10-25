@@ -6,23 +6,27 @@ import {
 } from "../../src/adapters/driven/mongo-curriculum-pack-repository.js";
 import { createApp } from "../../src/adapters/driving/http/create-app.js";
 
-const DEFAULT_DEV_TOKEN_SECRET =
-  "diabe-teach-default-dev-capability-token-secret";
-
 function buildProductionApp() {
-  const mongoUri = process.env.MONGODB_URI ?? "mongodb://127.0.0.1:27017";
   const mongoDbName = process.env.MONGODB_DB_NAME ?? "diabe_teach";
-  const tokenSecret =
-    process.env.CAPABILITY_TOKEN_SECRET ?? DEFAULT_DEV_TOKEN_SECRET;
+  const tokenSecret = process.env.CAPABILITY_TOKEN_SECRET;
 
   const packRepo = new MongoCurriculumPackRepository({
     getCollection: async () => {
+      const mongoUri = process.env.MONGODB_URI;
+      if (!mongoUri) {
+        throw new Error(
+          "MONGODB_URI environment variable is required to query custom Curriculum Packs.",
+        );
+      }
       const db = await getMongoDatabase(mongoUri, mongoDbName);
       return db.collection<CurriculumPackDocument>("curriculum_packs");
     },
   });
 
-  const tokenVerifier = new HmacCapabilityTokenAdapter(tokenSecret);
+  const tokenVerifier =
+    tokenSecret && tokenSecret.trim().length > 0
+      ? new HmacCapabilityTokenAdapter(tokenSecret)
+      : undefined;
 
   return createApp({
     packRepo,

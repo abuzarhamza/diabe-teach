@@ -1,9 +1,9 @@
 import {
-  AdjacencyRule,
-  CalibrationExample,
+  AdjudicationRubric,
+  BoardConfig,
   CurriculumPack,
   KeywordCard,
-  PerceptionSurveyItem,
+  PerceptionSurvey,
   SemanticDomain,
 } from "../../domain/curriculum-pack/curriculum-pack.js";
 
@@ -22,27 +22,14 @@ export interface PublicCurriculumPackDto {
   readonly title: string;
   readonly version: string;
   readonly description: string;
-  readonly boardConfig: {
-    readonly rows: number;
-    readonly cols: number;
-    readonly minChainLength: number;
-    readonly adjacencyRule: AdjacencyRule;
-  };
+  readonly boardConfig: BoardConfig;
   readonly domains: readonly SemanticDomain[];
   readonly cards: readonly KeywordCard[];
-  readonly adjudicationRubric: {
-    readonly evaluatorPersona: string;
-    readonly subjectDomain: string;
-    readonly chainContinuityCriteria: readonly string[];
-    readonly calibrationBoardCardIds?: readonly (readonly string[])[];
-    readonly calibrationExamples: readonly CalibrationExample[];
-  };
+  readonly adjudicationRubric: AdjudicationRubric;
   readonly assessmentInstrument: {
     readonly questions: readonly PublicAssessmentQuestionDto[];
   } | null;
-  readonly perceptionSurvey: {
-    readonly items: readonly PerceptionSurveyItem[];
-  } | null;
+  readonly perceptionSurvey: PerceptionSurvey | null;
 }
 
 export class CurriculumPackProjector {
@@ -55,39 +42,10 @@ export class CurriculumPackProjector {
       title: pack.title,
       version: pack.version,
       description: pack.description,
-      boardConfig: {
-        rows: pack.boardConfig.rows,
-        cols: pack.boardConfig.cols,
-        minChainLength: pack.boardConfig.minChainLength,
-        adjacencyRule: pack.boardConfig.adjacencyRule,
-      },
-      domains: pack.domains.map((d) => ({ ...d })),
-      cards: pack.cards.map((c) => ({
-        ...c,
-        aliases: [...c.aliases],
-      })),
-      adjudicationRubric: {
-        evaluatorPersona: pack.adjudicationRubric.evaluatorPersona,
-        subjectDomain: pack.adjudicationRubric.subjectDomain,
-        chainContinuityCriteria: [
-          ...pack.adjudicationRubric.chainContinuityCriteria,
-        ],
-        ...(pack.adjudicationRubric.calibrationBoardCardIds
-          ? {
-              calibrationBoardCardIds:
-                pack.adjudicationRubric.calibrationBoardCardIds.map((row) => [
-                  ...row,
-                ]),
-            }
-          : {}),
-        calibrationExamples: pack.adjudicationRubric.calibrationExamples.map(
-          (ex) => ({
-            ...ex,
-            path: ex.path.map((coord) => ({ ...coord })),
-            keywordIds: [...ex.keywordIds],
-          }),
-        ),
-      },
+      boardConfig: pack.boardConfig,
+      domains: pack.domains,
+      cards: pack.cards,
+      adjudicationRubric: pack.adjudicationRubric,
       assessmentInstrument: pack.assessmentInstrument
         ? {
             questions: pack.assessmentInstrument.questions.map((q) => {
@@ -95,8 +53,8 @@ export class CurriculumPackProjector {
                 id: q.id,
                 bloomLevel: q.bloomLevel,
                 stem: q.stem,
-                options: [...q.options] as const,
-                relatedKeywordIds: [...q.relatedKeywordIds],
+                options: q.options,
+                relatedKeywordIds: q.relatedKeywordIds,
               };
               if (options.includeAnswerKeys) {
                 return {
@@ -109,11 +67,7 @@ export class CurriculumPackProjector {
             }),
           }
         : null,
-      perceptionSurvey: pack.perceptionSurvey
-        ? {
-            items: pack.perceptionSurvey.items.map((item) => ({ ...item })),
-          }
-        : null,
+      perceptionSurvey: pack.perceptionSurvey,
     };
   }
 }

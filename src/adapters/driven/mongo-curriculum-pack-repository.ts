@@ -1,27 +1,14 @@
 import { CurriculumPackRepositoryPort } from "../../application/ports/curriculum-pack-repository.port.js";
 import {
-  AdjudicationRubric,
-  AssessmentInstrument,
-  BoardConfig,
   CurriculumPack,
-  KeywordCard,
-  PerceptionSurvey,
-  SemanticDomain,
+  CurriculumPackProps,
 } from "../../domain/curriculum-pack/curriculum-pack.js";
 import { DIABE_TEACH_PACK } from "../../domain/curriculum-pack/diabe-teach-pack.js";
 import { PackId } from "../../domain/curriculum-pack/pack-id.js";
 
-export interface CurriculumPackDocument {
+export interface CurriculumPackDocument
+  extends Omit<CurriculumPackProps, "id"> {
   readonly _id: string;
-  readonly title: string;
-  readonly version: string;
-  readonly description: string;
-  readonly boardConfig: BoardConfig;
-  readonly domains: readonly SemanticDomain[];
-  readonly cards: readonly KeywordCard[];
-  readonly adjudicationRubric: AdjudicationRubric;
-  readonly assessmentInstrument: AssessmentInstrument | null;
-  readonly perceptionSurvey: PerceptionSurvey | null;
 }
 
 export interface CurriculumPackCollectionLike {

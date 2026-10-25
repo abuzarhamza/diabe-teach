@@ -12,21 +12,11 @@ import { CurriculumPackRepositoryPort } from "../ports/curriculum-pack-repositor
 
 export interface GetCurriculumPackByIdQuery {
   readonly packId: string;
-  readonly authorizationHeader?: string | null;
+  readonly bearerToken?: string | null;
 }
 
 export interface GetCurriculumPackByIdResult {
   readonly pack: PublicCurriculumPackDto;
-}
-
-function extractBearerToken(authorizationHeader: string): string {
-  const match = /^Bearer\s+(\S+)$/.exec(authorizationHeader.trim());
-  if (!match || !match[1]) {
-    throw new UnauthorizedTokenError(
-      "Malformed Authorization header. Expected 'Bearer <token>'.",
-    );
-  }
-  return match[1];
 }
 
 export class GetCurriculumPackByIdUseCase {
@@ -46,15 +36,13 @@ export class GetCurriculumPackByIdUseCase {
   ): Promise<GetCurriculumPackByIdResult> {
     let callerRole: "anonymous" | "participant" | "instructor" = "anonymous";
 
-    if (
-      query.authorizationHeader !== undefined &&
-      query.authorizationHeader !== null
-    ) {
-      const rawToken = extractBearerToken(query.authorizationHeader);
-      if (!this.#tokenVerifier) {
-        throw new UnauthorizedTokenError("Token verification is not configured.");
+    if (query.bearerToken !== undefined && query.bearerToken !== null) {
+      if (query.bearerToken.length === 0 || !this.#tokenVerifier) {
+        throw new UnauthorizedTokenError(
+          "Missing or unconfigured bearer capability token.",
+        );
       }
-      const verified = await this.#tokenVerifier.verifyToken(rawToken);
+      const verified = await this.#tokenVerifier.verifyToken(query.bearerToken);
       if (!verified) {
         throw new UnauthorizedTokenError("Invalid or unrecognized bearer token.");
       }

@@ -1,3 +1,7 @@
+import { PackNotFoundError } from "../errors/domain-errors.js";
+
+const SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/i;
+
 export class PackId {
   public readonly value: string;
 
@@ -8,8 +12,8 @@ export class PackId {
 
   public static create(raw: string): PackId {
     const trimmed = raw.trim();
-    if (trimmed.length === 0) {
-      throw new Error("PackId cannot be empty.");
+    if (trimmed.length === 0 || !SLUG_PATTERN.test(trimmed)) {
+      throw new PackNotFoundError(raw);
     }
     return new PackId(trimmed);
   }
