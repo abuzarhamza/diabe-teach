@@ -1,0 +1,3 @@
+# Single-Entrypoint OpenAPI Routing and Inbound/Outbound Hexagonal Separation
+
+The learner established three core architectural principles for this codebase: (1) use everyday `inbound` and `outbound` adapter folders rather than `driving`/`driven`, (2) strictly separate interface/contract files (`*.types.ts`, `*.port.ts`, `*.dto.ts`) from class and factory implementations, and (3) route all HTTP traffic through a single `netlify/functions/api.ts` entrypoint backed by `openapi-backend` reading `docs/api/openapi.yaml` (`createApp`) with a simple `transformRequest -> execute` factory pipeline. Future lessons can build directly on this 7-stage pipeline mental model without re-explaining why per-endpoint function files or inline regexes were eliminated.

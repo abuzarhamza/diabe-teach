@@ -1,0 +1,366 @@
+:root {
+  --bg-paper: #fffff8;
+  --bg-card: #f9f8f2;
+  --bg-code: #f3f1e9;
+  --ink-primary: #111111;
+  --ink-secondary: #4a4a45;
+  --ink-muted: #73726c;
+  --border-subtle: #dcd9ce;
+  --accent-navy: #1b365d;
+  --accent-teal: #0f6b63;
+  --accent-amber: #9c5700;
+  --accent-crimson: #8b1e24;
+  --accent-green: #1d6b38;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background-color: var(--bg-paper);
+  color: var(--ink-primary);
+  font-family: "Palatino Linotype", Palatino, Palladio, "URW Palladio L", "Book Antiqua", Baskerville, "Bookman Old Style", "Bitstream Charter", "Nimbus Roman No9 L", Garamond, "Apple Garamond", "ITC Garamond Narrow", "New Century Schoolbook", "Century Schoolbook", "Century Schoolbook L", Georgia, serif;
+  font-size: 18px;
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+}
+
+main.tufte-page {
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 3rem 2rem 5rem;
+}
+
+header.lesson-header {
+  border-bottom: 2px solid var(--ink-primary);
+  padding-bottom: 1.5rem;
+  margin-bottom: 2.5rem;
+}
+
+.eyebrow {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--accent-navy);
+  font-weight: 700;
+  margin-bottom: 0.4rem;
+}
+
+h1 {
+  font-weight: 400;
+  font-size: 2.3rem;
+  line-height: 1.2;
+  margin: 0.2rem 0 0.75rem;
+}
+
+.subtitle {
+  font-style: italic;
+  color: var(--ink-secondary);
+  font-size: 1.15rem;
+  margin: 0;
+}
+
+h2 {
+  font-weight: 400;
+  font-style: italic;
+  font-size: 1.6rem;
+  margin-top: 2.75rem;
+  margin-bottom: 0.9rem;
+  border-bottom: 1px solid var(--border-subtle);
+  padding-bottom: 0.35rem;
+}
+
+h3 {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--accent-navy);
+  margin-top: 1.5rem;
+  margin-bottom: 0.45rem;
+}
+
+p {
+  margin: 0 0 1.1rem;
+}
+
+a {
+  color: var(--accent-navy);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+a:hover {
+  color: var(--accent-teal);
+}
+
+code, pre {
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace;
+  font-size: 0.84rem;
+}
+
+code {
+  background: var(--bg-code);
+  padding: 0.12rem 0.35rem;
+  border-radius: 3px;
+  border: 1px solid var(--border-subtle);
+}
+
+pre {
+  background: var(--bg-code);
+  padding: 1rem 1.2rem;
+  border-left: 3px solid var(--accent-navy);
+  overflow-x: auto;
+  line-height: 1.45;
+  margin: 0.75rem 0 1.25rem;
+}
+
+pre code {
+  background: none;
+  padding: 0;
+  border: none;
+}
+
+.nav-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.25rem;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 0.85rem;
+  margin-top: 1rem;
+}
+
+/* Step-by-Step Pipeline Cards */
+.pipeline-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  margin: 1.5rem 0 2.5rem;
+}
+
+.step-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-left: 5px solid var(--accent-navy);
+  padding: 1.2rem 1.4rem;
+  border-radius: 4px;
+}
+
+.step-card.ring-inbound {
+  border-left-color: var(--accent-navy);
+}
+
+.step-card.ring-application {
+  border-left-color: var(--accent-teal);
+}
+
+.step-card.ring-domain {
+  border-left-color: var(--accent-green);
+}
+
+.step-card.ring-outbound {
+  border-left-color: var(--accent-amber);
+}
+
+.step-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.step-badge {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 0.15rem 0.55rem;
+  border-radius: 3px;
+  background: var(--accent-navy);
+  color: #fff;
+}
+
+.ring-application .step-badge { background: var(--accent-teal); }
+.ring-domain .step-badge { background: var(--accent-green); }
+.ring-outbound .step-badge { background: var(--accent-amber); }
+
+.step-file {
+  font-family: "SFMono-Regular", Consolas, Menlo, monospace;
+  font-size: 0.82rem;
+  color: var(--ink-secondary);
+}
+
+/* Interactive Request Simulator */
+.simulator-box {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  padding: 1.5rem;
+  border-radius: 6px;
+  margin: 1.5rem 0 2.5rem;
+}
+
+.sim-controls {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 0.88rem;
+}
+
+.sim-controls label {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 0.3rem;
+}
+
+.sim-controls select {
+  width: 100%;
+  padding: 0.45rem 0.6rem;
+  font-size: 0.88rem;
+  background: #fff;
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+}
+
+.sim-trace-step {
+  padding: 0.65rem 0.9rem;
+  margin-bottom: 0.45rem;
+  border-radius: 4px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 0.88rem;
+  border-left: 4px solid var(--border-subtle);
+  background: #fff;
+}
+
+.sim-trace-step.pass {
+  border-left-color: var(--accent-green);
+}
+
+.sim-trace-step.stop {
+  border-left-color: var(--accent-crimson);
+  background: #fff5f5;
+}
+
+.sim-trace-step.skip {
+  opacity: 0.48;
+}
+
+/* Retrieval Practice Quiz */
+.quiz-container {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  padding: 1.5rem;
+  border-radius: 6px;
+  margin: 1.5rem 0 2.5rem;
+}
+
+.quiz-question {
+  margin-bottom: 1.6rem;
+  padding-bottom: 1.2rem;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.quiz-question:last-child {
+  margin-bottom: 0;
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+.quiz-prompt {
+  font-weight: 600;
+  margin-bottom: 0.65rem;
+}
+
+.quiz-options {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.quiz-option-btn {
+  text-align: left;
+  padding: 0.55rem 0.85rem;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 0.88rem;
+  background: #fff;
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.quiz-option-btn:hover {
+  background: var(--bg-code);
+}
+
+.quiz-option-btn.correct {
+  background: #edf7f0;
+  border-color: var(--accent-green);
+  color: var(--accent-green);
+  font-weight: 600;
+}
+
+.quiz-option-btn.incorrect {
+  background: #fdf0f0;
+  border-color: var(--accent-crimson);
+  color: var(--accent-crimson);
+}
+
+.quiz-feedback {
+  margin-top: 0.55rem;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 0.85rem;
+  min-height: 1.3rem;
+}
+
+/* Reference Table */
+table.ref-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1.25rem 0 2rem;
+  font-size: 0.9rem;
+}
+
+table.ref-table th,
+table.ref-table td {
+  text-align: left;
+  padding: 0.65rem 0.75rem;
+  border-bottom: 1px solid var(--border-subtle);
+  vertical-align: top;
+}
+
+table.ref-table th {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  border-bottom: 2px solid var(--ink-primary);
+}
+
+.callout-box {
+  background: var(--bg-card);
+  border-left: 4px solid var(--accent-teal);
+  padding: 1rem 1.25rem;
+  margin: 1.5rem 0;
+}
+
+@media print {
+  body {
+    background: #fff;
+    font-size: 12pt;
+  }
+  main.tufte-page {
+    padding: 0;
+    max-width: 100%;
+  }
+  .simulator-box, .quiz-container {
+    break-inside: avoid;
+  }
+}
