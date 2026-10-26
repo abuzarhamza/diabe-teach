@@ -5,6 +5,11 @@ import {
 } from "../../application/ports/capability-token.port.js";
 
 export class HmacCapabilityTokenAdapter implements CapabilityTokenPort {
+  static readonly #JWT_HEADER_B64 = Buffer.from(
+    JSON.stringify({ alg: "HS256", typ: "JWT" }),
+    "utf8",
+  ).toString("base64url");
+
   readonly #secret: string;
 
   public constructor(secret: string) {
@@ -25,6 +30,7 @@ export class HmacCapabilityTokenAdapter implements CapabilityTokenPort {
   }
 
   public async signToken(capability: VerifiedCapability): Promise<string> {
+    const headerB64 = HmacCapabilityTokenAdapter.#JWT_HEADER_B64;
     const payloadJson = JSON.stringify({
       role: capability.role,
       sessionId: capability.sessionId,
@@ -33,24 +39,37 @@ export class HmacCapabilityTokenAdapter implements CapabilityTokenPort {
         : {}),
     });
     const payloadB64 = Buffer.from(payloadJson, "utf8").toString("base64url");
+    const signingInput = `${headerB64}.${payloadB64}`;
     const signatureB64 = createHmac("sha256", this.#secret)
-      .update(payloadB64)
+      .update(signingInput)
       .digest("base64url");
-    return `${payloadB64}.${signatureB64}`;
+    return `${signingInput}.${signatureB64}`;
   }
 
   public async verifyToken(token: string): Promise<VerifiedCapability | null> {
     const parts = token.split(".");
-    if (parts.length !== 2) {
+    if (parts.length !== 3) {
       return null;
     }
-    const [payloadB64, signatureB64] = parts;
-    if (!payloadB64 || !signatureB64) {
+    const [headerB64, payloadB64, signatureB64] = parts;
+    if (!headerB64 || !payloadB64 || !signatureB64) {
       return null;
     }
 
+    try {
+      const header = JSON.parse(
+        Buffer.from(headerB64, "base64url").toString("utf8"),
+      ) as Record<string, unknown>;
+      if (header.alg !== "HS256") {
+        return null;
+      }
+    } catch {
+      return null;
+    }
+
+    const signingInput = `${headerB64}.${payloadB64}`;
     const expectedSigB64 = createHmac("sha256", this.#secret)
-      .update(payloadB64)
+      .update(signingInput)
       .digest("base64url");
 
     const actualBuf = Buffer.from(signatureB64, "utf8");

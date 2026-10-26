@@ -1,3 +1,4 @@
+import { createHmac } from "node:crypto";
 import { describe, expect, it, vi } from "vitest";
 import type { Context } from "@netlify/functions";
 import { OpenApiHttpApp } from "../src/adapters/inbound/http/create-app.js";
@@ -368,24 +369,135 @@ describe("Ticket 02 — Role-Aware Answer-Key Redaction & CapabilityToken Verifi
     }
   });
 
-  it("signs and verifies stateless capability tokens with HmacCapabilityTokenAdapter and rejects tampered tokens", async () => {
-    const hmacAdapter = new HmacCapabilityTokenAdapter(
-      "test-secret-key-for-hmac-256",
-    );
+  describe("HmacCapabilityTokenAdapter — RFC 7519 3-Part JWT", () => {
+    const secret = "test-secret-key-for-hmac-256";
+    const hmacAdapter = new HmacCapabilityTokenAdapter(secret);
 
-    const instructorToken = await hmacAdapter.signToken({
-      role: "instructor",
-      sessionId: "sess-42",
+    it("produces a standard 3-part RFC 7519 JWT with alg: HS256 and typ: JWT header", async () => {
+      const token = await hmacAdapter.signToken({
+        role: "instructor",
+        sessionId: "sess-42",
+      });
+
+      const parts = token.split(".");
+      expect(parts).toHaveLength(3);
+
+      const [headerB64, payloadB64, signatureB64] = parts;
+      expect(headerB64).toBe("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9");
+
+      const header = JSON.parse(
+        Buffer.from(headerB64!, "base64url").toString("utf8"),
+      );
+      expect(header).toEqual({ alg: "HS256", typ: "JWT" });
+
+      const payload = JSON.parse(
+        Buffer.from(payloadB64!, "base64url").toString("utf8"),
+      );
+      expect(payload).toEqual({
+        role: "instructor",
+        sessionId: "sess-42",
+      });
+
+      expect(signatureB64).toBeTruthy();
     });
 
-    const verified = await hmacAdapter.verifyToken(instructorToken);
-    expect(verified).toEqual({
-      role: "instructor",
-      sessionId: "sess-42",
+    it("verifies valid 3-part tokens and returns capability claims for instructor and participant", async () => {
+      const instructorToken = await hmacAdapter.signToken({
+        role: "instructor",
+        sessionId: "sess-42",
+      });
+      const verifiedInstructor = await hmacAdapter.verifyToken(instructorToken);
+      expect(verifiedInstructor).toEqual({
+        role: "instructor",
+        sessionId: "sess-42",
+      });
+
+      const participantToken = await hmacAdapter.signToken({
+        role: "participant",
+        sessionId: "sess-42",
+        participantId: "part-99",
+      });
+      const verifiedParticipant =
+        await hmacAdapter.verifyToken(participantToken);
+      expect(verifiedParticipant).toEqual({
+        role: "participant",
+        sessionId: "sess-42",
+        participantId: "part-99",
+      });
     });
 
-    const tampered = `${instructorToken}tampered`;
-    expect(await hmacAdapter.verifyToken(tampered)).toBeNull();
+    it("rejects tokens with != 3 parts including legacy 2-part tokens", async () => {
+      expect(await hmacAdapter.verifyToken("")).toBeNull();
+      expect(await hmacAdapter.verifyToken("single-token")).toBeNull();
+      expect(await hmacAdapter.verifyToken("part1.part2")).toBeNull();
+      expect(await hmacAdapter.verifyToken("a.b.c.d")).toBeNull();
+
+      // Legacy 2-part token with valid 2-part signature
+      const legacyPayload = Buffer.from(
+        JSON.stringify({ role: "instructor", sessionId: "sess-1" }),
+      ).toString("base64url");
+      const legacySig = createHmac("sha256", secret)
+        .update(legacyPayload)
+        .digest("base64url");
+      expect(
+        await hmacAdapter.verifyToken(`${legacyPayload}.${legacySig}`),
+      ).toBeNull();
+    });
+
+    it("rejects tokens where header alg is not HS256", async () => {
+      const badHeaderNone = Buffer.from(
+        JSON.stringify({ alg: "none", typ: "JWT" }),
+      ).toString("base64url");
+      const badHeaderRs256 = Buffer.from(
+        JSON.stringify({ alg: "RS256", typ: "JWT" }),
+      ).toString("base64url");
+      const payload = Buffer.from(
+        JSON.stringify({ role: "instructor", sessionId: "sess-1" }),
+      ).toString("base64url");
+
+      expect(
+        await hmacAdapter.verifyToken(`${badHeaderNone}.${payload}.somesig`),
+      ).toBeNull();
+      expect(
+        await hmacAdapter.verifyToken(`${badHeaderRs256}.${payload}.somesig`),
+      ).toBeNull();
+    });
+
+    it("rejects tokens with corrupted signatures or tampered payloads", async () => {
+      const validToken = await hmacAdapter.signToken({
+        role: "instructor",
+        sessionId: "sess-42",
+      });
+
+      const [headerB64, payloadB64, signatureB64] = validToken.split(".");
+
+      // Corrupted signature
+      expect(
+        await hmacAdapter.verifyToken(
+          `${headerB64}.${payloadB64}.${signatureB64}x`,
+        ),
+      ).toBeNull();
+
+      // Tampered payload
+      const tamperedPayload = Buffer.from(
+        JSON.stringify({ role: "participant", sessionId: "sess-42" }),
+      ).toString("base64url");
+      expect(
+        await hmacAdapter.verifyToken(
+          `${headerB64}.${tamperedPayload}.${signatureB64}`,
+        ),
+      ).toBeNull();
+
+      // Tampered header
+      const tamperedHeader = Buffer.from(
+        JSON.stringify({ alg: "HS256", typ: "JWT", extra: true }),
+      ).toString("base64url");
+      expect(
+        await hmacAdapter.verifyToken(
+          `${tamperedHeader}.${payloadB64}.${signatureB64}`,
+        ),
+      ).toBeNull();
+    });
   });
 });
 
