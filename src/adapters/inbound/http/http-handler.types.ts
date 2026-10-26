@@ -1,8 +1,12 @@
-import { CapabilityTokenPort } from "../../../application/ports/capability-token.port.js";
+import {
+  CapabilityTokenPort,
+  VerifiedCapability,
+} from "../../../application/ports/capability-token.port.js";
 import { CurriculumPackRepositoryPort } from "../../../application/ports/curriculum-pack-repository.port.js";
 
 export interface RouteContext {
   readonly params?: Readonly<Record<string, string | undefined>>;
+  readonly verifiedCapability?: VerifiedCapability;
 }
 
 export interface HttpRequestInput {

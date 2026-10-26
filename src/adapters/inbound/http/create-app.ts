@@ -1,5 +1,7 @@
 import { resolve } from "node:path";
 import { OpenAPIBackend, type Context as OpenApiContext } from "openapi-backend";
+import { VerifiedCapability } from "../../../application/ports/capability-token.port.js";
+import { UnauthorizedTokenError } from "../../../domain/errors/domain-errors.js";
 import { BaseHttpHandler } from "./endpoint-handler.factory.js";
 import { GetPackByIdHttpHandler } from "./get-pack-by-id.handler.js";
 import {
@@ -30,28 +32,109 @@ export class OpenApiHttpApp implements HttpApp {
             request.headers.get("x-api-key"),
             deps,
           ),
-        BearerAuth: (): boolean => true,
+        BearerAuth: async (
+          _c: OpenApiContext,
+          request: Request,
+        ): Promise<unknown> => {
+          const authHeader = request.headers.get("authorization");
+          if (!authHeader) {
+            return false;
+          }
+          const match = /^Bearer\s+(\S+)$/i.exec(authHeader.trim());
+          if (!match || !match[1]) {
+            throw new UnauthorizedTokenError(
+              BaseHttpHandler.INVALID_CAPABILITY_TOKEN_MESSAGE,
+            );
+          }
+          const token = match[1];
+          if (!deps.tokenVerifier) {
+            throw new UnauthorizedTokenError(
+              BaseHttpHandler.INVALID_CAPABILITY_TOKEN_MESSAGE,
+            );
+          }
+          const verified = await deps.tokenVerifier.verifyToken(token);
+          if (!verified) {
+            throw new UnauthorizedTokenError(
+              BaseHttpHandler.INVALID_CAPABILITY_TOKEN_MESSAGE,
+            );
+          }
+          return verified;
+        },
       },
       handlers: {
         getCurriculumPackById: (
           c: OpenApiContext,
           request: Request,
           context?: RouteContext,
-        ): Promise<Response> =>
-          getPackByIdHandler.handle(request, {
+        ): Promise<Response> => {
+          const bearerSecurity = c.security?.BearerAuth;
+          if (
+            bearerSecurity &&
+            typeof bearerSecurity === "object" &&
+            "error" in bearerSecurity
+          ) {
+            const err = (bearerSecurity as { error: unknown }).error;
+            const message =
+              err instanceof Error
+                ? err.message
+                : BaseHttpHandler.INVALID_CAPABILITY_TOKEN_MESSAGE;
+            return Promise.resolve(
+              BaseHttpHandler.jsonResponse(
+                {
+                  code: "UNAUTHORIZED_TOKEN",
+                  message,
+                },
+                401,
+              ),
+            );
+          }
+          const verifiedCapability =
+            bearerSecurity &&
+            typeof bearerSecurity === "object" &&
+            !("error" in bearerSecurity)
+              ? (bearerSecurity as VerifiedCapability)
+              : undefined;
+
+          return getPackByIdHandler.handle(request, {
             params: {
               ...(c.request.params as Record<string, string | undefined>),
               ...(context?.params ?? {}),
             },
-          }),
-        unauthorizedHandler: (): Response =>
-          BaseHttpHandler.jsonResponse(
+            verifiedCapability,
+          });
+        },
+        unauthorizedHandler: (c: OpenApiContext): Response => {
+          const bearerSecurity = c.security?.BearerAuth;
+          const bearerErr =
+            bearerSecurity &&
+            typeof bearerSecurity === "object" &&
+            "error" in bearerSecurity
+              ? (bearerSecurity as { error: unknown }).error
+              : null;
+
+          const isBearerOnly =
+            c.operation?.security &&
+            Array.isArray(c.operation.security) &&
+            c.operation.security.length > 0 &&
+            c.operation.security.every(
+              (req) => "BearerAuth" in req && !("ApiKeyAuth" in req),
+            );
+
+          let message = BaseHttpHandler.INVALID_API_KEY_MESSAGE;
+          if (bearerErr instanceof Error) {
+            message = bearerErr.message;
+          } else if (isBearerOnly) {
+            message = BaseHttpHandler.INVALID_CAPABILITY_TOKEN_MESSAGE;
+          }
+
+          return BaseHttpHandler.jsonResponse(
             {
               code: "UNAUTHORIZED_TOKEN",
-              message: BaseHttpHandler.INVALID_API_KEY_MESSAGE,
+              message,
             },
             401,
-          ),
+          );
+        },
         notFound: (_c: OpenApiContext, request: Request): Response => {
           const url = new URL(request.url);
           return BaseHttpHandler.jsonResponse(

@@ -1,10 +1,14 @@
 import { PublicCurriculumPackDto } from "../dtos/curriculum-pack.dto.js";
-import { CapabilityTokenPort } from "./capability-token.port.js";
+import {
+  CapabilityTokenPort,
+  VerifiedCapability,
+} from "./capability-token.port.js";
 import { CurriculumPackRepositoryPort } from "./curriculum-pack-repository.port.js";
 
 export interface GetCurriculumPackByIdQuery {
   readonly packId: string;
   readonly bearerToken?: string | null;
+  readonly verifiedCapability?: VerifiedCapability;
 }
 
 export interface GetCurriculumPackByIdResult {

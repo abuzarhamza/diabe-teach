@@ -29,7 +29,9 @@ export class GetCurriculumPackByIdUseCase
   ): Promise<GetCurriculumPackByIdResult> {
     let callerRole: "anonymous" | "participant" | "instructor" = "anonymous";
 
-    if (query.bearerToken !== undefined && query.bearerToken !== null) {
+    if (query.verifiedCapability) {
+      callerRole = query.verifiedCapability.role;
+    } else if (query.bearerToken !== undefined && query.bearerToken !== null) {
       if (query.bearerToken.length === 0 || !this.#tokenVerifier) {
         throw new UnauthorizedTokenError(
           "Missing or unconfigured bearer capability token.",

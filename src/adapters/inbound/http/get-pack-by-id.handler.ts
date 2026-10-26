@@ -31,6 +31,7 @@ export class GetPackByIdHttpHandler extends BaseHttpHandler<
       bearerToken: BaseHttpHandler.parseBearerTokenHeader(
         request.headers.get("authorization"),
       ),
+      verifiedCapability: context?.verifiedCapability,
     };
   }
 

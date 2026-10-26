@@ -17,5 +17,5 @@
     "noEmit": true,
     "types": ["node"]
   },
-  "include": ["src/**/*.ts", "netlify/**/*.ts", "tests/**/*.ts"]
+  "include": ["src/**/*.ts", "netlify/**/*.ts", "tests/**/*.ts", "scripts/**/*.ts"]
 }

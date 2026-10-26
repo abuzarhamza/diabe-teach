@@ -13,6 +13,8 @@ import {
 export abstract class BaseHttpHandler<TQuery, TResult> {
   public static readonly INVALID_API_KEY_MESSAGE =
     "Missing or invalid x-api-key header.";
+  public static readonly INVALID_CAPABILITY_TOKEN_MESSAGE =
+    "Malformed, invalid, or expired capability token.";
 
   protected readonly successStatus: number;
 

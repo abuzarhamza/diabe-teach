@@ -687,7 +687,7 @@ describe("Ticket 03 — Hybrid MongoDB Persistence & Netlify Functions v2 Compos
       MONGODB_URI: "  mongodb+srv://cluster.example.net  ",
       MONGODB_DB_NAME: "",
       CAPABILITY_TOKEN_SECRET: "  my-secret  ",
-    });
+    }, { yamlFilePath: false });
 
     expect(envConfig).toEqual({
       mongoUri: "mongodb+srv://cluster.example.net",
@@ -922,7 +922,7 @@ describe("Ticket 12 — Pure MongoDB Persistence & Idempotent Database Seeding S
     delete process.env.MONGODB_URI;
 
     try {
-      await expect(CurriculumPackSeeder.seed()).rejects.toThrow(
+      await expect(CurriculumPackSeeder.seed({ mongoUri: "" })).rejects.toThrow(
         "MONGODB_URI environment variable is required to seed Curriculum Packs into MongoDB.",
       );
     } finally {

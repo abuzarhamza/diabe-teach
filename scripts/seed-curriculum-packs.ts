@@ -2,6 +2,7 @@ import { DEFAULT_MONGODB_DB_NAME } from "../src/adapters/outbound/curriculum-pac
 import { MongoConnectionManager } from "../src/adapters/outbound/mongo-client-singleton.js";
 import { MongoCurriculumPackRepository } from "../src/adapters/outbound/mongo-curriculum-pack-repository.js";
 import { CurriculumPackDocument } from "../src/adapters/outbound/mongo-curriculum-pack-repository.types.js";
+import { AppRuntime } from "../src/app-runtime.js";
 import { CurriculumPack } from "../src/domain/curriculum-pack/curriculum-pack.js";
 import { DIABE_TEACH_PACK } from "../src/domain/curriculum-pack/diabe-teach-pack.js";
 
@@ -17,6 +18,22 @@ export interface SeederOptions {
 }
 
 export class CurriculumPackSeeder {
+  public static resolveOptions(options?: SeederOptions): {
+    readonly mongoUri?: string;
+    readonly dbName: string;
+    readonly packs: readonly CurriculumPack[];
+  } {
+    const rawEnvUri = options?.mongoUri ?? process.env.MONGODB_URI?.trim();
+    const rawEnvDb = options?.dbName ?? process.env.MONGODB_DB_NAME?.trim();
+    const runtimeConfig = AppRuntime.loadEnvConfig();
+
+    return {
+      mongoUri: rawEnvUri || runtimeConfig.mongoUri,
+      dbName: rawEnvDb || runtimeConfig.mongoDbName || DEFAULT_MONGODB_DB_NAME,
+      packs: options?.packs ?? [DIABE_TEACH_PACK],
+    };
+  }
+
   public static toDocument(pack: CurriculumPack): CurriculumPackDocument {
     return {
       _id: pack.id.value,
