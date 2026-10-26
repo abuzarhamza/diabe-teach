@@ -103,13 +103,12 @@ export class OpenApiHttpApp implements HttpApp {
     if (!authHeader) {
       return false;
     }
-    const match = /^Bearer\s+(\S+)$/i.exec(authHeader.trim());
-    if (!match || !match[1] || !deps.tokenVerifier) {
-      throw new UnauthorizedTokenError(
-        BaseHttpHandler.INVALID_CAPABILITY_TOKEN_MESSAGE,
-      );
-    }
-    const verified = await deps.tokenVerifier.verifyToken(match[1]);
+    const token = BaseHttpHandler.parseBearerTokenHeader(authHeader);
+    const verified =
+      token && deps.tokenVerifier
+        ? await deps.tokenVerifier.verifyToken(token)
+        : null;
+
     if (!verified) {
       throw new UnauthorizedTokenError(
         BaseHttpHandler.INVALID_CAPABILITY_TOKEN_MESSAGE,
@@ -122,20 +121,22 @@ export class OpenApiHttpApp implements HttpApp {
     errorMessage?: string;
     capability?: VerifiedCapability;
   } {
-    const sec = c.security?.BearerAuth;
-    if (sec && typeof sec === "object") {
-      if ("error" in sec) {
-        const err = (sec as { error: unknown }).error;
-        return {
-          errorMessage:
-            err instanceof Error
-              ? err.message
-              : BaseHttpHandler.INVALID_CAPABILITY_TOKEN_MESSAGE,
-        };
-      }
-      return { capability: sec as VerifiedCapability };
+    const sec = c.security?.BearerAuth as
+      | { error?: unknown; role?: string }
+      | undefined;
+    if (!sec || typeof sec !== "object") {
+      return {};
     }
-    return {};
+    if ("error" in sec) {
+      const err = sec.error;
+      return {
+        errorMessage:
+          err instanceof Error
+            ? err.message
+            : BaseHttpHandler.INVALID_CAPABILITY_TOKEN_MESSAGE,
+      };
+    }
+    return { capability: sec as VerifiedCapability };
   }
 
   static #getUnauthorizedMessage(c: OpenApiContext): string {
@@ -143,12 +144,9 @@ export class OpenApiHttpApp implements HttpApp {
     if (errorMessage) {
       return errorMessage;
     }
-    const isBearerOnly =
-      Array.isArray(c.operation?.security) &&
-      c.operation.security.length > 0 &&
-      c.operation.security.every(
-        (req) => "BearerAuth" in req && !("ApiKeyAuth" in req),
-      );
+    const isBearerOnly = c.operation?.security?.every?.(
+      (req) => "BearerAuth" in req && !("ApiKeyAuth" in req),
+    );
     return isBearerOnly
       ? BaseHttpHandler.INVALID_CAPABILITY_TOKEN_MESSAGE
       : BaseHttpHandler.INVALID_API_KEY_MESSAGE;

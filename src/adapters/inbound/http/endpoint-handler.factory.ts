@@ -88,10 +88,10 @@ export abstract class BaseHttpHandler<TQuery, TResult> {
     if (authorizationHeader === null) {
       return null;
     }
-    const match = /^Bearer\s+(\S+)$/.exec(authorizationHeader.trim());
+    const match = /^Bearer\s+(\S+)$/i.exec(authorizationHeader.trim());
     if (!match || !match[1]) {
       throw new UnauthorizedTokenError(
-        "Malformed Authorization header. Expected 'Bearer <token>'.",
+        BaseHttpHandler.INVALID_CAPABILITY_TOKEN_MESSAGE,
       );
     }
     return match[1];

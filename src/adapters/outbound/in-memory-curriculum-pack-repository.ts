@@ -6,14 +6,14 @@ import { PackId } from "../../domain/curriculum-pack/pack-id.js";
 export class InMemoryCurriculumPackRepository
   implements CurriculumPackRepositoryPort
 {
-  readonly #packsById = new Map<string, CurriculumPack>();
+  readonly #packsById: ReadonlyMap<string, CurriculumPack>;
 
   public constructor(
     initialPacks: readonly CurriculumPack[] = [DIABE_TEACH_PACK],
   ) {
-    for (const pack of initialPacks) {
-      this.#packsById.set(pack.id.value, pack);
-    }
+    this.#packsById = new Map(
+      initialPacks.map((pack) => [pack.id.value, pack]),
+    );
   }
 
   public async findById(packId: PackId): Promise<CurriculumPack | null> {
