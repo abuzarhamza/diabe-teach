@@ -33,6 +33,8 @@ Welcome to the **Diabe-Teach Knowledge Base & Research Wiki**. This repository i
 | [16](16-mongoose-outbound-adapter-research.md) | [Using Mongoose for Outbound Persistence in Hexagonal DDD](16-mongoose-outbound-adapter-research.md) | Evaluation of Mongoose Schema/Model, AWS Lambda connection pooling, and `.lean()` queries for Aggregate Root rehydration. |
 | [17](17-pure-mongodb-persistence-without-in-memory-fallback.md) | [Pure MongoDB Persistence Without In-Memory Built-In Fallback](17-pure-mongodb-persistence-without-in-memory-fallback.md) | Removal of hardcoded in-memory built-in packs from `MongoCurriculumPackRepository`, establishing `DIABE_TEACH_PACK` as canonical seed/test fixture. |
 | [18](18-deploying-diabe-teach-to-netlify.md) | [Deploying Diabe-Teach to Netlify](18-deploying-diabe-teach-to-netlify.md) | Authoritative deployment guide: Netlify Functions v2, MongoDB Atlas setup, database seeding (`npm run db:seed`), environment variables, and smoke tests. |
+| [19](19-database-naming-conventions-research.md) | [Database Naming Conventions Research](19-database-naming-conventions-research.md) | Canonical naming for platform database (`concept_chain`) and multi-subject data stores. |
+| [20](20-standard-rfc7519-jwt-and-openapi-security-handlers.md) | [Standard RFC 7519 JWT & OpenAPI Security Handlers](20-standard-rfc7519-jwt-and-openapi-security-handlers.md) | Migration from legacy 2-part tokens to standard 3-part RFC 7519 JWTs and centralized `openapi-backend` security pipeline. |
 
 ---
 
