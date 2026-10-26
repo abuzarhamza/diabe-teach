@@ -1,4 +1,4 @@
-import {
+import type {
   AdjudicationRubric,
   AssessmentInstrument,
   BoardConfig,
@@ -30,16 +30,21 @@ export class CurriculumPack {
   readonly #cardsByLookupKey: ReadonlyMap<string, KeywordCard>;
 
   private constructor(props: CurriculumPackProps) {
-    this.id = props.id instanceof PackId ? props.id : PackId.create(props.id);
+    this.id = props.id instanceof PackId
+      ? props.id
+      : PackId.create(props.id);
     this.title = props.title;
     this.version = props.version;
     this.description = props.description;
     this.boardConfig = CurriculumPack.#deepFreeze({ ...props.boardConfig });
     this.domains = CurriculumPack.#deepFreeze(
-      props.domains.map((d) => ({ ...d })),
+      props.domains.map(d => ({ ...d })),
     );
     this.cards = CurriculumPack.#deepFreeze(
-      props.cards.map((c) => ({ ...c, aliases: [...c.aliases] })),
+      props.cards.map(c => ({
+        ...c,
+        aliases: [...c.aliases],
+      })),
     );
     this.adjudicationRubric = CurriculumPack.#cloneRubric(
       props.adjudicationRubric,
@@ -65,8 +70,8 @@ export class CurriculumPack {
 
   public resolveCardByLabelOrAlias(query: string): KeywordCard | undefined {
     return (
-      this.#cardsById.get(query) ??
-      this.#cardsByLookupKey.get(CurriculumPack.#normalizeLookupKey(query))
+      this.#cardsById.get(query)
+      ?? this.#cardsByLookupKey.get(CurriculumPack.#normalizeLookupKey(query))
     );
   }
 
@@ -78,13 +83,13 @@ export class CurriculumPack {
       ...(rubric.calibrationBoardCardIds
         ? {
             calibrationBoardCardIds: rubric.calibrationBoardCardIds.map(
-              (row) => [...row],
+              row => [...row],
             ),
           }
         : {}),
-      calibrationExamples: rubric.calibrationExamples.map((ex) => ({
+      calibrationExamples: rubric.calibrationExamples.map(ex => ({
         ...ex,
-        path: ex.path.map((coord) => ({ ...coord })),
+        path: ex.path.map(coord => ({ ...coord })),
         keywordIds: [...ex.keywordIds],
       })),
     });
@@ -93,9 +98,10 @@ export class CurriculumPack {
   static #cloneAssessment(
     instrument: AssessmentInstrument | null,
   ): AssessmentInstrument | null {
-    if (!instrument) return null;
+    if (!instrument)
+      return null;
     return CurriculumPack.#deepFreeze({
-      questions: instrument.questions.map((q) => ({
+      questions: instrument.questions.map(q => ({
         ...q,
         options: [...q.options] as const,
         relatedKeywordIds: [...q.relatedKeywordIds],
@@ -106,9 +112,10 @@ export class CurriculumPack {
   static #cloneSurvey(
     survey: PerceptionSurvey | null,
   ): PerceptionSurvey | null {
-    if (!survey) return null;
+    if (!survey)
+      return null;
     return CurriculumPack.#deepFreeze({
-      items: survey.items.map((item) => ({ ...item })),
+      items: survey.items.map(item => ({ ...item })),
     });
   }
 
@@ -143,9 +150,9 @@ export class CurriculumPack {
     Object.freeze(obj);
     for (const value of Object.values(obj as Record<string, unknown>)) {
       if (
-        value !== null &&
-        typeof value === "object" &&
-        !Object.isFrozen(value)
+        value !== null
+        && typeof value === "object"
+        && !Object.isFrozen(value)
       ) {
         CurriculumPack.#deepFreeze(value);
       }

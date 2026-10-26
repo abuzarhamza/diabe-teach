@@ -1,9 +1,9 @@
+import type { CurriculumPackDocument } from "../src/adapters/outbound/mongo-curriculum-pack-repository.types.js";
+import type { CurriculumPack } from "../src/domain/curriculum-pack/curriculum-pack.js";
 import { DEFAULT_MONGODB_DB_NAME } from "../src/adapters/outbound/curriculum-pack.schema.js";
 import { MongoConnectionManager } from "../src/adapters/outbound/mongo-client-singleton.js";
 import { MongoCurriculumPackRepository } from "../src/adapters/outbound/mongo-curriculum-pack-repository.js";
-import { CurriculumPackDocument } from "../src/adapters/outbound/mongo-curriculum-pack-repository.types.js";
 import { AppRuntime } from "../src/app-runtime.js";
-import { CurriculumPack } from "../src/domain/curriculum-pack/curriculum-pack.js";
 import { DIABE_TEACH_PACK } from "../src/domain/curriculum-pack/diabe-teach-pack.js";
 
 export interface SeedingResult {
@@ -56,8 +56,8 @@ export class CurriculumPackSeeder {
         "MONGODB_URI environment variable is required to seed Curriculum Packs into MongoDB.",
       );
     }
-    const { mongoUri, dbName, packs } =
-      CurriculumPackSeeder.resolveOptions(options);
+    const { mongoUri, dbName, packs }
+      = CurriculumPackSeeder.resolveOptions(options);
 
     const connection = await MongoConnectionManager.getConnection(
       mongoUri!,
@@ -80,9 +80,9 @@ export class CurriculumPackSeeder {
   }
 }
 
-const isCli =
-  process.argv[1]?.endsWith("seed-curriculum-packs.ts") ||
-  process.argv[1]?.endsWith("seed-curriculum-packs.js");
+const isCli
+  = process.argv[1]?.endsWith("seed-curriculum-packs.ts")
+    || process.argv[1]?.endsWith("seed-curriculum-packs.js");
 
 if (isCli) {
   CurriculumPackSeeder.seed()

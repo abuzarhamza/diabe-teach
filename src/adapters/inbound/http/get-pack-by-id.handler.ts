@@ -1,15 +1,15 @@
-import {
+import type {
   GetCurriculumPackByIdQuery,
   GetCurriculumPackByIdResult,
 } from "../../../application/ports/get-curriculum-pack-by-id.port.js";
-import { GetCurriculumPackByIdUseCase } from "../../../application/use-cases/get-curriculum-pack-by-id.use-case.js";
-import { PackNotFoundError } from "../../../domain/errors/domain-errors.js";
-import { BaseHttpHandler } from "./endpoint-handler.factory.js";
-import {
+import type {
   GetPackByIdHandlerDependencies,
   HttpRequestInput,
   RouteContext,
 } from "./http-handler.types.js";
+import { GetCurriculumPackByIdUseCase } from "../../../application/use-cases/get-curriculum-pack-by-id.use-case.js";
+import { PackNotFoundError } from "../../../domain/errors/domain-errors.js";
+import { BaseHttpHandler } from "./endpoint-handler.factory.js";
 
 export class GetPackByIdHttpHandler extends BaseHttpHandler<
   GetCurriculumPackByIdQuery,

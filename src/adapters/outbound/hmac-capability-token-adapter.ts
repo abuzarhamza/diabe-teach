@@ -1,8 +1,8 @@
-import { jwtVerify, SignJWT } from "jose";
-import {
+import type {
   CapabilityTokenPort,
   VerifiedCapability,
 } from "../../application/ports/capability-token.port.js";
+import { jwtVerify, SignJWT } from "jose";
 
 export class HmacCapabilityTokenAdapter implements CapabilityTokenPort {
   readonly #secretKey: Uint8Array;
@@ -18,7 +18,9 @@ export class HmacCapabilityTokenAdapter implements CapabilityTokenPort {
     secret: string | undefined,
   ): HmacCapabilityTokenAdapter | undefined {
     const trimmed = secret?.trim();
-    return trimmed ? new HmacCapabilityTokenAdapter(trimmed) : undefined;
+    return trimmed
+      ? new HmacCapabilityTokenAdapter(trimmed)
+      : undefined;
   }
 
   public async signToken(capability: VerifiedCapability): Promise<string> {
@@ -40,9 +42,9 @@ export class HmacCapabilityTokenAdapter implements CapabilityTokenPort {
       });
 
       if (
-        (payload.role !== "instructor" && payload.role !== "participant") ||
-        typeof payload.sessionId !== "string" ||
-        payload.sessionId.length === 0
+        (payload.role !== "instructor" && payload.role !== "participant")
+        || typeof payload.sessionId !== "string"
+        || payload.sessionId.length === 0
       ) {
         return null;
       }
@@ -50,12 +52,13 @@ export class HmacCapabilityTokenAdapter implements CapabilityTokenPort {
       return {
         role: payload.role,
         sessionId: payload.sessionId,
-        ...(typeof payload.participantId === "string" &&
-        payload.participantId.length > 0
+        ...(typeof payload.participantId === "string"
+          && payload.participantId.length > 0
           ? { participantId: payload.participantId }
           : {}),
       };
-    } catch {
+    }
+    catch {
       return null;
     }
   }

@@ -1,4 +1,4 @@
-import { PackId } from "./pack-id.js";
+import type { PackId } from "./pack-id.js";
 
 export type AdjacencyRule = "chebyshev-8" | "orthogonal-4";
 

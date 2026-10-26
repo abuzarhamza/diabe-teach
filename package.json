@@ -7,6 +7,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
+    "lint": "eslint src netlify scripts tests",
+    "lint:fix": "eslint src netlify scripts tests --fix",
     "lint:boundaries": "depcruise src netlify --config .dependency-cruiser.cjs",
     "db:seed": "node --experimental-strip-types scripts/seed-curriculum-packs.ts"
   },
@@ -18,9 +20,11 @@
     "openapi-backend": "^5.22.0"
   },
   "devDependencies": {
+    "@antfu/eslint-config": "^10.0.0",
     "@types/node": "^22.13.0",
     "dependency-cruiser": "^16.10.0",
     "escomplex": "^2.0.0-alpha",
+    "eslint": "^10.13.0",
     "typescript": "^5.7.3",
     "vitest": "^3.0.5"
   }

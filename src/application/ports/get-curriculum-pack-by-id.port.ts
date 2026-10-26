@@ -1,9 +1,9 @@
-import { PublicCurriculumPackDto } from "../dtos/curriculum-pack.dto.js";
-import {
+import type { PublicCurriculumPackDto } from "../dtos/curriculum-pack.dto.js";
+import type {
   CapabilityTokenPort,
   VerifiedCapability,
 } from "./capability-token.port.js";
-import { CurriculumPackRepositoryPort } from "./curriculum-pack-repository.port.js";
+import type { CurriculumPackRepositoryPort } from "./curriculum-pack-repository.port.js";
 
 export interface GetCurriculumPackByIdQuery {
   readonly packId: string;
@@ -21,7 +21,7 @@ export interface GetCurriculumPackByIdDependencies {
 }
 
 export interface GetCurriculumPackByIdUseCasePort {
-  execute(
+  execute: (
     query: GetCurriculumPackByIdQuery,
-  ): Promise<GetCurriculumPackByIdResult>;
+  ) => Promise<GetCurriculumPackByIdResult>;
 }

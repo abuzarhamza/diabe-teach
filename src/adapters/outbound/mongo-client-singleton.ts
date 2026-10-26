@@ -1,4 +1,5 @@
-import mongoose, { Connection } from "mongoose";
+import type { Connection } from "mongoose";
+import mongoose from "mongoose";
 
 export class MongoConnectionManager {
   static readonly #cachedConnections = new Map<string, Promise<Connection>>();

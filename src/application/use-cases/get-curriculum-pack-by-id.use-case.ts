@@ -1,21 +1,20 @@
+import type { CapabilityTokenPort } from "../ports/capability-token.port.js";
+import type { CurriculumPackRepositoryPort } from "../ports/curriculum-pack-repository.port.js";
+import type {
+  GetCurriculumPackByIdDependencies,
+  GetCurriculumPackByIdQuery,
+  GetCurriculumPackByIdResult,
+  GetCurriculumPackByIdUseCasePort,
+} from "../ports/get-curriculum-pack-by-id.port.js";
 import { PackId } from "../../domain/curriculum-pack/pack-id.js";
 import {
   PackNotFoundError,
   UnauthorizedTokenError,
 } from "../../domain/errors/domain-errors.js";
 import { CurriculumPackProjector } from "../dtos/curriculum-pack-projector.js";
-import { CapabilityTokenPort } from "../ports/capability-token.port.js";
-import { CurriculumPackRepositoryPort } from "../ports/curriculum-pack-repository.port.js";
-import {
-  GetCurriculumPackByIdDependencies,
-  GetCurriculumPackByIdQuery,
-  GetCurriculumPackByIdResult,
-  GetCurriculumPackByIdUseCasePort,
-} from "../ports/get-curriculum-pack-by-id.port.js";
 
 export class GetCurriculumPackByIdUseCase
-  implements GetCurriculumPackByIdUseCasePort
-{
+implements GetCurriculumPackByIdUseCasePort {
   readonly #packRepo: CurriculumPackRepositoryPort;
   readonly #tokenVerifier?: CapabilityTokenPort;
 

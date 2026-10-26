@@ -1,5 +1,5 @@
-import { CapabilityTokenPort } from "./application/ports/capability-token.port.js";
-import { CurriculumPackRepositoryPort } from "./application/ports/curriculum-pack-repository.port.js";
+import type { CapabilityTokenPort } from "./application/ports/capability-token.port.js";
+import type { CurriculumPackRepositoryPort } from "./application/ports/curriculum-pack-repository.port.js";
 
 export type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 
@@ -15,6 +15,11 @@ export interface ProductionDependencies {
   readonly tokenVerifier?: CapabilityTokenPort;
   readonly apiKey?: string;
   readonly requireApiKey?: boolean;
+}
+
+export interface ServerlessHandlerOptions {
+  readonly dependencies?: ProductionDependencies;
+  readonly maxBodyBytes?: number;
 }
 
 export interface ServerlessRouteConfig {

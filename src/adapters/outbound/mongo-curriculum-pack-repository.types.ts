@@ -1,4 +1,4 @@
-import { CurriculumPackProps } from "../../domain/curriculum-pack/curriculum-pack.types.js";
+import type { CurriculumPackProps } from "../../domain/curriculum-pack/curriculum-pack.types.js";
 
 export interface CurriculumPackDocument
   extends Omit<CurriculumPackProps, "id"> {
@@ -6,9 +6,9 @@ export interface CurriculumPackDocument
 }
 
 export interface CurriculumPackCollectionLike {
-  findOne(
+  findOne: (
     filter: { readonly _id: string },
-  ): Promise<CurriculumPackDocument | null>;
+  ) => Promise<CurriculumPackDocument | null>;
 }
 
 export interface MongoCurriculumPackRepositoryOptions {

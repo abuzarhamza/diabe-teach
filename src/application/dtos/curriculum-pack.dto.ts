@@ -1,4 +1,4 @@
-import {
+import type {
   AdjudicationRubric,
   BoardConfig,
   KeywordCard,

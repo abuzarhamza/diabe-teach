@@ -1,14 +1,15 @@
-import { resolve } from "node:path";
-import { OpenAPIBackend, type Context as OpenApiContext } from "openapi-backend";
-import { VerifiedCapability } from "../../../application/ports/capability-token.port.js";
-import { UnauthorizedTokenError } from "../../../domain/errors/domain-errors.js";
-import { BaseHttpHandler } from "./endpoint-handler.factory.js";
-import { GetPackByIdHttpHandler } from "./get-pack-by-id.handler.js";
-import {
+import type { Context as OpenApiContext } from "openapi-backend";
+import type { VerifiedCapability } from "../../../application/ports/capability-token.port.js";
+import type {
   AppDependencies,
   HttpApp,
   RouteContext,
 } from "./http-handler.types.js";
+import { resolve } from "node:path";
+import { OpenAPIBackend } from "openapi-backend";
+import { UnauthorizedTokenError } from "../../../domain/errors/domain-errors.js";
+import { BaseHttpHandler } from "./endpoint-handler.factory.js";
+import { GetPackByIdHttpHandler } from "./get-pack-by-id.handler.js";
 
 export class OpenApiHttpApp implements HttpApp {
   static readonly #OPENAPI_YAML_PATH = resolve(
@@ -41,8 +42,8 @@ export class OpenApiHttpApp implements HttpApp {
           request: Request,
           context?: RouteContext,
         ): Promise<Response> => {
-          const { errorMessage, capability } =
-            OpenApiHttpApp.#resolveBearerSecurity(c);
+          const { errorMessage, capability }
+            = OpenApiHttpApp.#resolveBearerSecurity(c);
           if (errorMessage) {
             return Promise.resolve(
               BaseHttpHandler.jsonResponse(
@@ -104,8 +105,8 @@ export class OpenApiHttpApp implements HttpApp {
       return false;
     }
     const token = BaseHttpHandler.parseBearerTokenHeader(authHeader);
-    const verified =
-      token && deps.tokenVerifier
+    const verified
+      = token && deps.tokenVerifier
         ? await deps.tokenVerifier.verifyToken(token)
         : null;
 
@@ -145,7 +146,7 @@ export class OpenApiHttpApp implements HttpApp {
       return errorMessage;
     }
     const isBearerOnly = c.operation?.security?.every?.(
-      (req) => "BearerAuth" in req && !("ApiKeyAuth" in req),
+      req => "BearerAuth" in req && !("ApiKeyAuth" in req),
     );
     return isBearerOnly
       ? BaseHttpHandler.INVALID_CAPABILITY_TOKEN_MESSAGE

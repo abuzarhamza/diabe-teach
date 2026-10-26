@@ -1,8 +1,8 @@
-import {
+import type {
   CapabilityTokenPort,
   VerifiedCapability,
 } from "../../../application/ports/capability-token.port.js";
-import { CurriculumPackRepositoryPort } from "../../../application/ports/curriculum-pack-repository.port.js";
+import type { CurriculumPackRepositoryPort } from "../../../application/ports/curriculum-pack-repository.port.js";
 
 export interface RouteContext {
   readonly params?: Readonly<Record<string, string | undefined>>;
@@ -35,5 +35,5 @@ export interface AppDependencies extends ApiKeyValidationConfig {
 }
 
 export interface HttpApp {
-  fetch(request: Request, context?: RouteContext): Promise<Response>;
+  fetch: (request: Request, context?: RouteContext) => Promise<Response>;
 }

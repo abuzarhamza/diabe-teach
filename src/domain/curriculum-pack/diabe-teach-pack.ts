@@ -643,7 +643,12 @@ export const DIABE_TEACH_PACK: CurriculumPack = CurriculumPack.create({
           { row: 0, col: 1 },
           { row: 0, col: 0 },
         ],
-        keywordIds: ["autoimmune", "islet-cells", "pancreas", "retinopathy"],
+        keywordIds: [
+          "autoimmune",
+          "islet-cells",
+          "pancreas",
+          "retinopathy",
+        ],
         narrativeExplanation:
           "Autoimmune destruction of islet cells in the pancreas causes diabetes mellitus, which leads to microvascular complications such as retinopathy.",
         isValid: false,
@@ -665,7 +670,12 @@ export const DIABE_TEACH_PACK: CurriculumPack = CurriculumPack.create({
           "C-peptide binds to GLUT4 transporters to inhibit peripheral glucose uptake.",
         ],
         correctIndex: 0,
-        relatedKeywordIds: ["c-peptide", "insulin", "beta-cells", "pancreas"],
+        relatedKeywordIds: [
+          "c-peptide",
+          "insulin",
+          "beta-cells",
+          "pancreas",
+        ],
         explanation:
           "Pancreatic beta cells cleave proinsulin into equimolar amounts of insulin and C-peptide; pharmaceutical insulin preparations contain no C-peptide.",
       },
@@ -844,7 +854,13 @@ export const DIABE_TEACH_PACK: CurriculumPack = CurriculumPack.create({
           "Capillary glucometers store 90 days of venous plasma samples internally.",
         ],
         correctIndex: 0,
-        relatedKeywordIds: ["hba1c", "venous", "glucose", "fasting", "gtt"],
+        relatedKeywordIds: [
+          "hba1c",
+          "venous",
+          "glucose",
+          "fasting",
+          "gtt",
+        ],
         explanation:
           "Non-enzymatic glycation of hemoglobin in red blood cells occurs continuously over their ~120-day lifespan, making HbA1c independent of acute fasting status.",
       },
@@ -859,7 +875,7 @@ export const DIABE_TEACH_PACK: CurriculumPack = CurriculumPack.create({
       },
       {
         id: "survey-q2",
-        prompt: 'I enjoyed playing the "Diabe-teach" game.',
+        prompt: "I enjoyed playing the \"Diabe-teach\" game.",
       },
       {
         id: "survey-q3",

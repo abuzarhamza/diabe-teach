@@ -1,18 +1,17 @@
-import { CurriculumPackRepositoryPort } from "../../application/ports/curriculum-pack-repository.port.js";
-import { CurriculumPack } from "../../domain/curriculum-pack/curriculum-pack.js";
+import type { CurriculumPackRepositoryPort } from "../../application/ports/curriculum-pack-repository.port.js";
+import type { CurriculumPack } from "../../domain/curriculum-pack/curriculum-pack.js";
+import type { PackId } from "../../domain/curriculum-pack/pack-id.js";
 import { DIABE_TEACH_PACK } from "../../domain/curriculum-pack/diabe-teach-pack.js";
-import { PackId } from "../../domain/curriculum-pack/pack-id.js";
 
 export class InMemoryCurriculumPackRepository
-  implements CurriculumPackRepositoryPort
-{
+implements CurriculumPackRepositoryPort {
   readonly #packsById: ReadonlyMap<string, CurriculumPack>;
 
   public constructor(
     initialPacks: readonly CurriculumPack[] = [DIABE_TEACH_PACK],
   ) {
     this.#packsById = new Map(
-      initialPacks.map((pack) => [pack.id.value, pack]),
+      initialPacks.map(pack => [pack.id.value, pack]),
     );
   }
 

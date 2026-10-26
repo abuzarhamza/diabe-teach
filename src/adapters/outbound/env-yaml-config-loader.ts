@@ -1,12 +1,12 @@
-import { existsSync, readFileSync } from "node:fs";
-import { resolve } from "node:path";
-import { DEFAULT_MONGODB_DB_NAME } from "./curriculum-pack.schema.js";
-import {
+import type {
   EnvYamlAuthConfig,
   EnvYamlConfig,
   EnvYamlMongoConfig,
   ResolvedEnvConfig,
 } from "./env-yaml-config-loader.types.js";
+import { existsSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { DEFAULT_MONGODB_DB_NAME } from "./curriculum-pack.schema.js";
 
 export class EnvYamlConfigLoader {
   public static parseYamlString(content: string): EnvYamlConfig {
@@ -34,20 +34,21 @@ export class EnvYamlConfigLoader {
         continue;
       }
 
-      const match = line.match(/^([a-zA-Z0-9_-]+)\s*:\s*(.*)$/);
-      if (match && match[1] && match[2] !== undefined) {
-        const key = match[1];
-        let val = match[2].trim();
+      const colonIndex = line.indexOf(":");
+      if (colonIndex > 0) {
+        const key = line.slice(0, colonIndex).trim();
+        let val = line.slice(colonIndex + 1).trim();
         if (
-          (val.startsWith('"') && val.endsWith('"')) ||
-          (val.startsWith("'") && val.endsWith("'"))
+          (val.startsWith("\"") && val.endsWith("\""))
+          || (val.startsWith("'") && val.endsWith("'"))
         ) {
           val = val.slice(1, -1);
         }
 
         if (currentSection === "mongodb") {
           mongodb[key] = val;
-        } else if (currentSection === "auth") {
+        }
+        else if (currentSection === "auth") {
           auth[key] = val;
         }
       }
@@ -78,7 +79,8 @@ export class EnvYamlConfigLoader {
       }
       const fileContent = readFileSync(resolvedPath, "utf-8");
       return EnvYamlConfigLoader.parseYamlString(fileContent);
-    } catch {
+    }
+    catch {
       return {};
     }
   }

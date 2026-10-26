@@ -7,5 +7,5 @@ export interface VerifiedCapability {
 }
 
 export interface CapabilityTokenPort {
-  verifyToken(token: string): Promise<VerifiedCapability | null>;
+  verifyToken: (token: string) => Promise<VerifiedCapability | null>;
 }

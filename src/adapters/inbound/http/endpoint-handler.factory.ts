@@ -1,20 +1,21 @@
+import type {
+  ApiKeyValidationConfig,
+  HttpRequestInput,
+  RouteContext,
+} from "./http-handler.types.js";
 import { timingSafeEqual } from "node:crypto";
 import {
   DomainError,
   PackNotFoundError,
   UnauthorizedTokenError,
 } from "../../../domain/errors/domain-errors.js";
-import {
-  ApiKeyValidationConfig,
-  HttpRequestInput,
-  RouteContext,
-} from "./http-handler.types.js";
 
 export abstract class BaseHttpHandler<TQuery, TResult> {
-  public static readonly INVALID_API_KEY_MESSAGE =
-    "Missing or invalid x-api-key header.";
-  public static readonly INVALID_CAPABILITY_TOKEN_MESSAGE =
-    "Malformed, invalid, or expired capability token.";
+  public static readonly INVALID_API_KEY_MESSAGE
+    = "Missing or invalid x-api-key header.";
+
+  public static readonly INVALID_CAPABILITY_TOKEN_MESSAGE
+    = "Malformed, invalid, or expired capability token.";
 
   protected readonly successStatus: number;
 
@@ -36,7 +37,8 @@ export abstract class BaseHttpHandler<TQuery, TResult> {
       const query = await this.transformRequest({ request, context });
       const result = await this.execute(query);
       return BaseHttpHandler.jsonResponse(result, this.successStatus);
-    } catch (error) {
+    }
+    catch (error) {
       if (error instanceof DomainError) {
         return BaseHttpHandler.mapDomainErrorToResponse(error);
       }
@@ -57,18 +59,18 @@ export abstract class BaseHttpHandler<TQuery, TResult> {
     providedHeader: string | null,
     config: ApiKeyValidationConfig,
   ): boolean {
-    const shouldEnforce =
-      config.requireApiKey === true ||
-      (typeof config.apiKey === "string" && config.apiKey.length > 0);
+    const shouldEnforce
+      = config.requireApiKey === true
+        || (typeof config.apiKey === "string" && config.apiKey.length > 0);
 
     if (!shouldEnforce) {
       return true;
     }
 
     if (
-      !config.apiKey ||
-      config.apiKey.trim().length === 0 ||
-      !providedHeader
+      !config.apiKey
+      || config.apiKey.trim().length === 0
+      || !providedHeader
     ) {
       return false;
     }
@@ -77,8 +79,8 @@ export abstract class BaseHttpHandler<TQuery, TResult> {
     const expectedBuf = Buffer.from(config.apiKey.trim(), "utf8");
 
     return (
-      actualBuf.length === expectedBuf.length &&
-      timingSafeEqual(actualBuf, expectedBuf)
+      actualBuf.length === expectedBuf.length
+      && timingSafeEqual(actualBuf, expectedBuf)
     );
   }
 
@@ -101,7 +103,9 @@ export abstract class BaseHttpHandler<TQuery, TResult> {
     const payload = {
       code: error.code,
       message: error.message,
-      ...(error.details ? { details: error.details } : {}),
+      ...(error.details
+        ? { details: error.details }
+        : {}),
     };
 
     if (error instanceof UnauthorizedTokenError) {

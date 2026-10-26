@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { AppRuntime } from "../src/app-runtime.js";
 import { CurriculumPackSeeder } from "../scripts/seed-curriculum-packs.js";
+import { AppRuntime } from "../src/app-runtime.js";
 
-describe("AppRuntime and Seeder Integration with .env.dev.yaml (Ticket 02)", () => {
+describe("appRuntime and Seeder Integration with .env.dev.yaml (Ticket 02)", () => {
   it("merges .env.dev.yaml values into AppRuntime.loadEnvConfig when process.env does not override", () => {
     // When process.env is empty, AppRuntime should load from local .env.dev.yaml if present
     const loaded = AppRuntime.loadEnvConfig({});
@@ -28,7 +28,7 @@ describe("AppRuntime and Seeder Integration with .env.dev.yaml (Ticket 02)", () 
     expect(loaded.apiKey).toBe("override-api-key");
   });
 
-  it("CurriculumPackSeeder resolves config via AppRuntime when no explicit options are provided", () => {
+  it("curriculumPackSeeder resolves config via AppRuntime when no explicit options are provided", () => {
     // Test that CurriculumPackSeeder resolveOptions returns the loaded .env.dev.yaml config
     const resolved = CurriculumPackSeeder.resolveOptions();
 

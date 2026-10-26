@@ -1,20 +1,21 @@
+import type { Context } from "@netlify/functions";
+import type { CurriculumPackDocument } from "../src/adapters/outbound/mongo-curriculum-pack-repository.types.js";
 import { createHmac } from "node:crypto";
 import { describe, expect, it, vi } from "vitest";
-import type { Context } from "@netlify/functions";
+import apiNetlifyHandler, {
+  config as apiNetlifyConfig,
+  DEFAULT_MAX_BODY_BYTES,
+} from "../netlify/functions/api.js";
+import { CurriculumPackSeeder } from "../scripts/seed-curriculum-packs.js";
 import { OpenApiHttpApp } from "../src/adapters/inbound/http/create-app.js";
 import { GetPackByIdHttpHandler } from "../src/adapters/inbound/http/get-pack-by-id.handler.js";
 import { FakeCapabilityTokenAdapter } from "../src/adapters/outbound/fake-capability-token-adapter.js";
 import { HmacCapabilityTokenAdapter } from "../src/adapters/outbound/hmac-capability-token-adapter.js";
 import { InMemoryCurriculumPackRepository } from "../src/adapters/outbound/in-memory-curriculum-pack-repository.js";
-import { MongoCurriculumPackRepository } from "../src/adapters/outbound/mongo-curriculum-pack-repository.js";
-import { CurriculumPackDocument } from "../src/adapters/outbound/mongo-curriculum-pack-repository.types.js";
 import { MongoConnectionManager } from "../src/adapters/outbound/mongo-client-singleton.js";
-import { DIABE_TEACH_PACK } from "../src/domain/curriculum-pack/diabe-teach-pack.js";
-import { CurriculumPackSeeder } from "../scripts/seed-curriculum-packs.js";
-import apiNetlifyHandler, {
-  config as apiNetlifyConfig,
-} from "../netlify/functions/api.js";
+import { MongoCurriculumPackRepository } from "../src/adapters/outbound/mongo-curriculum-pack-repository.js";
 import { AppRuntime } from "../src/app-runtime.js";
+import { DIABE_TEACH_PACK } from "../src/domain/curriculum-pack/diabe-teach-pack.js";
 
 const APPENDIX_1_VERBATIM_KEYWORDS = [
   "Insulin",
@@ -68,7 +69,7 @@ const APPENDIX_1_VERBATIM_KEYWORDS = [
   "Children",
 ] as const;
 
-describe("Ticket 01 — Walking Skeleton: GET /api/v1/packs/{packId}", () => {
+describe("ticket 01 — Walking Skeleton: GET /api/v1/packs/{packId}", () => {
   it("returns 200 OK with the complete 49-card diabe-teach CurriculumPack, 7 SemanticDomains, and Figure 2 CalibrationExamples", async () => {
     const packRepo = new InMemoryCurriculumPackRepository([DIABE_TEACH_PACK]);
     const app = new OpenApiHttpApp({ packRepo });
@@ -129,7 +130,7 @@ describe("Ticket 01 — Walking Skeleton: GET /api/v1/packs/{packId}", () => {
     expect(body.pack.domains).toHaveLength(7);
     expect(body.pack.cards).toHaveLength(49);
 
-    const returnedVerbatimLabels = body.pack.cards.map((c) => c.verbatimLabel);
+    const returnedVerbatimLabels = body.pack.cards.map(c => c.verbatimLabel);
     expect(new Set(returnedVerbatimLabels)).toEqual(
       new Set(APPENDIX_1_VERBATIM_KEYWORDS),
     );
@@ -142,9 +143,9 @@ describe("Ticket 01 — Walking Skeleton: GET /api/v1/packs/{packId}", () => {
     const examples = body.pack.adjudicationRubric.calibrationExamples;
     expect(examples).toHaveLength(3);
 
-    const chainA = examples.find((e) => e.id === "fig2-chain-a");
-    const chainB = examples.find((e) => e.id === "fig2-chain-b");
-    const chainC = examples.find((e) => e.id === "fig2-chain-c");
+    const chainA = examples.find(e => e.id === "fig2-chain-a");
+    const chainB = examples.find(e => e.id === "fig2-chain-b");
+    const chainC = examples.find(e => e.id === "fig2-chain-c");
 
     expect(chainA?.isValid).toBe(true);
     expect(chainA?.keywordIds).toHaveLength(9);
@@ -208,7 +209,7 @@ describe("Ticket 01 — Walking Skeleton: GET /api/v1/packs/{packId}", () => {
   });
 });
 
-describe("Ticket 02 — Role-Aware Answer-Key Redaction & CapabilityToken Verification", () => {
+describe("ticket 02 — Role-Aware Answer-Key Redaction & CapabilityToken Verification", () => {
   it("redacts correctIndex and explanation for anonymous callers while returning all 10 Bloom Level 2/3 MCQs and 9 Appendix 2 Likert items", async () => {
     const packRepo = new InMemoryCurriculumPackRepository([DIABE_TEACH_PACK]);
     const tokenVerifier = new FakeCapabilityTokenAdapter();
@@ -369,7 +370,7 @@ describe("Ticket 02 — Role-Aware Answer-Key Redaction & CapabilityToken Verifi
     }
   });
 
-  describe("HmacCapabilityTokenAdapter — RFC 7519 3-Part JWT", () => {
+  describe("hmacCapabilityTokenAdapter — RFC 7519 3-Part JWT", () => {
     const secret = "test-secret-key-for-hmac-256";
     const hmacAdapter = new HmacCapabilityTokenAdapter(secret);
 
@@ -417,8 +418,8 @@ describe("Ticket 02 — Role-Aware Answer-Key Redaction & CapabilityToken Verifi
         sessionId: "sess-42",
         participantId: "part-99",
       });
-      const verifiedParticipant =
-        await hmacAdapter.verifyToken(participantToken);
+      const verifiedParticipant
+        = await hmacAdapter.verifyToken(participantToken);
       expect(verifiedParticipant).toEqual({
         role: "participant",
         sessionId: "sess-42",
@@ -501,7 +502,7 @@ describe("Ticket 02 — Role-Aware Answer-Key Redaction & CapabilityToken Verifi
   });
 });
 
-describe("Ticket 03 — Hybrid MongoDB Persistence & Netlify Functions v2 Composition Root", () => {
+describe("ticket 03 — Hybrid MongoDB Persistence & Netlify Functions v2 Composition Root", () => {
   const customCardioPackDoc: CurriculumPackDocument = {
     _id: "cardio-teach",
     title: "Cardio-teach: Heart Failure & Arrhythmia Reasoning",
@@ -558,7 +559,9 @@ describe("Ticket 03 — Hybrid MongoDB Persistence & Netlify Functions v2 Compos
 
   it("queries MongoDB curriculum_packs collection dynamically without in-memory fallback", async () => {
     const findOneSpy = vi.fn(async (filter: { _id: string }) =>
-      filter._id === "diabe-teach" ? customCardioPackDoc : null,
+      filter._id === "diabe-teach"
+        ? customCardioPackDoc
+        : null,
     );
     const repo = new MongoCurriculumPackRepository({
       getCollection: async () => ({
@@ -577,7 +580,9 @@ describe("Ticket 03 — Hybrid MongoDB Persistence & Netlify Functions v2 Compos
 
   it("loads custom packs from MongoDB curriculum_packs collection and applies role-aware answer-key redaction", async () => {
     const findOneSpy = vi.fn(async (filter: { _id: string }) =>
-      filter._id === "cardio-teach" ? customCardioPackDoc : null,
+      filter._id === "cardio-teach"
+        ? customCardioPackDoc
+        : null,
     );
     const repo = new MongoCurriculumPackRepository({
       getCollection: async () => ({
@@ -657,7 +662,9 @@ describe("Ticket 03 — Hybrid MongoDB Persistence & Netlify Functions v2 Compos
       request: new Request("https://internal.lambda.local/invoke", {
         headers: { Authorization: "Bearer my-token-123" },
       }),
-      context: { params: { packId: "diabe-teach" } },
+      context: {
+        params: { packId: "diabe-teach" },
+      },
     });
 
     expect(query).toEqual({
@@ -674,7 +681,9 @@ describe("Ticket 03 — Hybrid MongoDB Persistence & Netlify Functions v2 Compos
       new Request("https://internal.lambda.local/invoke", {
         method: "GET",
       }),
-      { params: { packId: "diabe-teach" } },
+      {
+        params: { packId: "diabe-teach" },
+      },
     );
 
     expect(response.status).toBe(200);
@@ -782,13 +791,14 @@ describe("Ticket 03 — Hybrid MongoDB Persistence & Netlify Functions v2 Compos
         {} as unknown as Context,
       );
       expect(notImplementedRes.status).toBe(501);
-    } finally {
+    }
+    finally {
       AppRuntime.setProductionDependencies(null);
     }
   });
 });
 
-describe("Ticket 07 — x-api-key Header Validation (ApiKeyAuth) & Fail-Closed Production Security", () => {
+describe("ticket 07 — x-api-key Header Validation (ApiKeyAuth) & Fail-Closed Production Security", () => {
   it("rejects missing or invalid x-api-key with 401 UNAUTHORIZED_TOKEN when apiKey is configured on createApp", async () => {
     const packRepo = new InMemoryCurriculumPackRepository([DIABE_TEACH_PACK]);
     const app = new OpenApiHttpApp({
@@ -852,7 +862,7 @@ describe("Ticket 07 — x-api-key Header Validation (ApiKeyAuth) & Fail-Closed P
       new Request("http://localhost:3000/api/v1/packs/diabe-teach", {
         headers: {
           "x-api-key": "valid-client-api-key-123",
-          Authorization: "Bearer inst-token",
+          "Authorization": "Bearer inst-token",
         },
       }),
     );
@@ -896,7 +906,7 @@ describe("Ticket 07 — x-api-key Header Validation (ApiKeyAuth) & Fail-Closed P
   });
 });
 
-describe("Ticket 12 — Pure MongoDB Persistence & Idempotent Database Seeding Script", () => {
+describe("ticket 12 — Pure MongoDB Persistence & Idempotent Database Seeding Script", () => {
   it("converts CurriculumPack aggregate into a schema-conforming CurriculumPackDocument", () => {
     const doc = CurriculumPackSeeder.toDocument(DIABE_TEACH_PACK);
 
@@ -925,7 +935,8 @@ describe("Ticket 12 — Pure MongoDB Persistence & Idempotent Database Seeding S
       await expect(CurriculumPackSeeder.seed({ mongoUri: "" })).rejects.toThrow(
         "MONGODB_URI environment variable is required to seed Curriculum Packs into MongoDB.",
       );
-    } finally {
+    }
+    finally {
       if (originalUri !== undefined) {
         process.env.MONGODB_URI = originalUri;
       }
@@ -972,8 +983,92 @@ describe("Ticket 12 — Pure MongoDB Persistence & Idempotent Database Seeding S
         seededCount: 1,
         packIds: ["diabe-teach"],
       });
-    } finally {
+    }
+    finally {
       getConnectionSpy.mockRestore();
     }
+  });
+
+  describe("api.ts Request Body Size Limit (HTTP 413)", () => {
+    it("exports DEFAULT_MAX_BODY_BYTES as 1 MB (1048576 bytes)", () => {
+      expect(DEFAULT_MAX_BODY_BYTES).toBe(1024 * 1024);
+      expect(AppRuntime.DEFAULT_MAX_BODY_BYTES).toBe(1024 * 1024);
+    });
+
+    it("rejects requests exceeding maxBodyBytes via content-length header with 413 Payload Too Large", async () => {
+      const handler = AppRuntime.createServerlessHttpHandler({
+        maxBodyBytes: 100,
+      });
+
+      const request = new Request("http://localhost:3000/api/v1/packs", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "content-length": "101",
+        },
+        body: JSON.stringify({ test: "x" }),
+      });
+
+      const response = await handler(request);
+      expect(response.status).toBe(413);
+      const body = (await response.json()) as {
+        code: string;
+        message: string;
+        details: { maxBodyBytes: number; actualBytes: number };
+      };
+      expect(body.code).toBe("INVALID_REQUEST_BODY");
+      expect(body.message).toContain("100 bytes");
+      expect(body.details).toEqual({
+        maxBodyBytes: 100,
+        actualBytes: 101,
+      });
+    });
+
+    it("rejects requests exceeding maxBodyBytes via stream payload without content-length header", async () => {
+      const handler = AppRuntime.createServerlessHttpHandler({
+        maxBodyBytes: 50,
+      });
+
+      const payload = JSON.stringify({
+        large: "a".repeat(100),
+      });
+      const request = new Request("http://localhost:3000/api/v1/packs", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: payload,
+      });
+
+      const response = await handler(request);
+      expect(response.status).toBe(413);
+      const body = (await response.json()) as {
+        code: string;
+        message: string;
+        details: { maxBodyBytes: number; actualBytes: number };
+      };
+      expect(body.code).toBe("INVALID_REQUEST_BODY");
+      expect(body.details.maxBodyBytes).toBe(50);
+      expect(body.details.actualBytes).toBeGreaterThan(50);
+    });
+
+    it("bypasses size limit validation on GET requests", async () => {
+      const packRepo = new InMemoryCurriculumPackRepository([DIABE_TEACH_PACK]);
+      const handler = AppRuntime.createServerlessHttpHandler({
+        dependencies: { packRepo },
+        maxBodyBytes: 10,
+      });
+
+      const request = new Request(
+        `http://localhost:3000/api/v1/packs/diabe-teach?longQueryParam=${
+          "x".repeat(500)}`,
+        {
+          method: "GET",
+        },
+      );
+
+      const response = await handler(request);
+      expect(response.status).toBe(200);
+    });
   });
 });

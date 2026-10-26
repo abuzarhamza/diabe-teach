@@ -1,4 +1,4 @@
-import {
+import type {
   CapabilityTokenPort,
   VerifiedCapability,
 } from "../../application/ports/capability-token.port.js";

@@ -1,7 +1,13 @@
-import { Connection, Model } from "mongoose";
-import { CurriculumPackRepositoryPort } from "../../application/ports/curriculum-pack-repository.port.js";
+import type { Connection, Model } from "mongoose";
+import type { CurriculumPackRepositoryPort } from "../../application/ports/curriculum-pack-repository.port.js";
+import type { PackId } from "../../domain/curriculum-pack/pack-id.js";
+import type {
+  CurriculumPackCollectionLike,
+  CurriculumPackDocument,
+  MongoCurriculumPackConnectionConfig,
+  MongoCurriculumPackRepositoryOptions,
+} from "./mongo-curriculum-pack-repository.types.js";
 import { CurriculumPack } from "../../domain/curriculum-pack/curriculum-pack.js";
-import { PackId } from "../../domain/curriculum-pack/pack-id.js";
 import {
   CURRICULUM_PACK_MODEL_NAME,
   CURRICULUM_PACKS_COLLECTION,
@@ -9,12 +15,6 @@ import {
   DEFAULT_MONGODB_DB_NAME,
 } from "./curriculum-pack.schema.js";
 import { MongoConnectionManager } from "./mongo-client-singleton.js";
-import {
-  CurriculumPackCollectionLike,
-  CurriculumPackDocument,
-  MongoCurriculumPackConnectionConfig,
-  MongoCurriculumPackRepositoryOptions,
-} from "./mongo-curriculum-pack-repository.types.js";
 
 export {
   CURRICULUM_PACK_MODEL_NAME,
@@ -24,8 +24,7 @@ export {
 };
 
 export class MongoCurriculumPackRepository
-  implements CurriculumPackRepositoryPort
-{
+implements CurriculumPackRepositoryPort {
   public static readonly modelName = CURRICULUM_PACK_MODEL_NAME;
   public static readonly collectionName = CURRICULUM_PACKS_COLLECTION;
 
@@ -40,13 +39,13 @@ export class MongoCurriculumPackRepository
   ): Model<CurriculumPackDocument> {
     return (
       (connection.models[CURRICULUM_PACK_MODEL_NAME] as
-        | Model<CurriculumPackDocument>
-        | undefined) ??
-      connection.model<CurriculumPackDocument>(
-        CURRICULUM_PACK_MODEL_NAME,
-        curriculumPackSchema,
-        CURRICULUM_PACKS_COLLECTION,
-      )
+      | Model<CurriculumPackDocument>
+      | undefined)
+    ?? connection.model<CurriculumPackDocument>(
+      CURRICULUM_PACK_MODEL_NAME,
+      curriculumPackSchema,
+      CURRICULUM_PACKS_COLLECTION,
+    )
     );
   }
 
@@ -66,7 +65,7 @@ export class MongoCurriculumPackRepository
         );
         const model = MongoCurriculumPackRepository.getModel(connection);
         return {
-          findOne: async (filter) =>
+          findOne: async filter =>
             model.findOne(filter).lean<CurriculumPackDocument | null>().exec(),
         };
       },
@@ -76,7 +75,9 @@ export class MongoCurriculumPackRepository
   public async findById(packId: PackId): Promise<CurriculumPack | null> {
     const collection = await this.#getCollection();
     const doc = await collection.findOne({ _id: packId.value });
-    return doc ? MongoCurriculumPackRepository.#toDomain(doc) : null;
+    return doc
+      ? MongoCurriculumPackRepository.#toDomain(doc)
+      : null;
   }
 
   static #toDomain(doc: CurriculumPackDocument): CurriculumPack {

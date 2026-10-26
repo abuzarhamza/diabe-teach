@@ -1,5 +1,5 @@
-import { CurriculumPack } from "../../domain/curriculum-pack/curriculum-pack.js";
-import {
+import type { CurriculumPack } from "../../domain/curriculum-pack/curriculum-pack.js";
+import type {
   CurriculumPackProjectionOptions,
   PublicAssessmentQuestionDto,
   PublicCurriculumPackDto,

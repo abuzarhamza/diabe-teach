@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { EnvYamlConfigLoader } from "../src/adapters/outbound/env-yaml-config-loader.js";
 
-describe("EnvYamlConfigLoader (Ticket 01)", () => {
+describe("envYamlConfigLoader (Ticket 01)", () => {
   it("parses valid YAML content into structured EnvYamlConfig", () => {
     const yamlString = `
 mongodb:
