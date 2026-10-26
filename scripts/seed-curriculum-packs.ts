@@ -50,30 +50,28 @@ export class CurriculumPackSeeder {
   }
 
   public static async seed(options?: SeederOptions): Promise<SeedingResult> {
-    const mongoUri = options?.mongoUri ?? process.env.MONGODB_URI?.trim();
-    if (!mongoUri) {
+    const rawUri = options?.mongoUri ?? process.env.MONGODB_URI?.trim();
+    if (!rawUri) {
       throw new Error(
         "MONGODB_URI environment variable is required to seed Curriculum Packs into MongoDB.",
       );
     }
-    const dbName =
-      options?.dbName ??
-      process.env.MONGODB_DB_NAME?.trim() ??
-      DEFAULT_MONGODB_DB_NAME;
-    const packs = options?.packs ?? [DIABE_TEACH_PACK];
+    const { mongoUri, dbName, packs } =
+      CurriculumPackSeeder.resolveOptions(options);
 
     const connection = await MongoConnectionManager.getConnection(
-      mongoUri,
+      mongoUri!,
       dbName,
     );
     const model = MongoCurriculumPackRepository.getModel(connection);
 
-    const seededIds: string[] = [];
-    for (const pack of packs) {
-      const doc = CurriculumPackSeeder.toDocument(pack);
-      await model.replaceOne({ _id: doc._id }, doc, { upsert: true });
-      seededIds.push(doc._id);
-    }
+    const seededIds = await Promise.all(
+      packs.map(async (pack) => {
+        const doc = CurriculumPackSeeder.toDocument(pack);
+        await model.replaceOne({ _id: doc._id }, doc, { upsert: true });
+        return doc._id;
+      }),
+    );
 
     return {
       seededCount: seededIds.length,
@@ -82,16 +80,16 @@ export class CurriculumPackSeeder {
   }
 }
 
-if (
+const isCli =
   process.argv[1]?.endsWith("seed-curriculum-packs.ts") ||
-  process.argv[1]?.endsWith("seed-curriculum-packs.js")
-) {
+  process.argv[1]?.endsWith("seed-curriculum-packs.js");
+
+if (isCli) {
   CurriculumPackSeeder.seed()
     .then((result) => {
       console.log(
         `Successfully seeded ${result.seededCount} Curriculum Pack(s) into MongoDB: [${result.packIds.join(", ")}]`,
       );
-      process.exit(0);
     })
     .catch((error: unknown) => {
       console.error("Failed to seed Curriculum Packs:", error);

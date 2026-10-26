@@ -32,27 +32,30 @@ export class AppRuntime {
           );
     const resolvedYaml = EnvYamlConfigLoader.toRuntimeEnvConfig(yamlConfig);
 
-    const rawMongoUri = env.MONGODB_URI?.trim();
-    const rawDbName = env.MONGODB_DB_NAME?.trim();
-    const rawTokenSecret = env.CAPABILITY_TOKEN_SECRET?.trim();
-    const rawApiKey = env.API_KEY?.trim();
-
     return {
-      mongoUri:
-        rawMongoUri && rawMongoUri.length > 0
-          ? rawMongoUri
-          : resolvedYaml.mongoUri,
+      mongoUri: AppRuntime.#trimOrFallback(
+        env.MONGODB_URI,
+        resolvedYaml.mongoUri,
+      ),
       mongoDbName:
-        rawDbName && rawDbName.length > 0
-          ? rawDbName
-          : (resolvedYaml.mongoDbName ?? DEFAULT_MONGODB_DB_NAME),
-      capabilityTokenSecret:
-        rawTokenSecret && rawTokenSecret.length > 0
-          ? rawTokenSecret
-          : resolvedYaml.capabilityTokenSecret,
-      apiKey:
-        rawApiKey && rawApiKey.length > 0 ? rawApiKey : resolvedYaml.apiKey,
+        AppRuntime.#trimOrFallback(
+          env.MONGODB_DB_NAME,
+          resolvedYaml.mongoDbName,
+        ) ?? DEFAULT_MONGODB_DB_NAME,
+      capabilityTokenSecret: AppRuntime.#trimOrFallback(
+        env.CAPABILITY_TOKEN_SECRET,
+        resolvedYaml.capabilityTokenSecret,
+      ),
+      apiKey: AppRuntime.#trimOrFallback(env.API_KEY, resolvedYaml.apiKey),
     };
+  }
+
+  static #trimOrFallback(
+    value: string | undefined,
+    fallback?: string,
+  ): string | undefined {
+    const trimmed = value?.trim();
+    return trimmed && trimmed.length > 0 ? trimmed : fallback;
   }
 
   public static buildProductionDependencies(

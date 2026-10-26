@@ -56,31 +56,52 @@ export class HmacCapabilityTokenAdapter implements CapabilityTokenPort {
       return null;
     }
 
-    try {
-      const header = JSON.parse(
-        Buffer.from(headerB64, "base64url").toString("utf8"),
-      ) as Record<string, unknown>;
-      if (header.alg !== "HS256") {
-        return null;
-      }
-    } catch {
+    if (!HmacCapabilityTokenAdapter.#isValidHeader(headerB64)) {
       return null;
     }
 
     const signingInput = `${headerB64}.${payloadB64}`;
-    const expectedSigB64 = createHmac("sha256", this.#secret)
-      .update(signingInput)
-      .digest("base64url");
-
-    const actualBuf = Buffer.from(signatureB64, "utf8");
-    const expectedBuf = Buffer.from(expectedSigB64, "utf8");
     if (
-      actualBuf.length !== expectedBuf.length ||
-      !timingSafeEqual(actualBuf, expectedBuf)
+      !HmacCapabilityTokenAdapter.#isValidSignature(
+        signingInput,
+        signatureB64,
+        this.#secret,
+      )
     ) {
       return null;
     }
 
+    return HmacCapabilityTokenAdapter.#parsePayload(payloadB64);
+  }
+
+  static #isValidHeader(headerB64: string): boolean {
+    try {
+      const header = JSON.parse(
+        Buffer.from(headerB64, "base64url").toString("utf8"),
+      ) as Record<string, unknown>;
+      return header.alg === "HS256";
+    } catch {
+      return false;
+    }
+  }
+
+  static #isValidSignature(
+    signingInput: string,
+    signatureB64: string,
+    secret: string,
+  ): boolean {
+    const expectedSigB64 = createHmac("sha256", secret)
+      .update(signingInput)
+      .digest("base64url");
+    const actualBuf = Buffer.from(signatureB64, "utf8");
+    const expectedBuf = Buffer.from(expectedSigB64, "utf8");
+    return (
+      actualBuf.length === expectedBuf.length &&
+      timingSafeEqual(actualBuf, expectedBuf)
+    );
+  }
+
+  static #parsePayload(payloadB64: string): VerifiedCapability | null {
     try {
       const parsed = JSON.parse(
         Buffer.from(payloadB64, "base64url").toString("utf8"),

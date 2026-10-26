@@ -27,35 +27,45 @@ export class GetCurriculumPackByIdUseCase
   public async execute(
     query: GetCurriculumPackByIdQuery,
   ): Promise<GetCurriculumPackByIdResult> {
-    let callerRole: "anonymous" | "participant" | "instructor" = "anonymous";
-
-    if (query.verifiedCapability) {
-      callerRole = query.verifiedCapability.role;
-    } else if (query.bearerToken !== undefined && query.bearerToken !== null) {
-      if (query.bearerToken.length === 0 || !this.#tokenVerifier) {
-        throw new UnauthorizedTokenError(
-          "Missing or unconfigured bearer capability token.",
-        );
-      }
-      const verified = await this.#tokenVerifier.verifyToken(query.bearerToken);
-      if (!verified) {
-        throw new UnauthorizedTokenError(
-          "Invalid or unrecognized bearer token.",
-        );
-      }
-      callerRole = verified.role;
-    }
-
-    const packId = PackId.create(query.packId);
-    const pack = await this.#packRepo.findById(packId);
-    if (!pack) {
-      throw new PackNotFoundError(packId.value);
-    }
+    const callerRole = await this.#resolveCallerRole(query);
+    const pack = await this.#loadPack(query.packId);
 
     return {
       pack: CurriculumPackProjector.toPublicDto(pack, {
         includeAnswerKeys: callerRole === "instructor",
       }),
     };
+  }
+
+  async #resolveCallerRole(
+    query: GetCurriculumPackByIdQuery,
+  ): Promise<"anonymous" | "participant" | "instructor"> {
+    if (query.verifiedCapability) {
+      return query.verifiedCapability.role;
+    }
+    if (query.bearerToken === undefined || query.bearerToken === null) {
+      return "anonymous";
+    }
+    if (query.bearerToken.length === 0 || !this.#tokenVerifier) {
+      throw new UnauthorizedTokenError(
+        "Missing or unconfigured bearer capability token.",
+      );
+    }
+    const verified = await this.#tokenVerifier.verifyToken(query.bearerToken);
+    if (!verified) {
+      throw new UnauthorizedTokenError(
+        "Invalid or unrecognized bearer token.",
+      );
+    }
+    return verified.role;
+  }
+
+  async #loadPack(rawPackId: string) {
+    const packId = PackId.create(rawPackId);
+    const pack = await this.#packRepo.findById(packId);
+    if (!pack) {
+      throw new PackNotFoundError(packId.value);
+    }
+    return pack;
   }
 }
