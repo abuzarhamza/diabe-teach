@@ -1,4 +1,5 @@
 import { OpenApiHttpApp } from "./adapters/inbound/http/create-app.js";
+import { EnvYamlConfigLoader } from "./adapters/outbound/env-yaml-config-loader.js";
 import { HmacCapabilityTokenAdapter } from "./adapters/outbound/hmac-capability-token-adapter.js";
 import {
   DEFAULT_MONGODB_DB_NAME,
@@ -12,26 +13,45 @@ import {
   ServerlessRouteConfig,
 } from "./app-runtime.types.js";
 
+export interface LoadEnvConfigOptions {
+  readonly yamlFilePath?: string | false;
+}
+
 export class AppRuntime {
   static #cachedProductionDependencies: ProductionDependencies | null = null;
 
   public static loadEnvConfig(
     env: NodeJS.ProcessEnv = process.env,
+    options?: LoadEnvConfigOptions,
   ): RuntimeEnvConfig {
+    const yamlConfig =
+      options?.yamlFilePath === false
+        ? {}
+        : EnvYamlConfigLoader.loadFromFile(
+            options?.yamlFilePath ?? ".env.dev.yaml",
+          );
+    const resolvedYaml = EnvYamlConfigLoader.toRuntimeEnvConfig(yamlConfig);
+
     const rawMongoUri = env.MONGODB_URI?.trim();
     const rawDbName = env.MONGODB_DB_NAME?.trim();
     const rawTokenSecret = env.CAPABILITY_TOKEN_SECRET?.trim();
     const rawApiKey = env.API_KEY?.trim();
 
     return {
-      mongoUri: rawMongoUri && rawMongoUri.length > 0 ? rawMongoUri : undefined,
+      mongoUri:
+        rawMongoUri && rawMongoUri.length > 0
+          ? rawMongoUri
+          : resolvedYaml.mongoUri,
       mongoDbName:
-        rawDbName && rawDbName.length > 0 ? rawDbName : DEFAULT_MONGODB_DB_NAME,
+        rawDbName && rawDbName.length > 0
+          ? rawDbName
+          : (resolvedYaml.mongoDbName ?? DEFAULT_MONGODB_DB_NAME),
       capabilityTokenSecret:
         rawTokenSecret && rawTokenSecret.length > 0
           ? rawTokenSecret
-          : undefined,
-      apiKey: rawApiKey && rawApiKey.length > 0 ? rawApiKey : undefined,
+          : resolvedYaml.capabilityTokenSecret,
+      apiKey:
+        rawApiKey && rawApiKey.length > 0 ? rawApiKey : resolvedYaml.apiKey,
     };
   }
 
