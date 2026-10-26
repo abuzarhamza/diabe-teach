@@ -6,6 +6,7 @@ import type {
 } from "./env-yaml-config-loader.types.js";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { parse as parseYaml } from "yaml";
 import { DEFAULT_MONGODB_DB_NAME } from "./curriculum-pack.schema.js";
 
 export class EnvYamlConfigLoader {
@@ -14,61 +15,44 @@ export class EnvYamlConfigLoader {
       return {};
     }
 
-    const lines = content.split(/\r?\n/);
-    let currentSection: "mongodb" | "auth" | null = null;
-    const mongodb: Record<string, string> = {};
-    const auth: Record<string, string> = {};
-
-    for (const rawLine of lines) {
-      const line = rawLine.trim();
-      if (!line || line.startsWith("#")) {
-        continue;
+    try {
+      const parsed = parseYaml(content) as Record<string, unknown> | null;
+      if (!parsed || typeof parsed !== "object") {
+        return {};
       }
 
-      if (line === "mongodb:") {
-        currentSection = "mongodb";
-        continue;
-      }
-      if (line === "auth:") {
-        currentSection = "auth";
-        continue;
+      const result: EnvYamlConfig = {};
+
+      if (parsed.mongodb && typeof parsed.mongodb === "object") {
+        const mongo = parsed.mongodb as Record<string, unknown>;
+        (result as { mongodb: EnvYamlMongoConfig }).mongodb = {
+          uri: typeof mongo.uri === "string"
+            ? mongo.uri
+            : undefined,
+          database: typeof mongo.database === "string"
+            ? mongo.database
+            : undefined,
+        };
       }
 
-      const colonIndex = line.indexOf(":");
-      if (colonIndex > 0) {
-        const key = line.slice(0, colonIndex).trim();
-        let val = line.slice(colonIndex + 1).trim();
-        if (
-          (val.startsWith("\"") && val.endsWith("\""))
-          || (val.startsWith("'") && val.endsWith("'"))
-        ) {
-          val = val.slice(1, -1);
-        }
-
-        if (currentSection === "mongodb") {
-          mongodb[key] = val;
-        }
-        else if (currentSection === "auth") {
-          auth[key] = val;
-        }
+      if (parsed.auth && typeof parsed.auth === "object") {
+        const auth = parsed.auth as Record<string, unknown>;
+        (result as { auth: EnvYamlAuthConfig }).auth = {
+          capability_token_secret:
+            typeof auth.capability_token_secret === "string"
+              ? auth.capability_token_secret
+              : undefined,
+          api_key: typeof auth.api_key === "string"
+            ? auth.api_key
+            : undefined,
+        };
       }
+
+      return result;
     }
-
-    const result: EnvYamlConfig = {};
-    if (Object.keys(mongodb).length > 0) {
-      (result as { mongodb: EnvYamlMongoConfig }).mongodb = {
-        uri: mongodb.uri,
-        database: mongodb.database,
-      };
+    catch {
+      return {};
     }
-    if (Object.keys(auth).length > 0) {
-      (result as { auth: EnvYamlAuthConfig }).auth = {
-        capability_token_secret: auth.capability_token_secret,
-        api_key: auth.api_key,
-      };
-    }
-
-    return result;
   }
 
   public static loadFromFile(filePath: string): EnvYamlConfig {

@@ -35,6 +35,7 @@ Welcome to the **Diabe-Teach Knowledge Base & Research Wiki**. This repository i
 | [18](18-deploying-diabe-teach-to-netlify.md) | [Deploying Diabe-Teach to Netlify](18-deploying-diabe-teach-to-netlify.md) | Authoritative deployment guide: Netlify Functions v2, MongoDB Atlas setup, database seeding (`npm run db:seed`), environment variables, and smoke tests. |
 | [19](19-database-naming-conventions-research.md) | [Database Naming Conventions Research](19-database-naming-conventions-research.md) | Canonical naming for platform database (`concept_chain`) and multi-subject data stores. |
 | [20](20-standard-rfc7519-jwt-and-openapi-security-handlers.md) | [Standard RFC 7519 JWT & OpenAPI Security Handlers](20-standard-rfc7519-jwt-and-openapi-security-handlers.md) | Migration from legacy 2-part tokens to standard 3-part RFC 7519 JWTs and centralized `openapi-backend` security pipeline. |
+| [21](21-npm-first-and-yaml-parser-evaluation.md) | [Dependency Selection Standard & YAML Parser Evaluation](21-npm-first-and-yaml-parser-evaluation.md) | Research evaluation of `yaml` vs `js-yaml` and repository rule enforcing popular npm modules first. |
 
 ---
 

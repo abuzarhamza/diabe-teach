@@ -17,11 +17,13 @@
     "jose": "^6.2.13",
     "mongodb": "^6.13.0",
     "mongoose": "^9.11.4",
-    "openapi-backend": "^5.22.0"
+    "openapi-backend": "^5.22.0",
+    "yaml": "^2.9.1"
   },
   "devDependencies": {
     "@antfu/eslint-config": "^10.0.0",
     "@types/node": "^22.13.0",
+    "@types/yaml": "^1.9.6",
     "dependency-cruiser": "^16.10.0",
     "escomplex": "^2.0.0-alpha",
     "eslint": "^10.13.0",
