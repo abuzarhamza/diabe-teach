@@ -1,8 +1,6 @@
 import type { CapabilityTokenPort } from "./application/ports/capability-token.port.js";
 import type { CurriculumPackRepositoryPort } from "./application/ports/curriculum-pack-repository.port.js";
 
-export type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
-
 export interface RuntimeEnvConfig {
   readonly mongoUri?: string;
   readonly mongoDbName: string;
@@ -16,22 +14,3 @@ export interface ProductionDependencies {
   readonly apiKey?: string;
   readonly requireApiKey?: boolean;
 }
-
-export interface ServerlessHandlerOptions {
-  readonly dependencies?: ProductionDependencies;
-  readonly maxBodyBytes?: number;
-}
-
-export interface ServerlessRouteConfig {
-  readonly path: `/${string}`;
-  readonly method: HttpMethod | HttpMethod[];
-}
-
-export interface ServerlessRequestContext {
-  readonly params?: Record<string, string | undefined>;
-}
-
-export type ServerlessHttpHandler = (
-  request: Request,
-  context?: ServerlessRequestContext,
-) => Promise<Response>;
