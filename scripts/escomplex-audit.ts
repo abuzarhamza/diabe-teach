@@ -1,4 +1,4 @@
-import { readFileSync, readdirSync, statSync } from "node:fs";
+import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import escomplex from "escomplex";
 
@@ -17,7 +17,8 @@ function getAllFiles(dir: string, fileList: string[] = []): string[] {
       if (file !== "node_modules" && file !== ".git" && file !== "dist") {
         getAllFiles(fullPath, fileList);
       }
-    } else if (file.endsWith(".ts") && !file.endsWith(".d.ts")) {
+    }
+    else if (file.endsWith(".ts") && !file.endsWith(".d.ts")) {
       fileList.push(fullPath);
     }
   }
@@ -30,7 +31,8 @@ const filesToAnalyze: string[] = [];
 for (const dir of targetDirs) {
   try {
     getAllFiles(dir, filesToAnalyze);
-  } catch (e) {
+  }
+  catch {
     // directory may not exist
   }
 }
@@ -56,7 +58,8 @@ for (const filePath of filesToAnalyze) {
       cyclomatic,
       sloc,
     });
-  } catch (err: any) {
+  }
+  catch {
     // Fallback for modules using novel TS syntax if escomplex parser stumbles
     const code = readFileSync(filePath, "utf-8");
     const lines = code.split("\n").length;
@@ -81,8 +84,11 @@ console.log(
 
 let allPassing = true;
 for (const r of reports) {
-  const status = r.maintainability >= 65 ? "PASS" : "WARN";
-  if (r.maintainability < 65) allPassing = false;
+  const status = r.maintainability >= 65
+    ? "PASS"
+    : "WARN";
+  if (r.maintainability < 65)
+    allPassing = false;
   console.log(
     `| ${r.maintainability.toString().padEnd(34)} | ${r.cyclomatic.toString().padEnd(21)} | ${r.sloc.toString().padEnd(4)} | [${status}] ${r.path}`,
   );
@@ -92,7 +98,8 @@ console.log(`\n=================================================================
 if (allPassing) {
   console.log(` [PASS] All analyzed modules exceed standard maintainability index (>65).`);
   console.log(` The codebase is clean, human-readable, and free of god modules.`);
-} else {
+}
+else {
   console.log(` [WARN] Some modules need decomposition.`);
 }
 console.log(`========================================================================\n`);
