@@ -3,7 +3,9 @@ import type {
   RuntimeEnvConfig,
 } from "./app-runtime.types.js";
 import { EnvYamlConfigLoader } from "./adapters/outbound/env-yaml-config-loader.js";
+import { FakeCapabilityTokenAdapter } from "./adapters/outbound/fake-capability-token-adapter.js";
 import { HmacCapabilityTokenAdapter } from "./adapters/outbound/hmac-capability-token-adapter.js";
+import { InMemoryGameSessionRepository } from "./adapters/outbound/in-memory-game-session-repository.js";
 import {
   DEFAULT_MONGODB_DB_NAME,
   MongoCurriculumPackRepository,
@@ -61,11 +63,17 @@ export class AppRuntime {
   ): ProductionDependencies {
     const config = AppRuntime.loadEnvConfig(env);
 
+    // HmacCapabilityTokenAdapter implements both signer and verifier ports
+    // Falls back to FakeCapabilityTokenAdapter for local development without secrets
+    const tokenAdapter = HmacCapabilityTokenAdapter.fromSecret(
+      config.capabilityTokenSecret,
+    ) ?? new FakeCapabilityTokenAdapter();
+
     return {
       packRepo: MongoCurriculumPackRepository.fromConfig(config),
-      tokenVerifier: HmacCapabilityTokenAdapter.fromSecret(
-        config.capabilityTokenSecret,
-      ),
+      sessionRepo: new InMemoryGameSessionRepository(),
+      tokenSigner: tokenAdapter,
+      tokenVerifier: tokenAdapter,
       apiKey: config.apiKey,
       requireApiKey: Boolean(config.apiKey),
     };

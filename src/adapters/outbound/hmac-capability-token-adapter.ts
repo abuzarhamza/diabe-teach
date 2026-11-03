@@ -1,10 +1,11 @@
 import type {
   CapabilityTokenPort,
+  CapabilityTokenSignerPort,
   VerifiedCapability,
 } from "../../application/ports/capability-token.port.js";
 import { jwtVerify, SignJWT } from "jose";
 
-export class HmacCapabilityTokenAdapter implements CapabilityTokenPort {
+export class HmacCapabilityTokenAdapter implements CapabilityTokenPort, CapabilityTokenSignerPort {
   readonly #secretKey: Uint8Array;
 
   public constructor(secret: string) {

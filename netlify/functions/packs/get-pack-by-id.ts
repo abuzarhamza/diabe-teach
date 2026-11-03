@@ -1,8 +1,7 @@
-import type { Config } from "@netlify/functions";
 import type { APIGatewayProxyEvent, APIGatewayProxyResult } from "aws-lambda";
 import type { ProductionDependencies } from "../../../src/app-runtime.types.js";
 import middy from "@middy/core";
-import httpHeaderNormalizer from "@middy/http-header-normalizer";
+import { wrapLambdaHandler } from "../../../src/adapters/inbound/http/lambda-to-v2-wrapper.js";
 import { authMiddleware } from "../../../src/adapters/inbound/http/middy/auth.middleware.js";
 import { domainErrorMiddleware } from "../../../src/adapters/inbound/http/middy/domain-error.middleware.js";
 import { AppRuntime } from "../../../src/app-runtime.js";
@@ -40,7 +39,6 @@ export function createGetPackByIdHandler(
   };
 
   return middy(rawHandler)
-    .use(httpHeaderNormalizer())
     .use(
       authMiddleware({
         tokenVerifier: deps.tokenVerifier,
@@ -51,9 +49,5 @@ export function createGetPackByIdHandler(
     .use(domainErrorMiddleware());
 }
 
-export default createGetPackByIdHandler();
-
-export const config: Config = {
-  path: "/api/v1/packs/:packId",
-  method: "GET",
-};
+export const lambdaHandler = createGetPackByIdHandler();
+export default wrapLambdaHandler(lambdaHandler);

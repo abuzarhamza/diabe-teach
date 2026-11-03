@@ -5,3 +5,13 @@
   directory = "netlify/functions"
   node_bundler = "esbuild"
   external_node_modules = ["mongoose", "mongodb"]
+
+[dev]
+  port = 8888
+  functionsPort = 9999
+  autoLaunch = false
+  framework = "#static"
+  publish = "."
+
+[context.dev.environment]
+  NODE_ENV = "development"
