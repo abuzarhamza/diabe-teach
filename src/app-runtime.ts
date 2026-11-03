@@ -1,14 +1,11 @@
 import type {
   ProductionDependencies,
   RuntimeEnvConfig,
-  ServerlessHandlerOptions,
-  ServerlessHttpHandler,
-  ServerlessRequestContext,
-  ServerlessRouteConfig,
 } from "./app-runtime.types.js";
-import { OpenApiHttpApp } from "./adapters/inbound/http/create-app.js";
 import { EnvYamlConfigLoader } from "./adapters/outbound/env-yaml-config-loader.js";
+import { FakeCapabilityTokenAdapter } from "./adapters/outbound/fake-capability-token-adapter.js";
 import { HmacCapabilityTokenAdapter } from "./adapters/outbound/hmac-capability-token-adapter.js";
+import { InMemoryGameSessionRepository } from "./adapters/outbound/in-memory-game-session-repository.js";
 import {
   DEFAULT_MONGODB_DB_NAME,
   MongoCurriculumPackRepository,
@@ -66,11 +63,17 @@ export class AppRuntime {
   ): ProductionDependencies {
     const config = AppRuntime.loadEnvConfig(env);
 
+    // HmacCapabilityTokenAdapter implements both signer and verifier ports
+    // Falls back to FakeCapabilityTokenAdapter for local development without secrets
+    const tokenAdapter = HmacCapabilityTokenAdapter.fromSecret(
+      config.capabilityTokenSecret,
+    ) ?? new FakeCapabilityTokenAdapter();
+
     return {
       packRepo: MongoCurriculumPackRepository.fromConfig(config),
-      tokenVerifier: HmacCapabilityTokenAdapter.fromSecret(
-        config.capabilityTokenSecret,
-      ),
+      sessionRepo: new InMemoryGameSessionRepository(),
+      tokenSigner: tokenAdapter,
+      tokenVerifier: tokenAdapter,
       apiKey: config.apiKey,
       requireApiKey: Boolean(config.apiKey),
     };
@@ -88,114 +91,5 @@ export class AppRuntime {
     deps: ProductionDependencies | null,
   ): void {
     AppRuntime.#cachedProductionDependencies = deps;
-  }
-
-  public static readonly DEFAULT_MAX_BODY_BYTES = 1024 * 1024; // 1 MB
-
-  public static async validateBodySize(
-    request: Request,
-    maxBodyBytes: number,
-  ): Promise<Response | null> {
-    if (request.method === "GET" || request.method === "HEAD") {
-      return null;
-    }
-
-    const contentLengthStr = request.headers.get("content-length");
-    if (contentLengthStr !== null) {
-      const contentLength = Number.parseInt(contentLengthStr, 10);
-      if (Number.isFinite(contentLength) && contentLength > maxBodyBytes) {
-        return new Response(
-          JSON.stringify({
-            code: "INVALID_REQUEST_BODY",
-            message: `Request body exceeds size limit of ${maxBodyBytes} bytes.`,
-            details: {
-              maxBodyBytes,
-              actualBytes: contentLength,
-            },
-          }),
-          {
-            status: 413,
-            headers: {
-              "content-type": "application/json; charset=utf-8",
-            },
-          },
-        );
-      }
-    }
-
-    if (request.body) {
-      try {
-        const cloned = request.clone();
-        const buffer = await cloned.arrayBuffer();
-        if (buffer.byteLength > maxBodyBytes) {
-          return new Response(
-            JSON.stringify({
-              code: "INVALID_REQUEST_BODY",
-              message: `Request body exceeds size limit of ${maxBodyBytes} bytes.`,
-              details: {
-                maxBodyBytes,
-                actualBytes: buffer.byteLength,
-              },
-            }),
-            {
-              status: 413,
-              headers: {
-                "content-type": "application/json; charset=utf-8",
-              },
-            },
-          );
-        }
-      }
-      catch {
-        // Body already consumed or non-cloneable
-      }
-    }
-
-    return null;
-  }
-
-  public static createServerlessHttpHandler(
-    optionsOrDeps?: ProductionDependencies | ServerlessHandlerOptions,
-  ): ServerlessHttpHandler {
-    const deps
-      = optionsOrDeps && "packRepo" in optionsOrDeps
-        ? optionsOrDeps
-        : optionsOrDeps?.dependencies;
-    const maxBodyBytes
-      = optionsOrDeps && "maxBodyBytes" in optionsOrDeps
-        ? optionsOrDeps.maxBodyBytes
-        : AppRuntime.DEFAULT_MAX_BODY_BYTES;
-
-    const fixedApp = deps
-      ? new OpenApiHttpApp(deps)
-      : null;
-
-    return async (
-      request: Request,
-      context?: ServerlessRequestContext,
-    ): Promise<Response> => {
-      const sizeError = await AppRuntime.validateBodySize(
-        request,
-        maxBodyBytes ?? AppRuntime.DEFAULT_MAX_BODY_BYTES,
-      );
-      if (sizeError) {
-        return sizeError;
-      }
-
-      const app
-        = fixedApp ?? new OpenApiHttpApp(AppRuntime.getProductionDependencies());
-      return app.fetch(request, {
-        params: context?.params,
-      });
-    };
-  }
-
-  public static defineServerlessRouteConfig(
-    route: ServerlessRouteConfig,
-  ): ServerlessRouteConfig {
-    return {
-      path: route.path,
-      method: route.method,
-    };
   }
 }

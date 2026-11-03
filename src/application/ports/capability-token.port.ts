@@ -9,3 +9,7 @@ export interface VerifiedCapability {
 export interface CapabilityTokenPort {
   verifyToken: (token: string) => Promise<VerifiedCapability | null>;
 }
+
+export interface CapabilityTokenSignerPort {
+  signToken: (capability: VerifiedCapability) => Promise<string>;
+}

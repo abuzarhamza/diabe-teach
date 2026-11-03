@@ -1,7 +1,6 @@
-import type { CapabilityTokenPort } from "./application/ports/capability-token.port.js";
+import type { CapabilityTokenPort, CapabilityTokenSignerPort } from "./application/ports/capability-token.port.js";
 import type { CurriculumPackRepositoryPort } from "./application/ports/curriculum-pack-repository.port.js";
-
-export type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
+import type { GameSessionRepositoryPort } from "./application/ports/game-session-repository.port.js";
 
 export interface RuntimeEnvConfig {
   readonly mongoUri?: string;
@@ -12,26 +11,9 @@ export interface RuntimeEnvConfig {
 
 export interface ProductionDependencies {
   readonly packRepo: CurriculumPackRepositoryPort;
+  readonly sessionRepo?: GameSessionRepositoryPort;
+  readonly tokenSigner?: CapabilityTokenSignerPort;
   readonly tokenVerifier?: CapabilityTokenPort;
   readonly apiKey?: string;
   readonly requireApiKey?: boolean;
 }
-
-export interface ServerlessHandlerOptions {
-  readonly dependencies?: ProductionDependencies;
-  readonly maxBodyBytes?: number;
-}
-
-export interface ServerlessRouteConfig {
-  readonly path: `/${string}`;
-  readonly method: HttpMethod | HttpMethod[];
-}
-
-export interface ServerlessRequestContext {
-  readonly params?: Record<string, string | undefined>;
-}
-
-export type ServerlessHttpHandler = (
-  request: Request,
-  context?: ServerlessRequestContext,
-) => Promise<Response>;
