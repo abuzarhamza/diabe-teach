@@ -6,16 +6,25 @@
   "scripts": {
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:bdd": "node --import tsx node_modules/@cucumber/cucumber/bin/cucumber.js --config tests/cucumber.mjs",
+    "test:bdd:mongodb": "BDD_USE_MONGODB=true node --import tsx node_modules/@cucumber/cucumber/bin/cucumber.js --config tests/cucumber.mjs",
+    "test:all": "npm run test && npm run test:bdd",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src netlify scripts tests",
     "lint:fix": "eslint src netlify scripts tests --fix",
     "lint:boundaries": "depcruise src netlify --config .dependency-cruiser.cjs",
-    "db:seed": "node --experimental-strip-types scripts/seed-curriculum-packs.ts"
+    "db:seed": "node --experimental-strip-types scripts/seed-curriculum-packs.ts",
+    "complexity": "node --experimental-strip-types scripts/run-complexity.ts",
+    "escomplex": "node --experimental-strip-types scripts/run-complexity.ts"
   },
   "dependencies": {
     "@middy/core": "^7.9.2",
+    "@middy/http-cors": "^7.9.2",
     "@middy/http-header-normalizer": "^7.9.2",
+    "@middy/http-json-body-parser": "^7.9.2",
+    "@middy/http-security-headers": "^7.9.2",
     "@netlify/functions": "^3.1.2",
+    "helmet": "^8.3.0",
     "jose": "^6.2.13",
     "mongodb": "^6.13.0",
     "mongoose": "^9.11.4",
@@ -23,12 +32,20 @@
   },
   "devDependencies": {
     "@antfu/eslint-config": "^10.0.0",
+    "@cucumber/cucumber": "^13.3.0",
     "@types/aws-lambda": "^8.10.164",
+    "@types/chai": "^5.2.3",
     "@types/node": "^22.13.0",
     "@types/yaml": "^1.9.6",
+    "@vitest/coverage-v8": "^3.0.5",
+    "c8": "^12.0.0",
+    "chai": "^6.3.0",
     "dependency-cruiser": "^16.10.0",
     "escomplex": "^2.0.0-alpha",
     "eslint": "^10.13.0",
+    "mongodb-memory-server": "^11.3.0",
+    "ts-node": "^10.9.2",
+    "tsx": "^4.23.15",
     "typescript": "^5.7.3",
     "vitest": "^3.0.5"
   }
