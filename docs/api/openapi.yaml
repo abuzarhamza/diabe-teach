@@ -183,6 +183,15 @@ paths:
                 $ref: "#/components/schemas/JoinSessionResponse"
         "404":
           $ref: "#/components/responses/NotFoundError"
+        "409":
+          description: >-
+            CONCURRENT_UPDATE_CONFLICT. Other requests kept changing the Game
+            Session while this one was being saved, and it still conflicted
+            after 3 attempts. Nothing was recorded. Safe to retry.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
 
   /api/v1/sessions/{sessionId}:
     get:
@@ -255,7 +264,16 @@ paths:
         "404":
           $ref: "#/components/responses/NotFoundError"
         "409":
-          $ref: "#/components/responses/ConflictError"
+          description: >-
+            INVALID_PHASE_TRANSITION. The requested phase does not follow the current phase.
+
+            CONCURRENT_UPDATE_CONFLICT. Other requests kept changing the Game
+            Session while this one was being saved, and it still conflicted
+            after 3 attempts. Nothing was recorded. Safe to retry.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
 
   /api/v1/sessions/{sessionId}/rounds/{roundNumber}/chains:
     post:
@@ -301,6 +319,10 @@ paths:
             Concept Chain in this round: the same board cells in the same or
             exactly reverse order (the narrative is ignored). Nothing is
             recorded. Other participants may submit the same chain.
+
+            CONCURRENT_UPDATE_CONFLICT. Other requests kept changing the Game
+            Session while this one was being saved, and it still conflicted
+            after 3 attempts. Nothing was recorded. Safe to retry.
           content:
             application/json:
               schema:
@@ -351,7 +373,12 @@ paths:
         "404":
           $ref: "#/components/responses/NotFoundError"
         "409":
-          description: Chain verdict is locked by an Instructor Final Ruling (ADJUDICATION_LOCKED_BY_INSTRUCTOR)
+          description: >-
+            ADJUDICATION_LOCKED_BY_INSTRUCTOR. The chain verdict is locked by an Instructor Final Ruling.
+
+            CONCURRENT_UPDATE_CONFLICT. Other requests kept changing the Game
+            Session while this one was being saved, and it still conflicted
+            after 3 attempts. Nothing was recorded. Safe to retry.
           content:
             application/json:
               schema:
@@ -421,7 +448,15 @@ paths:
         "404":
           $ref: "#/components/responses/NotFoundError"
         "409":
-          description: Participant has already submitted this assessment stage (ASSESSMENT_ALREADY_SUBMITTED)
+          description: >-
+            ASSESSMENT_ALREADY_SUBMITTED. The participant has already submitted this assessment stage.
+
+            PHASE_CLOSED_FOR_SUBMISSIONS. The session is not in this stage's
+            phase, or a posttest was sent before the participant's pretest.
+
+            CONCURRENT_UPDATE_CONFLICT. Other requests kept changing the Game
+            Session while this one was being saved, and it still conflicted
+            after 3 attempts. Nothing was recorded. Safe to retry.
           content:
             application/json:
               schema:
@@ -468,6 +503,19 @@ paths:
           $ref: "#/components/responses/UnauthorizedError"
         "404":
           $ref: "#/components/responses/NotFoundError"
+        "409":
+          description: >-
+            SURVEY_ALREADY_SUBMITTED. A perception survey has already been recorded.
+
+            PHASE_CLOSED_FOR_SUBMISSIONS. The session is not in the feedback-survey phase.
+
+            CONCURRENT_UPDATE_CONFLICT. Other requests kept changing the Game
+            Session while this one was being saved, and it still conflicted
+            after 3 attempts. Nothing was recorded. Safe to retry.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
         "422":
           $ref: "#/components/responses/UnprocessableEntityError"
 

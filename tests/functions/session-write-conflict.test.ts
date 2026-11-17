@@ -3,11 +3,17 @@ import type { GameSessionRepositoryPort } from "../../src/application/ports/game
 import type { RoomCode } from "../../src/domain/game-session/room-code.js";
 import type { SessionId } from "../../src/domain/game-session/session-id.js";
 import { describe, expect, it } from "vitest";
+import { createAdjudicateChainHandler } from "../../netlify/functions/sessions/adjudicate-chain.js";
+import { createJoinSessionHandler } from "../../netlify/functions/sessions/join-session.js";
+import { createSubmitAssessmentHandler } from "../../netlify/functions/sessions/submit-assessment.js";
 import { createSubmitChainHandler } from "../../netlify/functions/sessions/submit-chain.js";
+import { createSubmitSurveyHandler } from "../../netlify/functions/sessions/submit-survey.js";
 import { createTransitionPhaseHandler } from "../../netlify/functions/sessions/transition-phase.js";
 import { FakeCapabilityTokenAdapter } from "../../src/adapters/outbound/fake-capability-token-adapter.js";
+import { InMemoryCurriculumPackRepository } from "../../src/adapters/outbound/in-memory-curriculum-pack-repository.js";
 import { InMemoryGameSessionRepository } from "../../src/adapters/outbound/in-memory-game-session-repository.js";
 import { ConcurrentUpdateConflictError } from "../../src/domain/errors/domain-errors.js";
+import { ConceptChain } from "../../src/domain/game-session/concept-chain.js";
 import { GameSession } from "../../src/domain/game-session/game-session.js";
 
 /**
@@ -223,5 +229,263 @@ describe("session writes that lose a concurrent-update race", () => {
     expect(JSON.parse(response.body)).toMatchObject({ code: "CONCURRENT_UPDATE_CONFLICT" });
     expect(sessionRepo.saveAttempts).toBe(3);
     expect((await store.findById(session.sessionId))?.chains).toEqual([]);
+  });
+});
+
+function makeEvent(
+  path: string,
+  pathParameters: Record<string, string> | null,
+  body: object,
+  token?: string,
+): APIGatewayProxyEvent {
+  return {
+    ...makeChainEvent("unused", token ?? "", body),
+    path,
+    pathParameters,
+    headers: {
+      "content-type": "application/json",
+      ...(token && { authorization: `Bearer ${token}` }),
+    },
+  };
+}
+
+function makeJoinEvent(roomCode: string, displayName: string): APIGatewayProxyEvent {
+  return makeEvent("/api/v1/sessions/join", null, { roomCode, displayName });
+}
+
+function makeAdjudicateEvent(sessionId: string, chainId: string, token: string): APIGatewayProxyEvent {
+  return makeEvent(
+    `/api/v1/sessions/${sessionId}/rounds/1/chains/${chainId}/adjudicate`,
+    { sessionId, roundNumber: "1", chainId },
+    { action: "peer-approve" },
+    token,
+  );
+}
+
+const PRETEST_ANSWERS = Object.fromEntries(
+  Array.from({ length: 10 }, (_, i) => [`dm-mcq-${String(i + 1).padStart(2, "0")}`, "I_DONT_KNOW"]),
+);
+
+function makePretestEvent(sessionId: string, token: string): APIGatewayProxyEvent {
+  return makeEvent(
+    `/api/v1/sessions/${sessionId}/assessments/pretest`,
+    { sessionId, stage: "pretest" },
+    { answers: PRETEST_ANSWERS },
+    token,
+  );
+}
+
+function makeSurveyEvent(sessionId: string, token: string): APIGatewayProxyEvent {
+  return makeEvent(
+    `/api/v1/sessions/${sessionId}/survey`,
+    { sessionId },
+    {
+      responses: { "survey-q1": 4, "survey-q2": 5 },
+    },
+    token,
+  );
+}
+
+const FEEDBACK_SURVEY_PATH = [
+  "trial-orientation",
+  "round-1:chain-mapping",
+  "round-1:peer-adjudication",
+  "round-1:round-summary",
+  "round-2:chain-mapping",
+  "round-2:peer-adjudication",
+  "round-2:round-summary",
+  "posttest",
+  "feedback-survey",
+] as const;
+
+/**
+ * A stored session with Alice and Bob, set up by `prepare`, plus every handler
+ * wired to a repository double over the same store.
+ */
+async function setUpSession<TRepo extends CountingSessionRepository>(
+  makeRepo: (store: InMemoryGameSessionRepository) => TRepo,
+  prepare: (session: GameSession) => void = () => {},
+) {
+  const session = GameSession.create({
+    packId: "diabe-teach",
+    mode: "classroom",
+    adjudicationMode: "peer-instructor",
+    timerConfig: { roundMappingSec: null },
+  });
+  const alice = session.addParticipant("Alice");
+  const bob = session.addParticipant("Bob");
+  prepare(session);
+  const sessionId = session.sessionId.value;
+  const store = new InMemoryGameSessionRepository([session]);
+  const sessionRepo = makeRepo(store);
+  const tokenAdapter = new FakeCapabilityTokenAdapter();
+  const packRepo = new InMemoryCurriculumPackRepository();
+  const handlerDeps = { sessionRepo, tokenVerifier: tokenAdapter };
+
+  return {
+    session,
+    sessionId,
+    roomCode: session.roomCode.value,
+    store,
+    sessionRepo,
+    alice,
+    bob,
+    aliceToken: await tokenAdapter.signToken({ role: "participant", sessionId, participantId: alice.participantId }),
+    bobToken: await tokenAdapter.signToken({ role: "participant", sessionId, participantId: bob.participantId }),
+    instructorToken: await tokenAdapter.signToken({ role: "instructor", sessionId }),
+    join: createJoinSessionHandler({ ...handlerDeps, tokenSigner: tokenAdapter }),
+    transitionPhase: createTransitionPhaseHandler(handlerDeps),
+    adjudicateChain: createAdjudicateChainHandler(handlerDeps),
+    submitAssessment: createSubmitAssessmentHandler({ ...handlerDeps, packRepo }),
+    submitSurvey: createSubmitSurveyHandler({ ...handlerDeps, packRepo }),
+  };
+}
+
+function toChainMapping(session: GameSession): void {
+  session.transitionTo("trial-orientation", new Date());
+  session.transitionTo("round-1:chain-mapping", new Date());
+}
+
+function toFeedbackSurvey(session: GameSession): void {
+  for (const phase of FEEDBACK_SURVEY_PATH) {
+    session.transitionTo(phase, new Date());
+  }
+}
+
+/** Moves to Round 1 Chain-Mapping and records a chain by Alice. */
+function toChainMappingWithAlicesChain(session: GameSession): void {
+  toChainMapping(session);
+  const alice = session.participants.find(participant => participant.displayName === "Alice")!;
+  session.addChain(ConceptChain.create({ participantId: alice.participantId, roundNumber: 1, ...CHAIN_BODY }), new Date());
+}
+
+describe("every other session write recovers from one lost race", () => {
+  it("keeps both of two participants who join at the same moment", async () => {
+    const ctx = await setUpSession(store => new RaceBeforeFirstSaveSessionRepository(store));
+    ctx.sessionRepo.raceWith(async () => {
+      expect((await ctx.join(makeJoinEvent(ctx.roomCode, "Carol"), {} as never)).statusCode).toBe(200);
+    });
+
+    const response = await ctx.join(makeJoinEvent(ctx.roomCode, "Dave"), {} as never);
+
+    expect(response.statusCode).toBe(200);
+    expect(JSON.parse(response.body).state.participantCount).toBe(4);
+    const stored = await ctx.store.findById(ctx.session.sessionId);
+    expect(stored?.participants.map(participant => participant.displayName))
+      .toEqual(["Alice", "Bob", "Carol", "Dave"]);
+  });
+
+  it("advances the phase without dropping a participant who joined at the same moment", async () => {
+    const ctx = await setUpSession(store => new RaceBeforeFirstSaveSessionRepository(store), toChainMapping);
+    ctx.sessionRepo.raceWith(async () => {
+      expect((await ctx.join(makeJoinEvent(ctx.roomCode, "Carol"), {} as never)).statusCode).toBe(200);
+    });
+
+    const response = await ctx.transitionPhase(makeAdvancePhaseEvent(ctx.sessionId, ctx.instructorToken), {} as never);
+
+    expect(response.statusCode).toBe(200);
+    const stored = await ctx.store.findById(ctx.session.sessionId);
+    expect(stored?.currentPhase).toBe("round-1:peer-adjudication");
+    expect(stored?.participants.map(participant => participant.displayName)).toEqual(["Alice", "Bob", "Carol"]);
+  });
+
+  it("advances only one phase when the instructor presses advance twice at the same moment", async () => {
+    const ctx = await setUpSession(store => new RaceBeforeFirstSaveSessionRepository(store), toChainMapping);
+    ctx.sessionRepo.raceWith(async () => {
+      expect((await ctx.transitionPhase(makeAdvancePhaseEvent(ctx.sessionId, ctx.instructorToken), {} as never)).statusCode).toBe(200);
+    });
+
+    const response = await ctx.transitionPhase(makeAdvancePhaseEvent(ctx.sessionId, ctx.instructorToken), {} as never);
+
+    expect(response.statusCode).toBe(409);
+    expect(JSON.parse(response.body)).toMatchObject({ code: "INVALID_PHASE_TRANSITION" });
+    expect((await ctx.store.findById(ctx.session.sessionId))?.currentPhase).toBe("round-1:peer-adjudication");
+  });
+
+  it("records both of two peer votes cast on a chain at the same moment", async () => {
+    const ctx = await setUpSession(store => new RaceBeforeFirstSaveSessionRepository(store), toChainMappingWithAlicesChain);
+    const chainId = ctx.session.chains[0]!.chainId;
+    ctx.sessionRepo.raceWith(async () => {
+      expect((await ctx.adjudicateChain(makeAdjudicateEvent(ctx.sessionId, chainId, ctx.aliceToken), {} as never)).statusCode).toBe(200);
+    });
+
+    const response = await ctx.adjudicateChain(makeAdjudicateEvent(ctx.sessionId, chainId, ctx.bobToken), {} as never);
+
+    expect(response.statusCode).toBe(200);
+    expect(JSON.parse(response.body).chain.peerVotes).toHaveLength(2);
+    const stored = await ctx.store.findById(ctx.session.sessionId);
+    expect(stored?.getChain(chainId)?.peerVotes.map(vote => vote.voterParticipantId))
+      .toEqual([ctx.alice.participantId, ctx.bob.participantId]);
+  });
+
+  // A new session starts in the pretest phase.
+  it("records a pretest without dropping a participant who joined at the same moment", async () => {
+    const ctx = await setUpSession(store => new RaceBeforeFirstSaveSessionRepository(store));
+    ctx.sessionRepo.raceWith(async () => {
+      expect((await ctx.join(makeJoinEvent(ctx.roomCode, "Carol"), {} as never)).statusCode).toBe(200);
+    });
+
+    const response = await ctx.submitAssessment(makePretestEvent(ctx.sessionId, ctx.aliceToken), {} as never);
+
+    expect(response.statusCode).toBe(201);
+    const stored = await ctx.store.findById(ctx.session.sessionId);
+    expect(stored?.getAssessment(ctx.alice.participantId, "pretest")).toBeDefined();
+    expect(stored?.participants.map(participant => participant.displayName)).toEqual(["Alice", "Bob", "Carol"]);
+  });
+
+  it("records a perception survey without dropping a participant who joined at the same moment", async () => {
+    const ctx = await setUpSession(store => new RaceBeforeFirstSaveSessionRepository(store), toFeedbackSurvey);
+    ctx.sessionRepo.raceWith(async () => {
+      expect((await ctx.join(makeJoinEvent(ctx.roomCode, "Carol"), {} as never)).statusCode).toBe(200);
+    });
+
+    const response = await ctx.submitSurvey(makeSurveyEvent(ctx.sessionId, ctx.aliceToken), {} as never);
+
+    expect(response.statusCode).toBe(201);
+    const stored = await ctx.store.findById(ctx.session.sessionId);
+    expect(stored?.getSurveyResponse(ctx.alice.participantId)?.responses.size).toBe(2);
+    expect(stored?.participants.map(participant => participant.displayName)).toEqual(["Alice", "Bob", "Carol"]);
+  });
+});
+
+describe("every other session write that keeps losing the race", () => {
+  type Ctx = Awaited<ReturnType<typeof setUpSession<AlwaysConflictingSessionRepository>>>;
+
+  it.each<[string, ((session: GameSession) => void) | undefined, (ctx: Ctx) => Promise<{ statusCode: number; body: string }>]>([
+    [
+      "join",
+      undefined,
+      ctx => ctx.join(makeJoinEvent(ctx.roomCode, "Carol"), {} as never),
+    ],
+    [
+      "phase transition",
+      toChainMapping,
+      ctx => ctx.transitionPhase(makeAdvancePhaseEvent(ctx.sessionId, ctx.instructorToken), {} as never),
+    ],
+    [
+      "peer vote",
+      toChainMappingWithAlicesChain,
+      ctx => ctx.adjudicateChain(makeAdjudicateEvent(ctx.sessionId, ctx.session.chains[0]!.chainId, ctx.bobToken), {} as never),
+    ],
+    [
+      "pretest",
+      undefined,
+      ctx => ctx.submitAssessment(makePretestEvent(ctx.sessionId, ctx.aliceToken), {} as never),
+    ],
+    [
+      "perception survey",
+      toFeedbackSurvey,
+      ctx => ctx.submitSurvey(makeSurveyEvent(ctx.sessionId, ctx.aliceToken), {} as never),
+    ],
+  ])("returns 409 CONCURRENT_UPDATE_CONFLICT for a %s after exactly 3 save attempts, and changes nothing", async (_name, prepare, send) => {
+    const ctx = await setUpSession(store => new AlwaysConflictingSessionRepository(store), prepare);
+
+    const response = await send(ctx);
+
+    expect(response.statusCode).toBe(409);
+    expect(JSON.parse(response.body)).toMatchObject({ code: "CONCURRENT_UPDATE_CONFLICT" });
+    expect(ctx.sessionRepo.saveAttempts).toBe(3);
+    const stored = await ctx.store.findById(ctx.session.sessionId);
+    expect(stored?.version).toBe(0);
   });
 });

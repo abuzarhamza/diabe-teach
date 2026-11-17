@@ -27,13 +27,16 @@ import {
   SessionNotFoundError,
 } from "../../domain/errors/domain-errors.js";
 import { SessionId } from "../../domain/game-session/session-id.js";
+import { GameSessionUpdateRetrier } from "../services/game-session-update-retrier.js";
 
 export class SubmitAssessmentUseCase implements SubmitAssessmentUseCasePort {
   readonly #sessionRepo: GameSessionRepositoryPort;
+  readonly #sessionUpdates: GameSessionUpdateRetrier;
   readonly #packRepo: CurriculumPackRepositoryPort;
 
   public constructor(deps: SubmitAssessmentDependencies) {
     this.#sessionRepo = deps.sessionRepo;
+    this.#sessionUpdates = new GameSessionUpdateRetrier(deps.sessionRepo);
     this.#packRepo = deps.packRepo;
   }
 
@@ -50,23 +53,24 @@ export class SubmitAssessmentUseCase implements SubmitAssessmentUseCasePort {
       throw new ForbiddenRoleError("Participant ID is required.");
     }
 
-    // Load session
+    // Load the session once up front, to find and load its curriculum pack.
+    // The command below runs synchronously, so the pack must be ready first.
     const sessionId = SessionId.from(command.sessionId);
-    const session = await this.#sessionRepo.findById(sessionId);
+    const loaded = await this.#sessionRepo.findById(sessionId);
 
-    if (!session) {
+    if (!loaded) {
       throw new SessionNotFoundError(command.sessionId);
     }
 
     // Validate phase matches stage (and pretest prerequisite for posttest)
-    this.#validatePhaseForStage(session, command.stage, participantId);
+    this.#validatePhaseForStage(loaded, command.stage, participantId);
 
     // Load curriculum pack for question validation
-    const packId = PackId.create(session.packId);
+    const packId = PackId.create(loaded.packId);
     const pack = await this.#packRepo.findById(packId);
 
     if (!pack) {
-      throw new PackNotFoundError(session.packId);
+      throw new PackNotFoundError(loaded.packId);
     }
 
     // Validate all questions have answers
@@ -78,15 +82,18 @@ export class SubmitAssessmentUseCase implements SubmitAssessmentUseCasePort {
       Object.entries(command.answers),
     );
 
-    // Submit assessment (domain handles duplicate check)
-    const attempt = session.submitAssessment(
-      participantId,
-      command.stage,
-      answersMap,
+    // Re-check the phase against fresh state on every attempt, then submit
+    // (domain handles duplicate check)
+    const { session, attempt } = await this.#sessionUpdates.run(
+      sessionId,
+      (session) => {
+        this.#validatePhaseForStage(session, command.stage, participantId);
+        return {
+          session,
+          attempt: session.submitAssessment(participantId, command.stage, answersMap),
+        };
+      },
     );
-
-    // Persist the updated session
-    await this.#sessionRepo.update(session);
 
     // Return stage-appropriate result
     if (command.stage === "pretest") {

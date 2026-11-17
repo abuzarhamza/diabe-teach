@@ -1,3 +1,4 @@
+import type { GameSession } from "../../domain/game-session/game-session.js";
 import type { LikertRating } from "../../domain/game-session/game-session.types.js";
 import type { CurriculumPackRepositoryPort } from "../ports/curriculum-pack-repository.port.js";
 import type { GameSessionRepositoryPort } from "../ports/game-session-repository.port.js";
@@ -18,16 +19,19 @@ import {
   SurveyCommentsTooLongError,
 } from "../../domain/errors/domain-errors.js";
 import { SessionId } from "../../domain/game-session/session-id.js";
+import { GameSessionUpdateRetrier } from "../services/game-session-update-retrier.js";
 
 const MAX_COMMENT_WORDS = 1000;
 const VALID_LIKERT_VALUES = new Set<LikertRating>([1, 2, 3, 4, 5]);
 
 export class SubmitPerceptionSurveyUseCase implements SubmitPerceptionSurveyUseCasePort {
   readonly #sessionRepo: GameSessionRepositoryPort;
+  readonly #sessionUpdates: GameSessionUpdateRetrier;
   readonly #packRepo: CurriculumPackRepositoryPort;
 
   public constructor(deps: SubmitPerceptionSurveyDependencies) {
     this.#sessionRepo = deps.sessionRepo;
+    this.#sessionUpdates = new GameSessionUpdateRetrier(deps.sessionRepo);
     this.#packRepo = deps.packRepo;
   }
 
@@ -44,25 +48,24 @@ export class SubmitPerceptionSurveyUseCase implements SubmitPerceptionSurveyUseC
       throw new ForbiddenRoleError("Participant ID is required.");
     }
 
-    // Load session
+    // Load the session once up front, to find and load its curriculum pack.
+    // The command below runs synchronously, so the pack must be ready first.
     const sessionId = SessionId.from(command.sessionId);
-    const session = await this.#sessionRepo.findById(sessionId);
+    const loaded = await this.#sessionRepo.findById(sessionId);
 
-    if (!session) {
+    if (!loaded) {
       throw new SessionNotFoundError(command.sessionId);
     }
 
     // Validate phase is feedback-survey
-    if (session.currentPhase !== "feedback-survey") {
-      throw new PhaseClosedForSubmissionsError(session.currentPhase);
-    }
+    this.#validatePhase(loaded);
 
     // Load curriculum pack for valid item IDs
-    const packId = PackId.create(session.packId);
+    const packId = PackId.create(loaded.packId);
     const pack = await this.#packRepo.findById(packId);
 
     if (!pack) {
-      throw new PackNotFoundError(session.packId);
+      throw new PackNotFoundError(loaded.packId);
     }
 
     // Validate all response values are valid Likert ratings (1-5)
@@ -87,15 +90,15 @@ export class SubmitPerceptionSurveyUseCase implements SubmitPerceptionSurveyUseC
       Object.entries(filteredResponses),
     );
 
-    // Submit survey (domain handles duplicate check with SurveyAlreadySubmittedError)
-    const surveyResponse = session.submitSurvey(
-      participantId,
-      responsesMap,
-      command.comments,
+    // Re-check the phase against fresh state on every attempt, then submit
+    // (domain handles duplicate check with SurveyAlreadySubmittedError)
+    const surveyResponse = await this.#sessionUpdates.run(
+      sessionId,
+      (session) => {
+        this.#validatePhase(session);
+        return session.submitSurvey(participantId, responsesMap, command.comments);
+      },
     );
-
-    // Persist the updated session
-    await this.#sessionRepo.update(session);
 
     // Return receipt
     return {
@@ -103,6 +106,12 @@ export class SubmitPerceptionSurveyUseCase implements SubmitPerceptionSurveyUseC
       recordedItemCount: surveyResponse.responses.size,
       submittedAt: surveyResponse.submittedAt.toISOString(),
     };
+  }
+
+  #validatePhase(session: GameSession): void {
+    if (session.currentPhase !== "feedback-survey") {
+      throw new PhaseClosedForSubmissionsError(session.currentPhase);
+    }
   }
 
   #validateResponseValues(

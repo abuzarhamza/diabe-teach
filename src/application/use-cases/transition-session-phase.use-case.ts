@@ -1,26 +1,24 @@
+import type { PhaseIdentifier } from "../../domain/game-session/game-session.types.js";
 import type { ClockPort } from "../ports/clock.port.js";
-import type { GameSessionRepositoryPort } from "../ports/game-session-repository.port.js";
 import type {
   TransitionSessionPhaseCommand,
   TransitionSessionPhaseDependencies,
   TransitionSessionPhaseResult,
   TransitionSessionPhaseUseCasePort,
 } from "../ports/transition-session-phase.port.js";
-import {
-  ForbiddenRoleError,
-  SessionNotFoundError,
-} from "../../domain/errors/domain-errors.js";
+import { ForbiddenRoleError } from "../../domain/errors/domain-errors.js";
 import { PHASE_TRANSITIONS } from "../../domain/game-session/game-session.types.js";
 import { SessionId } from "../../domain/game-session/session-id.js";
 import { PublicSessionStateProjector } from "../dtos/public-session-state-projector.js";
+import { GameSessionUpdateRetrier } from "../services/game-session-update-retrier.js";
 
 export class TransitionSessionPhaseUseCase
 implements TransitionSessionPhaseUseCasePort {
-  readonly #sessionRepo: GameSessionRepositoryPort;
+  readonly #sessionUpdates: GameSessionUpdateRetrier;
   readonly #clock: ClockPort;
 
   public constructor(deps: TransitionSessionPhaseDependencies) {
-    this.#sessionRepo = deps.sessionRepo;
+    this.#sessionUpdates = new GameSessionUpdateRetrier(deps.sessionRepo);
     this.#clock = deps.clock;
   }
 
@@ -33,24 +31,28 @@ implements TransitionSessionPhaseUseCasePort {
       );
     }
 
-    const sessionId = SessionId.from(command.sessionId);
-    const session = await this.#sessionRepo.findById(sessionId);
+    const now = this.#clock.now();
 
-    if (!session) {
-      throw new SessionNotFoundError(command.sessionId);
-    }
-
-    if (command.action === "advance") {
-      const nextPhase = PHASE_TRANSITIONS.get(session.currentPhase);
-      if (nextPhase) {
-        session.transitionTo(nextPhase, this.#clock.now());
-      }
-    }
-    else if (command.action === "jump" && command.targetPhase) {
-      session.transitionTo(command.targetPhase, this.#clock.now());
-    }
-
-    await this.#sessionRepo.update(session);
+    // "advance" means "advance from the phase this request first saw". The
+    // target is fixed on the first attempt, so a retry after a competing
+    // advance is rejected as an invalid transition rather than skipping a phase.
+    let targetPhase: PhaseIdentifier | undefined;
+    let targetChosen = false;
+    const session = await this.#sessionUpdates.run(
+      SessionId.from(command.sessionId),
+      (session) => {
+        if (!targetChosen) {
+          targetChosen = true;
+          targetPhase = command.action === "advance"
+            ? PHASE_TRANSITIONS.get(session.currentPhase)
+            : command.targetPhase;
+        }
+        if (targetPhase) {
+          session.transitionTo(targetPhase, now);
+        }
+        return session;
+      },
+    );
 
     const state = PublicSessionStateProjector.toDto(session);
 

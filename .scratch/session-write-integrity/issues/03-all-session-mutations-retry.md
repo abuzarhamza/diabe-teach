@@ -6,9 +6,9 @@ See spec: `.scratch/session-write-integrity/spec.md`.
 
 **Blocked by:** 02 (chain submission retries on conflict)
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] Join, transition, adjudicate, assessment and survey all use the retry helper; no session-mutating use case calls the repository update directly
-- [ ] Handler test per use case: one scripted conflict, then success with the correct final state (e.g. both concurrent joiners appear in the roster)
-- [ ] OpenAPI documents 409 `CONCURRENT_UPDATE_CONFLICT` on all session-mutating operations
-- [ ] Existing tests, BDD and lint baselines unchanged
+- [x] Join, transition, adjudicate, assessment and survey all use the retry helper; no session-mutating use case calls the repository update directly
+- [x] Handler test per use case: one scripted conflict, then success with the correct final state (e.g. both concurrent joiners appear in the roster)
+- [x] OpenAPI documents 409 `CONCURRENT_UPDATE_CONFLICT` on all session-mutating operations
+- [x] Existing tests, BDD and lint baselines unchanged
