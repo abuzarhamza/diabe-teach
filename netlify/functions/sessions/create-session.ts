@@ -1,5 +1,6 @@
 import type { APIGatewayProxyEvent, APIGatewayProxyResult } from "aws-lambda";
 import type { CapabilityTokenSignerPort } from "../../../src/application/ports/capability-token.port.js";
+import type { ClockPort } from "../../../src/application/ports/clock.port.js";
 import type { CreateGameSessionCommand } from "../../../src/application/ports/create-game-session.port.js";
 import type { CurriculumPackRepositoryPort } from "../../../src/application/ports/curriculum-pack-repository.port.js";
 import type { GameSessionRepositoryPort } from "../../../src/application/ports/game-session-repository.port.js";
@@ -15,6 +16,7 @@ export interface CreateSessionHandlerDependencies {
   readonly sessionRepo: GameSessionRepositoryPort;
   readonly tokenSigner: CapabilityTokenSignerPort;
   readonly tokenVerifier?: unknown;
+  readonly clock?: ClockPort;
   readonly apiKey?: string;
   readonly requireApiKey?: boolean;
 }
@@ -23,7 +25,7 @@ export function createCreateSessionHandler(
   dependencies?: CreateSessionHandlerDependencies,
 ) {
   const prodDeps = AppRuntime.getProductionDependencies();
-  const deps = dependencies ?? {
+  const deps: CreateSessionHandlerDependencies = dependencies ?? {
     packRepo: prodDeps.packRepo,
     sessionRepo: prodDeps.sessionRepo!,
     tokenSigner: prodDeps.tokenSigner!,
@@ -31,11 +33,13 @@ export function createCreateSessionHandler(
     apiKey: prodDeps.apiKey,
     requireApiKey: prodDeps.requireApiKey,
   };
+  const clock = deps.clock ?? prodDeps.clock!;
 
   const useCase = new CreateGameSessionUseCase({
     packRepo: deps.packRepo,
     sessionRepo: deps.sessionRepo,
     tokenSigner: deps.tokenSigner,
+    clock,
   });
 
   const rawHandler = async (

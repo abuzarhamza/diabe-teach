@@ -37,8 +37,8 @@ describe("get /api/v1/sessions/{sessionId}/rounds/{n}/standings", () => {
       mode: "classroom",
       adjudicationMode: "peer-instructor",
     });
-    session.transitionTo("trial-orientation");
-    session.transitionTo("round-1:chain-mapping");
+    session.transitionTo("trial-orientation", new Date());
+    session.transitionTo("round-1:chain-mapping", new Date());
 
     const alice = session.addParticipant("Alice");
     const bob = session.addParticipant("Bob");
@@ -127,8 +127,8 @@ describe("get /api/v1/sessions/{sessionId}/rounds/{n}/standings", () => {
       mode: "classroom",
       adjudicationMode: "peer-instructor",
     });
-    session.transitionTo("trial-orientation");
-    session.transitionTo("round-1:chain-mapping");
+    session.transitionTo("trial-orientation", new Date());
+    session.transitionTo("round-1:chain-mapping", new Date());
     const participant = session.addParticipant("Charlie");
 
     const sessionRepo = new InMemoryGameSessionRepository([session]);

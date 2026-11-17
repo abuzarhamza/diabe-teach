@@ -52,14 +52,14 @@ function makePosttestSession() {
     adjudicationMode: "peer-instructor",
   });
   // Transition through all phases to posttest
-  session.transitionTo("trial-orientation");
-  session.transitionTo("round-1:chain-mapping");
-  session.transitionTo("round-1:peer-adjudication");
-  session.transitionTo("round-1:round-summary");
-  session.transitionTo("round-2:chain-mapping");
-  session.transitionTo("round-2:peer-adjudication");
-  session.transitionTo("round-2:round-summary");
-  session.transitionTo("posttest");
+  session.transitionTo("trial-orientation", new Date());
+  session.transitionTo("round-1:chain-mapping", new Date());
+  session.transitionTo("round-1:peer-adjudication", new Date());
+  session.transitionTo("round-1:round-summary", new Date());
+  session.transitionTo("round-2:chain-mapping", new Date());
+  session.transitionTo("round-2:peer-adjudication", new Date());
+  session.transitionTo("round-2:round-summary", new Date());
+  session.transitionTo("posttest", new Date());
   return session;
 }
 
@@ -78,14 +78,14 @@ function makePosttestSessionWithPretest(participantId: string) {
   session.submitAssessment(participantId, "pretest", new Map(Object.entries(makeAllIdkAnswers())));
 
   // Transition through all phases to posttest
-  session.transitionTo("trial-orientation");
-  session.transitionTo("round-1:chain-mapping");
-  session.transitionTo("round-1:peer-adjudication");
-  session.transitionTo("round-1:round-summary");
-  session.transitionTo("round-2:chain-mapping");
-  session.transitionTo("round-2:peer-adjudication");
-  session.transitionTo("round-2:round-summary");
-  session.transitionTo("posttest");
+  session.transitionTo("trial-orientation", new Date());
+  session.transitionTo("round-1:chain-mapping", new Date());
+  session.transitionTo("round-1:peer-adjudication", new Date());
+  session.transitionTo("round-1:round-summary", new Date());
+  session.transitionTo("round-2:chain-mapping", new Date());
+  session.transitionTo("round-2:peer-adjudication", new Date());
+  session.transitionTo("round-2:round-summary", new Date());
+  session.transitionTo("posttest", new Date());
   return session;
 }
 
@@ -512,14 +512,14 @@ describe("POST /api/v1/sessions/{sessionId}/assessments/{stage}", () => {
       await handler(pretestEvent, {} as never);
 
       // Transition to posttest
-      session.transitionTo("trial-orientation");
-      session.transitionTo("round-1:chain-mapping");
-      session.transitionTo("round-1:peer-adjudication");
-      session.transitionTo("round-1:round-summary");
-      session.transitionTo("round-2:chain-mapping");
-      session.transitionTo("round-2:peer-adjudication");
-      session.transitionTo("round-2:round-summary");
-      session.transitionTo("posttest");
+      session.transitionTo("trial-orientation", new Date());
+      session.transitionTo("round-1:chain-mapping", new Date());
+      session.transitionTo("round-1:peer-adjudication", new Date());
+      session.transitionTo("round-1:round-summary", new Date());
+      session.transitionTo("round-2:chain-mapping", new Date());
+      session.transitionTo("round-2:peer-adjudication", new Date());
+      session.transitionTo("round-2:round-summary", new Date());
+      session.transitionTo("posttest", new Date());
       await sessionRepo.update(session);
 
       // Submit posttest with all correct (100% correct)
@@ -575,14 +575,14 @@ describe("POST /api/v1/sessions/{sessionId}/assessments/{stage}", () => {
       await handler(pretestEvent, {} as never);
 
       // Transition to posttest
-      session.transitionTo("trial-orientation");
-      session.transitionTo("round-1:chain-mapping");
-      session.transitionTo("round-1:peer-adjudication");
-      session.transitionTo("round-1:round-summary");
-      session.transitionTo("round-2:chain-mapping");
-      session.transitionTo("round-2:peer-adjudication");
-      session.transitionTo("round-2:round-summary");
-      session.transitionTo("posttest");
+      session.transitionTo("trial-orientation", new Date());
+      session.transitionTo("round-1:chain-mapping", new Date());
+      session.transitionTo("round-1:peer-adjudication", new Date());
+      session.transitionTo("round-1:round-summary", new Date());
+      session.transitionTo("round-2:chain-mapping", new Date());
+      session.transitionTo("round-2:peer-adjudication", new Date());
+      session.transitionTo("round-2:round-summary", new Date());
+      session.transitionTo("posttest", new Date());
       await sessionRepo.update(session);
 
       // Submit posttest with all correct (0% wrong guess)
@@ -665,14 +665,14 @@ describe("POST /api/v1/sessions/{sessionId}/assessments/{stage}", () => {
       await handler(pretestEvent, {} as never);
 
       // Transition to posttest
-      session.transitionTo("trial-orientation");
-      session.transitionTo("round-1:chain-mapping");
-      session.transitionTo("round-1:peer-adjudication");
-      session.transitionTo("round-1:round-summary");
-      session.transitionTo("round-2:chain-mapping");
-      session.transitionTo("round-2:peer-adjudication");
-      session.transitionTo("round-2:round-summary");
-      session.transitionTo("posttest");
+      session.transitionTo("trial-orientation", new Date());
+      session.transitionTo("round-1:chain-mapping", new Date());
+      session.transitionTo("round-1:peer-adjudication", new Date());
+      session.transitionTo("round-1:round-summary", new Date());
+      session.transitionTo("round-2:chain-mapping", new Date());
+      session.transitionTo("round-2:peer-adjudication", new Date());
+      session.transitionTo("round-2:round-summary", new Date());
+      session.transitionTo("posttest", new Date());
       await sessionRepo.update(session);
 
       // Submit posttest

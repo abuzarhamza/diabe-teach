@@ -6,7 +6,7 @@ See spec: `.scratch/session-phase-deadlines/spec.md`.
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [ ] A session created with a custom `roundMappingSec` returns a `phaseEndsAt` consistent with that value from create, join, get-state and transition (handler tests)
 - [ ] The deadline calculation lives on the Game Session aggregate; no use case computes phase durations itself

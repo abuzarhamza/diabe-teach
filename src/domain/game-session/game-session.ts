@@ -21,6 +21,7 @@ import {
 } from "../errors/domain-errors.js";
 import {
   DEFAULT_TIMER_CONFIG,
+  PHASE_TIMER_FIELD,
   PHASE_TRANSITIONS,
 } from "./game-session.types.js";
 import { RoomCode } from "./room-code.js";
@@ -116,6 +117,16 @@ export class GameSession {
     return this.#phaseStartedAt;
   }
 
+  /**
+   * When the current phase is scheduled to end, derived from this session's
+   * own timer config. Phases without a configured duration (round summaries,
+   * completed) end the moment they start.
+   */
+  public get phaseEndsAt(): Date {
+    const durationSec = this.#currentPhaseDurationSec();
+    return new Date(this.#phaseStartedAt.getTime() + durationSec * 1000);
+  }
+
   public get participantCount(): number {
     return this.#participants.length;
   }
@@ -132,7 +143,7 @@ export class GameSession {
     return this.#createdAt;
   }
 
-  public transitionTo(targetPhase: PhaseIdentifier): void {
+  public transitionTo(targetPhase: PhaseIdentifier, now: Date): void {
     const allowedNext = PHASE_TRANSITIONS.get(this.#currentPhase);
 
     if (allowedNext !== targetPhase) {
@@ -140,7 +151,7 @@ export class GameSession {
     }
 
     this.#currentPhase = targetPhase;
-    this.#phaseStartedAt = new Date();
+    this.#phaseStartedAt = now;
 
     if (targetPhase === "round-1:chain-mapping") {
       this.#activeRoundNumber = 1;
@@ -262,5 +273,13 @@ export class GameSession {
       return this.#surveyResponse;
     }
     return undefined;
+  }
+
+  #currentPhaseDurationSec(): number {
+    const field = PHASE_TIMER_FIELD[this.#currentPhase];
+    if (field === null) {
+      return 0;
+    }
+    return this.#timerConfig[field];
   }
 }

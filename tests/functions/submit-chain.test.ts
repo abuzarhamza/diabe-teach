@@ -37,8 +37,8 @@ describe("post /api/v1/sessions/{sessionId}/rounds/{n}/chains", () => {
       mode: "classroom",
       adjudicationMode: "peer-instructor",
     });
-    session.transitionTo("trial-orientation");
-    session.transitionTo("round-1:chain-mapping");
+    session.transitionTo("trial-orientation", new Date());
+    session.transitionTo("round-1:chain-mapping", new Date());
     return session;
   };
 

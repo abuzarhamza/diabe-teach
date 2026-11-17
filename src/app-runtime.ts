@@ -10,6 +10,7 @@ import {
   MongoCurriculumPackRepository,
 } from "./adapters/outbound/mongo-curriculum-pack-repository.js";
 import { MongoGameSessionRepository } from "./adapters/outbound/mongo-game-session-repository.js";
+import { SystemClock } from "./adapters/outbound/system-clock.js";
 
 export interface LoadEnvConfigOptions {
   readonly yamlFilePath?: string | false;
@@ -74,6 +75,7 @@ export class AppRuntime {
       sessionRepo: MongoGameSessionRepository.fromConfig(config),
       tokenSigner: tokenAdapter,
       tokenVerifier: tokenAdapter,
+      clock: new SystemClock(),
       apiKey: config.apiKey,
       requireApiKey: Boolean(config.apiKey),
     };

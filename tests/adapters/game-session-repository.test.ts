@@ -58,7 +58,7 @@ describe("inMemoryGameSessionRepository", () => {
     });
     await repo.create(session);
 
-    session.transitionTo("trial-orientation");
+    session.transitionTo("trial-orientation", new Date());
     await repo.update(session);
 
     const found = await repo.findById(session.sessionId);

@@ -47,15 +47,15 @@ function makeEvent(
  * Helper to transition a session through all phases up to feedback-survey.
  */
 function transitionToFeedbackSurvey(session: GameSession): void {
-  session.transitionTo("trial-orientation");
-  session.transitionTo("round-1:chain-mapping");
-  session.transitionTo("round-1:peer-adjudication");
-  session.transitionTo("round-1:round-summary");
-  session.transitionTo("round-2:chain-mapping");
-  session.transitionTo("round-2:peer-adjudication");
-  session.transitionTo("round-2:round-summary");
-  session.transitionTo("posttest");
-  session.transitionTo("feedback-survey");
+  session.transitionTo("trial-orientation", new Date());
+  session.transitionTo("round-1:chain-mapping", new Date());
+  session.transitionTo("round-1:peer-adjudication", new Date());
+  session.transitionTo("round-1:round-summary", new Date());
+  session.transitionTo("round-2:chain-mapping", new Date());
+  session.transitionTo("round-2:peer-adjudication", new Date());
+  session.transitionTo("round-2:round-summary", new Date());
+  session.transitionTo("posttest", new Date());
+  session.transitionTo("feedback-survey", new Date());
 }
 
 /**
@@ -80,14 +80,14 @@ function makePosttestSession(): GameSession {
     mode: "classroom",
     adjudicationMode: "peer-instructor",
   });
-  session.transitionTo("trial-orientation");
-  session.transitionTo("round-1:chain-mapping");
-  session.transitionTo("round-1:peer-adjudication");
-  session.transitionTo("round-1:round-summary");
-  session.transitionTo("round-2:chain-mapping");
-  session.transitionTo("round-2:peer-adjudication");
-  session.transitionTo("round-2:round-summary");
-  session.transitionTo("posttest");
+  session.transitionTo("trial-orientation", new Date());
+  session.transitionTo("round-1:chain-mapping", new Date());
+  session.transitionTo("round-1:peer-adjudication", new Date());
+  session.transitionTo("round-1:round-summary", new Date());
+  session.transitionTo("round-2:chain-mapping", new Date());
+  session.transitionTo("round-2:peer-adjudication", new Date());
+  session.transitionTo("round-2:round-summary", new Date());
+  session.transitionTo("posttest", new Date());
   return session;
 }
 

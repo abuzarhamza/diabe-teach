@@ -156,7 +156,7 @@ describe("post /api/v1/sessions/{sessionId}/phase", () => {
 
   it("sets activeRoundNumber when entering round-1:chain-mapping", async () => {
     const session = makeSession();
-    session.transitionTo("trial-orientation");
+    session.transitionTo("trial-orientation", new Date());
     const sessionRepo = new InMemoryGameSessionRepository([session]);
     const tokenAdapter = new FakeCapabilityTokenAdapter();
 

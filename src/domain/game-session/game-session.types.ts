@@ -82,6 +82,25 @@ export const DEFAULT_TIMER_CONFIG: SessionTimerConfig = {
   feedbackSurveySec: 900,
 };
 
+/**
+ * Which timer-config field sets each phase's duration. `null` means the phase
+ * has no configured duration (it ends the moment it starts). Typed as a full
+ * Record so adding a phase forces a decision here.
+ */
+export const PHASE_TIMER_FIELD: Readonly<Record<PhaseIdentifier, keyof SessionTimerConfig | null>> = {
+  "pretest": "pretestSec",
+  "trial-orientation": "trialOrientationSec",
+  "round-1:chain-mapping": "roundMappingSec",
+  "round-1:peer-adjudication": "roundAdjudicationSec",
+  "round-1:round-summary": null,
+  "round-2:chain-mapping": "roundMappingSec",
+  "round-2:peer-adjudication": "roundAdjudicationSec",
+  "round-2:round-summary": null,
+  "posttest": "posttestSec",
+  "feedback-survey": "feedbackSurveySec",
+  "completed": null,
+};
+
 export const PHASE_TRANSITIONS: ReadonlyMap<PhaseIdentifier, PhaseIdentifier> = new Map([
   ["pretest", "trial-orientation"],
   ["trial-orientation", "round-1:chain-mapping"],
