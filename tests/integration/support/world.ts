@@ -1,7 +1,7 @@
 import type { APIGatewayProxyResult } from "aws-lambda";
-import type { CapabilityTokenPort, CapabilityTokenSignerPort } from "../../src/application/ports/capability-token.port.js";
-import type { CurriculumPackRepositoryPort } from "../../src/application/ports/curriculum-pack-repository.port.js";
-import type { GameSessionRepositoryPort } from "../../src/application/ports/game-session-repository.port.js";
+import type { CapabilityTokenPort, CapabilityTokenSignerPort } from "../../../src/application/ports/capability-token.port.js";
+import type { CurriculumPackRepositoryPort } from "../../../src/application/ports/curriculum-pack-repository.port.js";
+import type { GameSessionRepositoryPort } from "../../../src/application/ports/game-session-repository.port.js";
 import { World, setWorldConstructor } from "@cucumber/cucumber";
 
 export interface TestDependencies {

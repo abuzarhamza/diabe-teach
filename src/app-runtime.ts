@@ -5,11 +5,11 @@ import type {
 import { EnvYamlConfigLoader } from "./adapters/outbound/env-yaml-config-loader.js";
 import { FakeCapabilityTokenAdapter } from "./adapters/outbound/fake-capability-token-adapter.js";
 import { HmacCapabilityTokenAdapter } from "./adapters/outbound/hmac-capability-token-adapter.js";
-import { InMemoryGameSessionRepository } from "./adapters/outbound/in-memory-game-session-repository.js";
 import {
   DEFAULT_MONGODB_DB_NAME,
   MongoCurriculumPackRepository,
 } from "./adapters/outbound/mongo-curriculum-pack-repository.js";
+import { MongoGameSessionRepository } from "./adapters/outbound/mongo-game-session-repository.js";
 
 export interface LoadEnvConfigOptions {
   readonly yamlFilePath?: string | false;
@@ -71,7 +71,7 @@ export class AppRuntime {
 
     return {
       packRepo: MongoCurriculumPackRepository.fromConfig(config),
-      sessionRepo: new InMemoryGameSessionRepository(),
+      sessionRepo: MongoGameSessionRepository.fromConfig(config),
       tokenSigner: tokenAdapter,
       tokenVerifier: tokenAdapter,
       apiKey: config.apiKey,

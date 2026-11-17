@@ -6,6 +6,12 @@ export const DIABE_TEACH_PACK: CurriculumPack = CurriculumPack.create({
   version: "1.0.0",
   description:
     "Evidence-based 49-keyword associative concept-chaining board game for undergraduate medical education in diabetes mellitus (Shadan et al., BMC Medical Education 2025, 25:17).",
+  isSystemPack: true,
+  isArchived: false,
+  createdBy: null,
+  authorName: "Shadan et al.",
+  createdAt: new Date("2025-01-01T00:00:00.000Z"),
+  archivedAt: null,
   boardConfig: {
     rows: 7,
     cols: 7,

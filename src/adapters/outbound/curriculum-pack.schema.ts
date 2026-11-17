@@ -23,6 +23,12 @@ export const curriculumPackSchema = new Schema<CurriculumPackDocument>(
     adjudicationRubric: { type: Schema.Types.Mixed, required: true },
     assessmentInstrument: { type: Schema.Types.Mixed },
     perceptionSurvey: { type: Schema.Types.Mixed },
+    isSystemPack: { type: Boolean, required: true, default: false },
+    isArchived: { type: Boolean, required: true, default: false },
+    createdBy: { type: String, default: null },
+    authorName: { type: String, default: null },
+    createdAt: { type: Date, required: true, default: Date.now },
+    archivedAt: { type: Date, default: null },
   },
   {
     collection: CURRICULUM_PACKS_COLLECTION,

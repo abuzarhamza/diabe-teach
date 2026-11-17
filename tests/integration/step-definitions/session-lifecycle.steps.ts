@@ -5,15 +5,15 @@ import { createSession, joinSession } from "../support/http-client.js";
 Given(
   "the curriculum pack {string} is available",
   async function (this: TestWorld, _packId: string) {
-    // The pack is pre-loaded by the Before hook via InMemoryCurriculumPackRepository
-    // with DIABE_TEACH_PACK which has id "diabe-teach"
+    // The pack is pre-loaded in the Netlify dev server
+    // via InMemoryCurriculumPackRepository with DIABE_TEACH_PACK
   },
 );
 
 When(
   "the instructor creates a classroom session with pack {string}",
   async function (this: TestWorld, packId: string) {
-    this.lastResponse = await createSession(this.deps, {
+    this.lastResponse = await createSession({
       packId,
       mode: "classroom",
       adjudicationMode: "peer-instructor",
@@ -36,7 +36,7 @@ When(
 When(
   "the instructor creates a solo session with pack {string} as {string}",
   async function (this: TestWorld, packId: string, displayName: string) {
-    this.lastResponse = await createSession(this.deps, {
+    this.lastResponse = await createSession({
       packId,
       mode: "solo",
       adjudicationMode: "ai",
@@ -71,7 +71,7 @@ When(
       throw new Error("No room code available. Create a session first.");
     }
 
-    this.lastResponse = await joinSession(this.deps, {
+    this.lastResponse = await joinSession({
       roomCode: this.roomCode,
       displayName,
     });
@@ -96,7 +96,7 @@ When(
     }
 
     // Join first participant
-    let response = await joinSession(this.deps, {
+    let response = await joinSession({
       roomCode: this.roomCode,
       displayName: name1,
     });
@@ -111,7 +111,7 @@ When(
     }
 
     // Join second participant
-    response = await joinSession(this.deps, {
+    response = await joinSession({
       roomCode: this.roomCode,
       displayName: name2,
     });
@@ -132,7 +132,7 @@ When(
 When(
   "someone attempts to join with invalid room code {string}",
   async function (this: TestWorld, invalidCode: string) {
-    this.lastResponse = await joinSession(this.deps, {
+    this.lastResponse = await joinSession({
       roomCode: invalidCode,
       displayName: "Unknown",
     });

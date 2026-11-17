@@ -144,3 +144,58 @@ export class PackNotArchivedError extends DomainError {
     );
   }
 }
+
+export class AssessmentAlreadySubmittedError extends DomainError {
+  public readonly code = "ASSESSMENT_ALREADY_SUBMITTED" as const;
+
+  public constructor(participantId: string, stage: string) {
+    super(
+      `Participant '${participantId}' has already submitted the ${stage} assessment.`,
+      { participantId, stage },
+    );
+  }
+}
+
+export class AssessmentIncompleteError extends DomainError {
+  public readonly code = "ASSESSMENT_INCOMPLETE" as const;
+
+  public constructor(answeredCount: number, requiredCount: number) {
+    super(
+      `Assessment is incomplete: ${answeredCount} of ${requiredCount} questions answered.`,
+      { answeredCount, requiredCount },
+    );
+  }
+}
+
+export class SurveyAlreadySubmittedError extends DomainError {
+  public readonly code = "SURVEY_ALREADY_SUBMITTED" as const;
+
+  public constructor(participantId: string, sessionId: string) {
+    super(
+      `Participant '${participantId}' has already submitted the perception survey for session '${sessionId}'.`,
+      { participantId, sessionId },
+    );
+  }
+}
+
+export class SurveyCommentsTooLongError extends DomainError {
+  public readonly code = "SURVEY_COMMENTS_TOO_LONG" as const;
+
+  public constructor(wordCount: number, maxWords: number) {
+    super(
+      `Survey comments exceed maximum length: ${wordCount} words provided, maximum is ${maxWords}.`,
+      { wordCount, maxWords },
+    );
+  }
+}
+
+export class InvalidSurveyResponseError extends DomainError {
+  public readonly code = "INVALID_SURVEY_RESPONSE" as const;
+
+  public constructor(field: string, invalidValue: unknown) {
+    super(
+      `Invalid survey response for '${field}': value '${invalidValue}' is not a valid Likert scale option.`,
+      { field, invalidValue },
+    );
+  }
+}

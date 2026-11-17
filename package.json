@@ -4,6 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "dev": "netlify dev",
+    "dev:debug": "DEBUG=* netlify dev",
+    "dev:local": "node --import tsx scripts/start-dev-with-mongodb.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:bdd": "node --import tsx node_modules/@cucumber/cucumber/bin/cucumber.js --config tests/cucumber.mjs",
@@ -28,6 +31,7 @@
     "jose": "^6.2.13",
     "mongodb": "^6.13.0",
     "mongoose": "^9.11.4",
+    "word-count": "^0.3.1",
     "yaml": "^2.9.1"
   },
   "devDependencies": {
@@ -36,6 +40,7 @@
     "@types/aws-lambda": "^8.10.164",
     "@types/chai": "^5.2.3",
     "@types/node": "^22.13.0",
+    "@types/supertest": "^7.2.1",
     "@types/yaml": "^1.9.6",
     "@vitest/coverage-v8": "^3.0.5",
     "c8": "^12.0.0",
@@ -44,6 +49,8 @@
     "escomplex": "^2.0.0-alpha",
     "eslint": "^10.13.0",
     "mongodb-memory-server": "^11.3.0",
+    "netlify-cli": "^27.16.2",
+    "supertest": "^7.3.1",
     "ts-node": "^10.9.2",
     "tsx": "^4.23.15",
     "typescript": "^5.7.3",

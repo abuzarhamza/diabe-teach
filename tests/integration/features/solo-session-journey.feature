@@ -1,3 +1,4 @@
+@integration @game-session @solo
 Feature: Solo Game Session Journey
   As an individual learner
   I want to practice concept chaining on my own
@@ -6,6 +7,7 @@ Feature: Solo Game Session Journey
   Background:
     Given the curriculum pack "diabe-teach" is available
 
+  @smoke @session-creation
   Scenario: Solo session auto-joins the creator as participant
     When the instructor creates a solo session with pack "diabe-teach" as "Alice"
     Then the response status should be 201
@@ -13,6 +15,7 @@ Feature: Solo Game Session Journey
     And the response should contain instructorToken
     And the solo participant should be auto-joined
 
+  @phase-transition
   Scenario: Solo session progresses through phases
     When the instructor creates a solo session with pack "diabe-teach" as "Alice"
     And the instructor advances the phase
@@ -21,6 +24,7 @@ Feature: Solo Game Session Journey
     Then the session phase should be "round-1:chain-mapping"
     And the active round number should be 1
 
+  @chain-submission
   Scenario: Solo participant submits chains in round 1
     When the instructor creates a solo session with pack "diabe-teach" as "Alice"
     And the instructor advances the phase 2 times
@@ -29,6 +33,7 @@ Feature: Solo Game Session Journey
     And the response should contain a chain with status "pending-review"
     And the chain length should be 4
 
+  @phase-transition @chain-submission
   Scenario: Solo session completes round 1 chain-mapping
     When the instructor creates a solo session with pack "diabe-teach" as "Alice"
     And the instructor advances the phase 2 times
@@ -38,6 +43,7 @@ Feature: Solo Game Session Journey
     When the instructor advances the phase
     Then the session phase should be "round-1:peer-adjudication"
 
+  @phase-transition @round-progression
   Scenario: Solo session progresses to round 2
     When the instructor creates a solo session with pack "diabe-teach" as "Alice"
     And the instructor advances the phase 2 times
@@ -50,6 +56,7 @@ Feature: Solo Game Session Journey
     Then the session phase should be "round-2:chain-mapping"
     And the active round number should be 2
 
+  @e2e @full-journey
   Scenario: Solo session completes full journey
     When the instructor creates a solo session with pack "diabe-teach" as "Alice"
     # Phase: pretest -> trial-orientation
@@ -76,6 +83,7 @@ Feature: Solo Game Session Journey
     When the instructor advances the phase
     Then the session phase should be "completed"
 
+  @error-handling @validation
   Scenario: Chain submission before chain-mapping phase fails
     When the instructor creates a solo session with pack "diabe-teach" as "Alice"
     And the instructor advances the phase
@@ -84,6 +92,7 @@ Feature: Solo Game Session Journey
     Then the response status should be 409
     And the response error code should be "PHASE_CLOSED_FOR_SUBMISSIONS"
 
+  @session-state
   Scenario: Solo participant can retrieve session state
     When the instructor creates a solo session with pack "diabe-teach" as "Alice"
     And participant "Alice" retrieves the session state

@@ -1,0 +1,31 @@
+# BDD Test Configuration
+# Environment-specific settings for integration tests
+# Select environment via BDD_ENV variable (default: local)
+
+environments:
+  local:
+    base_url: "http://localhost:8888"
+    api_key: "dev-api-key-diabe-teach-local"
+    timeout_ms: 30000
+    use_mongodb: false
+
+  uat:
+    base_url: "https://uat-diabe-teach.netlify.app"
+    api_key: "${BDD_UAT_API_KEY}"  # Set via environment variable
+    timeout_ms: 60000
+    use_mongodb: true
+
+  prod:
+    base_url: "https://diabe-teach.netlify.app"
+    api_key: "${BDD_PROD_API_KEY}"  # Set via environment variable
+    timeout_ms: 60000
+    use_mongodb: true
+
+# Default test data
+test_data:
+  default_pack_id: "diabe-teach"
+  default_instructor_name: "TestInstructor"
+  default_participant_names:
+    - "Alice"
+    - "Bob"
+    - "Charlie"

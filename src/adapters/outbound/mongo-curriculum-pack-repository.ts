@@ -67,6 +67,16 @@ implements CurriculumPackRepositoryPort {
         return {
           findOne: async filter =>
             model.findOne(filter).lean<CurriculumPackDocument | null>().exec(),
+          find: async (filter = {}) =>
+            model.find(filter).lean<CurriculumPackDocument[]>().exec(),
+          create: async (doc) => {
+            await model.create(doc);
+          },
+          updateOne: async (filter, update) => {
+            await model.updateOne(filter, { $set: update }).exec();
+          },
+          exists: async filter =>
+            (await model.exists(filter)) !== null,
         };
       },
     });
@@ -78,6 +88,38 @@ implements CurriculumPackRepositoryPort {
     return doc
       ? MongoCurriculumPackRepository.#toDomain(doc)
       : null;
+  }
+
+  public async findAll(): Promise<readonly CurriculumPack[]> {
+    const collection = await this.#getCollection();
+    const docs = await collection.find();
+    return docs.map(doc => MongoCurriculumPackRepository.#toDomain(doc));
+  }
+
+  public async findAllActive(): Promise<readonly CurriculumPack[]> {
+    const collection = await this.#getCollection();
+    const docs = await collection.find({ isArchived: false });
+    return docs.map(doc => MongoCurriculumPackRepository.#toDomain(doc));
+  }
+
+  public async create(pack: CurriculumPack): Promise<void> {
+    const collection = await this.#getCollection();
+    await collection.create(MongoCurriculumPackRepository.#toDocument(pack));
+  }
+
+  public async update(pack: CurriculumPack): Promise<void> {
+    const collection = await this.#getCollection();
+    const doc = MongoCurriculumPackRepository.#toDocument(pack);
+    const { _id, ...updateFields } = doc;
+    await collection.updateOne({ _id }, updateFields);
+  }
+
+  public async existsByIdAndVersion(
+    packId: string,
+    version: string,
+  ): Promise<boolean> {
+    const collection = await this.#getCollection();
+    return collection.exists({ _id: packId, version });
   }
 
   static #toDomain(doc: CurriculumPackDocument): CurriculumPack {
@@ -92,6 +134,33 @@ implements CurriculumPackRepositoryPort {
       adjudicationRubric: doc.adjudicationRubric,
       assessmentInstrument: doc.assessmentInstrument,
       perceptionSurvey: doc.perceptionSurvey,
+      isSystemPack: doc.isSystemPack,
+      isArchived: doc.isArchived,
+      createdBy: doc.createdBy,
+      authorName: doc.authorName,
+      createdAt: doc.createdAt,
+      archivedAt: doc.archivedAt,
     });
+  }
+
+  static #toDocument(pack: CurriculumPack): CurriculumPackDocument {
+    return {
+      _id: pack.id.value,
+      title: pack.title,
+      version: pack.version,
+      description: pack.description,
+      boardConfig: pack.boardConfig,
+      domains: pack.domains,
+      cards: pack.cards,
+      adjudicationRubric: pack.adjudicationRubric,
+      assessmentInstrument: pack.assessmentInstrument,
+      perceptionSurvey: pack.perceptionSurvey,
+      isSystemPack: pack.isSystemPack,
+      isArchived: pack.isArchived,
+      createdBy: pack.createdBy,
+      authorName: pack.authorName,
+      createdAt: pack.createdAt,
+      archivedAt: pack.archivedAt,
+    };
   }
 }

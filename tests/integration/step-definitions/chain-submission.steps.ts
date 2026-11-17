@@ -15,7 +15,6 @@ When(
     }
 
     this.lastResponse = await submitChain(
-      this.deps,
       this.currentSessionId,
       roundNumber,
       token,
@@ -57,17 +56,17 @@ When(
     }
 
     // Parse coordinates like "0,0" to { row: 0, col: 0 }
-    const parseCoord = (s: string) => {
-      const [row, col] = s.split(",").map(Number);
-      return { row, col };
+    const parseCoord = (s: string): { row: number; col: number } => {
+      const parts = s.split(",").map(Number);
+      return { row: parts[0] ?? 0, col: parts[1] ?? 0 };
     };
 
     const start = parseCoord(startCoord);
     const end = parseCoord(endCoord);
 
     // Generate a simple path between start and end
-    const path = [start];
-    let current = { ...start };
+    const path: Array<{ row: number; col: number }> = [start];
+    const current = { row: start.row, col: start.col };
 
     while (current.row !== end.row || current.col !== end.col) {
       if (current.row < end.row) current.row++;
@@ -75,13 +74,12 @@ When(
       else if (current.col < end.col) current.col++;
       else if (current.col > end.col) current.col--;
 
-      path.push({ ...current });
+      path.push({ row: current.row, col: current.col });
     }
 
     const keywordIds = path.map((_, i) => `kw-${i + 1}`);
 
     this.lastResponse = await submitChain(
-      this.deps,
       this.currentSessionId,
       1,
       token,
@@ -113,7 +111,6 @@ When(
     }
 
     this.lastResponse = await submitChain(
-      this.deps,
       this.currentSessionId,
       1,
       token,
@@ -145,7 +142,6 @@ When(
     }
 
     this.lastResponse = await submitChain(
-      this.deps,
       this.currentSessionId,
       1,
       token,
@@ -175,7 +171,6 @@ When(
     }
 
     this.lastResponse = await adjudicateChain(
-      this.deps,
       this.currentSessionId,
       1,
       this.lastChainId,
@@ -194,7 +189,6 @@ When(
     }
 
     this.lastResponse = await adjudicateChain(
-      this.deps,
       this.currentSessionId,
       1,
       this.lastChainId,
@@ -217,7 +211,6 @@ When(
     }
 
     this.lastResponse = await getStandings(
-      this.deps,
       this.currentSessionId,
       roundNumber,
       this.instructorToken,
@@ -239,7 +232,6 @@ When(
     }
 
     this.lastResponse = await getStandings(
-      this.deps,
       this.currentSessionId,
       roundNumber,
       token,

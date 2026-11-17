@@ -26,6 +26,18 @@ _Avoid_: Prompt template, grading rules, judge config
 A canonical valid or invalid Concept Chain paired with a fixed board arrangement and reference rationale inside a Curriculum Pack, used both for the learner's Trial Round orientation and as a few-shot reference for automated adjudication.
 _Avoid_: Sample chain, fixture, demo path
 
+**System Pack**:
+A Curriculum Pack bundled with the platform (e.g., Diabe-teach) that is seeded to the database on deployment and protected from archiving or modification by users.
+_Avoid_: Built-in pack, default pack, core pack
+
+**Pack Version**:
+A specific immutable snapshot of a Curriculum Pack identified by its `packId` and semantic `version` string. Editing a pack requires registering a new version; the latest version is returned by default.
+_Avoid_: Revision, iteration, release
+
+**Pack Archive**:
+The soft-removal of a Curriculum Pack from the public listing while preserving access for existing Game Sessions that reference it. Archived packs remain accessible via direct lookup but do not appear in discovery endpoints.
+_Avoid_: Deletion, removal, deprecation
+
 ### Gameplay & Reasoning
 
 **Game Session**:

@@ -3,6 +3,26 @@ import type { SessionId } from "./session-id.js";
 
 export type SessionMode = "solo" | "classroom" | "study-rct";
 
+export type McqAnswerChoice = 0 | 1 | 2 | 3 | "I_DONT_KNOW";
+
+export type AssessmentStage = "pretest" | "posttest";
+
+export interface AssessmentAttempt {
+  readonly participantId: string;
+  readonly stage: AssessmentStage;
+  readonly answers: ReadonlyMap<string, McqAnswerChoice>;
+  readonly submittedAt: Date;
+}
+
+export type LikertRating = 1 | 2 | 3 | 4 | 5;
+
+export interface SurveyResponse {
+  readonly participantId: string;
+  readonly responses: ReadonlyMap<string, LikertRating>;
+  readonly comments?: string;
+  readonly submittedAt: Date;
+}
+
 export type AdjudicationMode = "ai" | "peer-instructor" | "hybrid";
 
 export type PhaseIdentifier
@@ -45,6 +65,12 @@ export interface GameSessionProps {
   readonly participants?: readonly Participant[];
   readonly activeRoundNumber?: 1 | 2 | null;
   readonly createdAt?: Date;
+  /** Used for rehydration from persistence - bypasses phase validation */
+  readonly _chains?: readonly import("./concept-chain.js").ConceptChain[];
+  /** Used for rehydration from persistence - bypasses phase validation */
+  readonly _assessments?: ReadonlyMap<AssessmentStage, AssessmentAttempt>;
+  /** Used for rehydration from persistence - bypasses phase validation */
+  readonly _surveyResponse?: SurveyResponse;
 }
 
 export const DEFAULT_TIMER_CONFIG: SessionTimerConfig = {

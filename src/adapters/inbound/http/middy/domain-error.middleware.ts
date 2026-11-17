@@ -1,11 +1,14 @@
 import type { MiddlewareObj } from "@middy/core";
 import {
   AdjudicationLockedError,
+  AssessmentAlreadySubmittedError,
+  AssessmentIncompleteError,
   ChainNotFoundError,
   ChainTopologyInvalidError,
   DomainError,
   ForbiddenRoleError,
   InvalidPhaseTransitionError,
+  InvalidSurveyResponseError,
   PackAlreadyArchivedError,
   PackAlreadyExistsError,
   PackIsSystemPackError,
@@ -14,6 +17,8 @@ import {
   PhaseClosedForSubmissionsError,
   RoomCodeNotFoundError,
   SessionNotFoundError,
+  SurveyAlreadySubmittedError,
+  SurveyCommentsTooLongError,
   UnauthorizedTokenError,
 } from "../../../../domain/errors/domain-errors.js";
 
@@ -41,6 +46,8 @@ export function domainErrorMiddleware(): MiddlewareObj<any, any> {
           || error instanceof PackAlreadyArchivedError
           || error instanceof PackNotArchivedError
           || error instanceof PackAlreadyExistsError
+          || error instanceof AssessmentAlreadySubmittedError
+          || error instanceof SurveyAlreadySubmittedError
         ) {
           statusCode = 409;
         }
@@ -53,7 +60,12 @@ export function domainErrorMiddleware(): MiddlewareObj<any, any> {
         else if (error instanceof ChainNotFoundError) {
           statusCode = 404;
         }
-        else if (error instanceof ChainTopologyInvalidError) {
+        else if (
+          error instanceof ChainTopologyInvalidError
+          || error instanceof AssessmentIncompleteError
+          || error instanceof SurveyCommentsTooLongError
+          || error instanceof InvalidSurveyResponseError
+        ) {
           statusCode = 422;
         }
 

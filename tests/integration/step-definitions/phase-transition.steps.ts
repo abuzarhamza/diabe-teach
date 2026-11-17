@@ -10,7 +10,6 @@ When(
     }
 
     this.lastResponse = await transitionPhase(
-      this.deps,
       this.currentSessionId,
       this.instructorToken,
       { action: "advance" },
@@ -28,7 +27,6 @@ When(
 
     for (let i = 0; i < times; i++) {
       this.lastResponse = await transitionPhase(
-        this.deps,
         this.currentSessionId,
         this.instructorToken,
         { action: "advance" },
@@ -50,7 +48,6 @@ When(
     }
 
     this.lastResponse = await transitionPhase(
-      this.deps,
       this.currentSessionId,
       this.instructorToken,
       { action: "jump", targetPhase },
@@ -72,7 +69,6 @@ When(
     }
 
     this.lastResponse = await transitionPhase(
-      this.deps,
       this.currentSessionId,
       token,
       { action: "advance" },
@@ -89,7 +85,6 @@ When(
     }
 
     this.lastResponse = await getSession(
-      this.deps,
       this.currentSessionId,
       this.instructorToken,
     );
@@ -110,7 +105,6 @@ When(
     }
 
     this.lastResponse = await getSession(
-      this.deps,
       this.currentSessionId,
       token,
     );

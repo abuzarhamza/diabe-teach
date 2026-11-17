@@ -46,6 +46,12 @@ export class CurriculumPackSeeder {
       adjudicationRubric: pack.adjudicationRubric,
       assessmentInstrument: pack.assessmentInstrument,
       perceptionSurvey: pack.perceptionSurvey,
+      isSystemPack: pack.isSystemPack,
+      isArchived: pack.isArchived,
+      createdBy: pack.createdBy,
+      authorName: pack.authorName,
+      createdAt: pack.createdAt,
+      archivedAt: pack.archivedAt,
     };
   }
 

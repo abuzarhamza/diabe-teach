@@ -1,16 +1,23 @@
 import type { ConceptChain } from "./concept-chain.js";
 import type {
   AdjudicationMode,
+  AssessmentAttempt,
+  AssessmentStage,
   GameSessionProps,
+  LikertRating,
+  McqAnswerChoice,
   Participant,
   PhaseIdentifier,
   SessionMode,
   SessionTimerConfig,
+  SurveyResponse,
 } from "./game-session.types.js";
 import { randomUUID } from "node:crypto";
 import {
+  AssessmentAlreadySubmittedError,
   InvalidPhaseTransitionError,
   PhaseClosedForSubmissionsError,
+  SurveyAlreadySubmittedError,
 } from "../errors/domain-errors.js";
 import {
   DEFAULT_TIMER_CONFIG,
@@ -29,7 +36,9 @@ export class GameSession {
   readonly #createdAt: Date;
   readonly #participants: Participant[];
   readonly #chains: ConceptChain[];
+  readonly #assessments: Map<AssessmentStage, AssessmentAttempt>;
 
+  #surveyResponse: SurveyResponse | null;
   #currentPhase: PhaseIdentifier;
   #phaseStartedAt: Date;
   #activeRoundNumber: 1 | 2 | null;
@@ -61,7 +70,14 @@ export class GameSession {
       : [];
     this.#activeRoundNumber = props.activeRoundNumber ?? null;
     this.#createdAt = props.createdAt ?? new Date();
-    this.#chains = [];
+    // Support rehydration from persistence with existing chains
+    this.#chains = props._chains ? [...props._chains] : [];
+    // Support rehydration from persistence with existing assessments
+    this.#assessments = props._assessments
+      ? new Map(props._assessments)
+      : new Map();
+    // Support rehydration from persistence with existing survey response
+    this.#surveyResponse = props._surveyResponse ?? null;
   }
 
   public static create(props: GameSessionProps): GameSession {
@@ -173,5 +189,78 @@ export class GameSession {
       this.#currentPhase === "round-1:chain-mapping"
       || this.#currentPhase === "round-2:chain-mapping"
     );
+  }
+
+  public get assessments(): ReadonlyMap<AssessmentStage, AssessmentAttempt> {
+    return this.#assessments;
+  }
+
+  public submitAssessment(
+    participantId: string,
+    stage: AssessmentStage,
+    answers: ReadonlyMap<string, McqAnswerChoice>,
+  ): AssessmentAttempt {
+    if (this.#assessments.has(stage)) {
+      const existing = this.#assessments.get(stage)!;
+      throw new AssessmentAlreadySubmittedError(existing.participantId, stage);
+    }
+
+    const attempt: AssessmentAttempt = {
+      participantId,
+      stage,
+      answers,
+      submittedAt: new Date(),
+    };
+
+    this.#assessments.set(stage, attempt);
+    return attempt;
+  }
+
+  public getAssessment(
+    participantId: string,
+    stage: AssessmentStage,
+  ): AssessmentAttempt | undefined {
+    const attempt = this.#assessments.get(stage);
+    if (attempt && attempt.participantId === participantId) {
+      return attempt;
+    }
+    return undefined;
+  }
+
+  public get surveyResponse(): SurveyResponse | null {
+    return this.#surveyResponse;
+  }
+
+  public submitSurvey(
+    participantId: string,
+    responses: ReadonlyMap<string, LikertRating>,
+    comments?: string,
+  ): SurveyResponse {
+    if (this.#surveyResponse !== null) {
+      throw new SurveyAlreadySubmittedError(
+        this.#surveyResponse.participantId,
+        this.#sessionId.value,
+      );
+    }
+
+    const surveyResponse: SurveyResponse = {
+      participantId,
+      responses,
+      ...(comments !== undefined && { comments }),
+      submittedAt: new Date(),
+    };
+
+    this.#surveyResponse = surveyResponse;
+    return surveyResponse;
+  }
+
+  public getSurveyResponse(participantId: string): SurveyResponse | undefined {
+    if (
+      this.#surveyResponse !== null
+      && this.#surveyResponse.participantId === participantId
+    ) {
+      return this.#surveyResponse;
+    }
+    return undefined;
   }
 }
