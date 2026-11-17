@@ -1,4 +1,4 @@
-import type { ConceptChain } from "./concept-chain.js";
+import type { ConceptChain, GridCoord } from "./concept-chain.js";
 import type {
   AdjudicationMode,
   AssessmentAttempt,
@@ -15,6 +15,7 @@ import type {
 import { randomUUID } from "node:crypto";
 import {
   AssessmentAlreadySubmittedError,
+  ChainAlreadySubmittedError,
   InvalidPhaseTransitionError,
   InvalidTimerConfigError,
   PhaseClosedForSubmissionsError,
@@ -227,7 +228,7 @@ export class GameSession {
     }
     const phaseEndsAt = this.phaseEndsAt;
     if (phaseEndsAt === null) {
-      this.#chains.push(chain);
+      this.#recordChain(chain);
       return;
     }
     const closesAtMs = phaseEndsAt.getTime() + SUBMISSION_GRACE_PERIOD_SEC * 1000;
@@ -237,7 +238,7 @@ export class GameSession {
         gracePeriodSec: SUBMISSION_GRACE_PERIOD_SEC,
       });
     }
-    this.#chains.push(chain);
+    this.#recordChain(chain);
   }
 
   public getChain(chainId: string): ConceptChain | undefined {
@@ -377,5 +378,32 @@ export class GameSession {
       return 0;
     }
     return this.#timerConfig[field];
+  }
+
+  /**
+   * Appends a chain unless its participant already submitted the same chain
+   * in the same round: the same cells in the same or exactly reverse order.
+   * The narrative and keywords are ignored. Other participants may submit
+   * the same chain.
+   */
+  #recordChain(chain: ConceptChain): void {
+    const repeated = this.#chains.find(existing =>
+      existing.participantId === chain.participantId
+      && existing.roundNumber === chain.roundNumber
+      && GameSession.#visitsSameCells(existing.path, chain.path),
+    );
+    if (repeated) {
+      throw new ChainAlreadySubmittedError(chain.participantId, chain.roundNumber, repeated.chainId);
+    }
+    this.#chains.push(chain);
+  }
+
+  static #visitsSameCells(a: readonly GridCoord[], b: readonly GridCoord[]): boolean {
+    if (a.length !== b.length) {
+      return false;
+    }
+    const sameCell = (p: GridCoord, q: GridCoord) => p.row === q.row && p.col === q.col;
+    const forward = a.every((cell, i) => sameCell(cell, b[i]!));
+    return forward || a.every((cell, i) => sameCell(cell, b[b.length - 1 - i]!));
   }
 }

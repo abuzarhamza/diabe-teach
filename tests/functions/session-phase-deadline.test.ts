@@ -196,15 +196,15 @@ describe("chain-mapping deadline enforcement", () => {
     expect(toMapping.body.state.currentPhase).toBe("round-1:chain-mapping");
     expect(toMapping.body.state.phaseEndsAt).toBe("2026-03-01T09:05:00.000Z");
 
-    const submitChain = async () =>
+    const submitChain = async (path = [
+      { row: 0, col: 0 },
+      { row: 0, col: 1 },
+      { row: 1, col: 1 },
+      { row: 1, col: 2 },
+    ]) =>
       invoke(handlers.submitChain, makeEvent("POST", `${sessionPath}/rounds/1/chains`, {
         body: {
-          path: [
-            { row: 0, col: 0 },
-            { row: 0, col: 1 },
-            { row: 1, col: 1 },
-            { row: 1, col: 2 },
-          ],
+          path,
           keywordIds: ["kw-1", "kw-2", "kw-3", "kw-4"],
           narrativeExplanation: "These concepts connect because...",
         },
@@ -259,7 +259,13 @@ describe("chain-mapping deadline enforcement", () => {
     expect(insideGrace.statusCode).toBe(201);
 
     round.clock.setNow(new Date("2026-03-01T09:05:05.000Z"));
-    const atGraceEnd = await round.submitChain();
+    // A different chain: the same participant cannot repeat the first one.
+    const atGraceEnd = await round.submitChain([
+      { row: 2, col: 0 },
+      { row: 2, col: 1 },
+      { row: 2, col: 2 },
+      { row: 3, col: 2 },
+    ]);
     expect(atGraceEnd.statusCode).toBe(201);
   });
 

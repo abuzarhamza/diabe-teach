@@ -179,6 +179,23 @@ describe("session writes that lose a concurrent-update race", () => {
     expect(stored?.chains.map(chain => chain.participantId)).toEqual([bob.participantId, alice.participantId]);
   });
 
+  it("records exactly one chain when one participant submits the same chain twice at the same moment", async () => {
+    const { session, sessionId, store, tokenAdapter, alice, aliceToken } = await setUpChainMappingSession();
+    const sessionRepo = new RaceBeforeFirstSaveSessionRepository(store);
+    const submitChain = createSubmitChainHandler({ sessionRepo, tokenVerifier: tokenAdapter });
+    sessionRepo.raceWith(async () => {
+      const competing = await submitChain(makeChainEvent(sessionId, aliceToken), {} as never);
+      expect(competing.statusCode).toBe(201);
+    });
+
+    const retried = await submitChain(makeChainEvent(sessionId, aliceToken), {} as never);
+
+    expect(retried.statusCode).toBe(409);
+    expect(JSON.parse(retried.body)).toMatchObject({ code: "CHAIN_ALREADY_SUBMITTED" });
+    const stored = await store.findById(session.sessionId);
+    expect(stored?.chains.map(chain => chain.participantId)).toEqual([alice.participantId]);
+  });
+
   it("does not retry a request rejected for a reason other than a conflict", async () => {
     const { sessionId, store, tokenAdapter, aliceToken } = await setUpChainMappingSession();
     const sessionRepo = new CountingSessionRepository(store);

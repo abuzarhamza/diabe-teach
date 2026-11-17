@@ -296,6 +296,11 @@ paths:
             (the fixed grace period) after the session's `phaseEndsAt`. An
             expired chain-mapping phase stays current, closed for submissions,
             until the instructor transitions to peer-adjudication.
+
+            CHAIN_ALREADY_SUBMITTED. The participant already submitted this
+            Concept Chain in this round: the same board cells in the same or
+            exactly reverse order (the narrative is ignored). Nothing is
+            recorded. Other participants may submit the same chain.
           content:
             application/json:
               schema:
@@ -577,6 +582,7 @@ components:
         - CHAIN_TOPOLOGY_INVALID
         - ASSESSMENT_INCOMPLETE
         - CONCURRENT_UPDATE_CONFLICT
+        - CHAIN_ALREADY_SUBMITTED
 
     ApiErrorResponse:
       type: object

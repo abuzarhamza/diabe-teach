@@ -8,14 +8,18 @@ See spec: `.scratch/session-write-integrity/spec.md`.
 
 **Blocked by:** 02 (chain submission retries on conflict). Run after 04, which edits the same chain-recording invariant.
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] Handler test: a participant re-submitting an identical chain in the same round gets 409 `CHAIN_ALREADY_SUBMITTED`; only one copy is stored
-- [ ] Handler test: a participant submitting the reverse of their earlier chain is rejected the same way
-- [ ] Handler test: two different participants submitting the same chain are both accepted
-- [ ] Handler test: the same participant may submit the same cells again in a different round (each round has a new board)
-- [ ] Handler test: two identical submissions from one participant, interleaved via the scripted-conflict repository double, record exactly one chain
-- [ ] OpenAPI: `CHAIN_ALREADY_SUBMITTED` added to `ApiErrorCode` and documented as a 409 on chain submission
-- [ ] Existing tests, BDD and lint baselines unchanged
+- [x] Handler test: a participant re-submitting an identical chain in the same round gets 409 `CHAIN_ALREADY_SUBMITTED`; only one copy is stored
+- [x] Handler test: a participant submitting the reverse of their earlier chain is rejected the same way
+- [x] Handler test: two different participants submitting the same chain are both accepted
+- [x] Handler test: the same participant may submit the same cells again in a different round (each round has a new board)
+- [x] Handler test: two identical submissions from one participant, interleaved via the scripted-conflict repository double, record exactly one chain
+- [x] OpenAPI: `CHAIN_ALREADY_SUBMITTED` added to `ApiErrorCode` and documented as a 409 on chain submission
+- [x] Existing tests, BDD and lint baselines unchanged
 
 **2026-11-17:** The user confirmed: "reverse CANT be submitted by the same team". The reverse-equals-same rule is now a user decision, not a Claude default.
+
+**2026-11-17:** The user decided: a chain rejected in adjudication still blocks the same team from resubmitting the same path (or its reverse) in that round, even with a better narrative. "reject. Keep it simple". This matches the implementation, which has no status filter.
+
+**2026-11-17 (chief of staff):** Merged onto `4fec3d2` (ticket 04). The only conflict was in `submit-chain.test.ts`, where both blocks were kept. The `addChain` order is now phase, round, deadline, then repeat check. Verified after the merge: typecheck passes; vitest 178/178; lint 132 (baseline); boundaries 6 (baseline); BDD 31/31 scenarios, 308 steps.

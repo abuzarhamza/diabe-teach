@@ -108,6 +108,17 @@ export class PhaseClosedForSubmissionsError extends DomainError {
   }
 }
 
+export class ChainAlreadySubmittedError extends DomainError {
+  public readonly code = "CHAIN_ALREADY_SUBMITTED" as const;
+
+  public constructor(participantId: string, roundNumber: number, existingChainId: string) {
+    super(
+      `Participant '${participantId}' already submitted this Concept Chain in round ${roundNumber}.`,
+      { participantId, roundNumber, existingChainId },
+    );
+  }
+}
+
 export class ChainTopologyInvalidError extends DomainError {
   public readonly code = "CHAIN_TOPOLOGY_INVALID" as const;
 

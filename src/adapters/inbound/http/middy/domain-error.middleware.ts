@@ -3,6 +3,7 @@ import {
   AdjudicationLockedError,
   AssessmentAlreadySubmittedError,
   AssessmentIncompleteError,
+  ChainAlreadySubmittedError,
   ChainNotFoundError,
   ChainTopologyInvalidError,
   ConcurrentUpdateConflictError,
@@ -54,6 +55,7 @@ export function domainErrorMiddleware(): MiddlewareObj<any, any> {
           || error instanceof AssessmentAlreadySubmittedError
           || error instanceof SurveyAlreadySubmittedError
           || error instanceof ConcurrentUpdateConflictError
+          || error instanceof ChainAlreadySubmittedError
         ) {
           statusCode = 409;
         }
