@@ -9,6 +9,6 @@ Source: `papers/diabe-teach.pdf` (Shadan et al., *BMC Medical Education* (2025) 
 - **The paper says nothing about duplicate chains, reversed chains, or teams submitting the same chain.**
 
 ## Implications
-- 2026-11-17: Session-write-integrity ticket 05 ("no repeat chains from the same team; a reverse counts as the same") is a **project decision by the user and Claude, not a paper rule**. Under the paper's winner rule, a repeat only affects the tie-break (most chains).
+- 2026-11-17: Session-write-integrity ticket 05 ("no repeat chains from the same team; a reverse counts as the same") is a **project decision by the user and Claude, not a paper rule**. On 2026-11-17 the user explicitly confirmed that a reversed chain cannot be submitted by the same team. Under the paper's winner rule, a repeat only affects the tie-break (most chains).
 - 2026-11-17: Default timers (1200s mapping, 600s adjudication, 900s trial) match the paper's 20/10/15 minutes.
 - Related: [timed or instructor-driven phases](decision-timed-or-instructor-driven-phases.md).

@@ -17,3 +17,5 @@ See spec: `.scratch/session-write-integrity/spec.md`.
 - [ ] Handler test: two identical submissions from one participant, interleaved via the scripted-conflict repository double, record exactly one chain
 - [ ] OpenAPI: `CHAIN_ALREADY_SUBMITTED` added to `ApiErrorCode` and documented as a 409 on chain submission
 - [ ] Existing tests, BDD and lint baselines unchanged
+
+**2026-11-17:** The user confirmed: "reverse CANT be submitted by the same team". The reverse-equals-same rule is now a user decision, not a Claude default.
