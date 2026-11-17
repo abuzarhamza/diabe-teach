@@ -1,6 +1,5 @@
 import type { GridCoord } from "../../domain/game-session/concept-chain.js";
 import type { ClockPort } from "../ports/clock.port.js";
-import type { GameSessionRepositoryPort } from "../ports/game-session-repository.port.js";
 import type {
   SubmitConceptChainCommand,
   SubmitConceptChainDependencies,
@@ -11,19 +10,19 @@ import type {
 import {
   ChainTopologyInvalidError,
   ForbiddenRoleError,
-  SessionNotFoundError,
 } from "../../domain/errors/domain-errors.js";
 import { ConceptChain } from "../../domain/game-session/concept-chain.js";
 import { SessionId } from "../../domain/game-session/session-id.js";
+import { GameSessionUpdateRetrier } from "../services/game-session-update-retrier.js";
 
 export class SubmitConceptChainUseCase
 implements SubmitConceptChainUseCasePort {
-  readonly #sessionRepo: GameSessionRepositoryPort;
+  readonly #sessionUpdates: GameSessionUpdateRetrier;
   readonly #clock: ClockPort;
   readonly #minChainLength: number;
 
   public constructor(deps: SubmitConceptChainDependencies) {
-    this.#sessionRepo = deps.sessionRepo;
+    this.#sessionUpdates = new GameSessionUpdateRetrier(deps.sessionRepo);
     this.#clock = deps.clock;
     this.#minChainLength = deps.minChainLength ?? 4;
   }
@@ -43,26 +42,26 @@ implements SubmitConceptChainUseCasePort {
       throw new ForbiddenRoleError("Participant ID is required.");
     }
 
-    const sessionId = SessionId.from(command.sessionId);
-    const session = await this.#sessionRepo.findById(sessionId);
+    // Built once, so a retry keeps the same chain id and submission time.
+    let built: ConceptChain | undefined;
+    const chain = await this.#sessionUpdates.run(
+      SessionId.from(command.sessionId),
+      (session) => {
+        this.#validateChainTopology(command.path);
 
-    if (!session) {
-      throw new SessionNotFoundError(command.sessionId);
-    }
+        built ??= ConceptChain.create({
+          participantId,
+          roundNumber: command.roundNumber,
+          path: command.path,
+          keywordIds: command.keywordIds,
+          narrativeExplanation: command.narrativeExplanation,
+          stepRationales: command.stepRationales,
+        });
 
-    this.#validateChainTopology(command.path);
-
-    const chain = ConceptChain.create({
-      participantId,
-      roundNumber: command.roundNumber,
-      path: command.path,
-      keywordIds: command.keywordIds,
-      narrativeExplanation: command.narrativeExplanation,
-      stepRationales: command.stepRationales,
-    });
-
-    session.addChain(chain, receivedAt);
-    await this.#sessionRepo.update(session);
+        session.addChain(built, receivedAt);
+        return built;
+      },
+    );
 
     const chainDto: SubmittedChainDto = {
       chainId: chain.chainId,

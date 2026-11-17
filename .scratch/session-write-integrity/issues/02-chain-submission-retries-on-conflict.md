@@ -6,11 +6,11 @@ See spec: `.scratch/session-write-integrity/spec.md`.
 
 **Blocked by:** 01 (versioned session writes)
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] Handler test: a chain submission interleaved with a phase transition ends as `PHASE_CLOSED_FOR_SUBMISSIONS`, and the session remains in the transitioned phase
-- [ ] Handler test: two conflicting chain submissions both end up recorded
-- [ ] Handler test: a repository double that always conflicts → 409 `CONCURRENT_UPDATE_CONFLICT` after exactly 3 save attempts
-- [ ] Handler test: a non-conflict domain error is not retried (one save attempt at most)
-- [ ] Interleaving is scripted deterministically via a repository test double (no real concurrency, no sleeps)
-- [ ] The retry helper is a single module that other use cases can adopt
+- [x] Handler test: a chain submission interleaved with a phase transition ends as `PHASE_CLOSED_FOR_SUBMISSIONS`, and the session remains in the transitioned phase
+- [x] Handler test: two conflicting chain submissions both end up recorded
+- [x] Handler test: a repository double that always conflicts → 409 `CONCURRENT_UPDATE_CONFLICT` after exactly 3 save attempts
+- [x] Handler test: a non-conflict domain error is not retried (one save attempt at most)
+- [x] Interleaving is scripted deterministically via a repository test double (no real concurrency, no sleeps)
+- [x] The retry helper is a single module that other use cases can adopt
