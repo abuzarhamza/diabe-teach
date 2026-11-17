@@ -9,6 +9,9 @@ Sources: [spec](../spec.md), [tickets](../issues/).
 - [SSE stream deferred](decision-sse-stream-deferred.md): clients poll session state; `/stream` is out of scope.
 - [Test seam: handlers + fake clock](decision-test-seam-handlers-plus-clock.md): the agreed testing approach.
 
+## Sources
+- [Game rules in the Diabe-teach paper](source-paper-game-rules.md): what the study paper does and does not specify.
+
 ## User preferences
 - [Working preferences](user-preferences.md): workflow skills, commit policy.
 
