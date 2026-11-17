@@ -141,6 +141,9 @@ export const gameSessionSchema = new Schema(
     assessments: { type: [assessmentAttemptSchema], default: [] },
     surveyResponse: { type: surveyResponseSchema, default: null },
     createdAt: { type: Date, required: true },
+    // Optimistic-concurrency version. Sessions stored before it existed have
+    // no value and are read as 0.
+    version: { type: Number },
   },
   {
     collection: GAME_SESSIONS_COLLECTION,

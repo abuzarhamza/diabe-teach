@@ -16,7 +16,7 @@ describe("inMemoryGameSessionRepository", () => {
     await repo.create(session);
     const found = await repo.findById(session.sessionId);
 
-    expect(found).toBe(session);
+    expect(found?.sessionId.value).toBe(session.sessionId.value);
   });
 
   it("retrieves a session by room code", async () => {
@@ -30,7 +30,7 @@ describe("inMemoryGameSessionRepository", () => {
     await repo.create(session);
     const found = await repo.findByRoomCode(session.roomCode);
 
-    expect(found).toBe(session);
+    expect(found?.sessionId.value).toBe(session.sessionId.value);
   });
 
   it("returns null for non-existent session id", async () => {
@@ -75,6 +75,6 @@ describe("inMemoryGameSessionRepository", () => {
 
     const found = await repo.findById(session.sessionId);
 
-    expect(found).toBe(session);
+    expect(found?.sessionId.value).toBe(session.sessionId.value);
   });
 });

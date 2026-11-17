@@ -512,15 +512,17 @@ describe("POST /api/v1/sessions/{sessionId}/assessments/{stage}", () => {
       await handler(pretestEvent, {} as never);
 
       // Transition to posttest
-      session.transitionTo("trial-orientation", new Date());
-      session.transitionTo("round-1:chain-mapping", new Date());
-      session.transitionTo("round-1:peer-adjudication", new Date());
-      session.transitionTo("round-1:round-summary", new Date());
-      session.transitionTo("round-2:chain-mapping", new Date());
-      session.transitionTo("round-2:peer-adjudication", new Date());
-      session.transitionTo("round-2:round-summary", new Date());
-      session.transitionTo("posttest", new Date());
-      await sessionRepo.update(session);
+      // Reload: the pretest submission saved a newer version of the session
+      const submitted = await sessionRepo.findById(session.sessionId);
+      submitted!.transitionTo("trial-orientation", new Date());
+      submitted!.transitionTo("round-1:chain-mapping", new Date());
+      submitted!.transitionTo("round-1:peer-adjudication", new Date());
+      submitted!.transitionTo("round-1:round-summary", new Date());
+      submitted!.transitionTo("round-2:chain-mapping", new Date());
+      submitted!.transitionTo("round-2:peer-adjudication", new Date());
+      submitted!.transitionTo("round-2:round-summary", new Date());
+      submitted!.transitionTo("posttest", new Date());
+      await sessionRepo.update(submitted!);
 
       // Submit posttest with all correct (100% correct)
       const posttestEvent = makeEvent(
@@ -575,15 +577,17 @@ describe("POST /api/v1/sessions/{sessionId}/assessments/{stage}", () => {
       await handler(pretestEvent, {} as never);
 
       // Transition to posttest
-      session.transitionTo("trial-orientation", new Date());
-      session.transitionTo("round-1:chain-mapping", new Date());
-      session.transitionTo("round-1:peer-adjudication", new Date());
-      session.transitionTo("round-1:round-summary", new Date());
-      session.transitionTo("round-2:chain-mapping", new Date());
-      session.transitionTo("round-2:peer-adjudication", new Date());
-      session.transitionTo("round-2:round-summary", new Date());
-      session.transitionTo("posttest", new Date());
-      await sessionRepo.update(session);
+      // Reload: the pretest submission saved a newer version of the session
+      const submitted = await sessionRepo.findById(session.sessionId);
+      submitted!.transitionTo("trial-orientation", new Date());
+      submitted!.transitionTo("round-1:chain-mapping", new Date());
+      submitted!.transitionTo("round-1:peer-adjudication", new Date());
+      submitted!.transitionTo("round-1:round-summary", new Date());
+      submitted!.transitionTo("round-2:chain-mapping", new Date());
+      submitted!.transitionTo("round-2:peer-adjudication", new Date());
+      submitted!.transitionTo("round-2:round-summary", new Date());
+      submitted!.transitionTo("posttest", new Date());
+      await sessionRepo.update(submitted!);
 
       // Submit posttest with all correct (0% wrong guess)
       const posttestEvent = makeEvent(
@@ -665,15 +669,17 @@ describe("POST /api/v1/sessions/{sessionId}/assessments/{stage}", () => {
       await handler(pretestEvent, {} as never);
 
       // Transition to posttest
-      session.transitionTo("trial-orientation", new Date());
-      session.transitionTo("round-1:chain-mapping", new Date());
-      session.transitionTo("round-1:peer-adjudication", new Date());
-      session.transitionTo("round-1:round-summary", new Date());
-      session.transitionTo("round-2:chain-mapping", new Date());
-      session.transitionTo("round-2:peer-adjudication", new Date());
-      session.transitionTo("round-2:round-summary", new Date());
-      session.transitionTo("posttest", new Date());
-      await sessionRepo.update(session);
+      // Reload: the pretest submission saved a newer version of the session
+      const submitted = await sessionRepo.findById(session.sessionId);
+      submitted!.transitionTo("trial-orientation", new Date());
+      submitted!.transitionTo("round-1:chain-mapping", new Date());
+      submitted!.transitionTo("round-1:peer-adjudication", new Date());
+      submitted!.transitionTo("round-1:round-summary", new Date());
+      submitted!.transitionTo("round-2:chain-mapping", new Date());
+      submitted!.transitionTo("round-2:peer-adjudication", new Date());
+      submitted!.transitionTo("round-2:round-summary", new Date());
+      submitted!.transitionTo("posttest", new Date());
+      await sessionRepo.update(submitted!);
 
       // Submit posttest
       const posttestAnswers = makeAllCorrectAnswers();

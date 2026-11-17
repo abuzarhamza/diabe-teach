@@ -575,6 +575,7 @@ components:
         - PACK_VALIDATION_FAILED
         - CHAIN_TOPOLOGY_INVALID
         - ASSESSMENT_INCOMPLETE
+        - CONCURRENT_UPDATE_CONFLICT
 
     ApiErrorResponse:
       type: object

@@ -63,6 +63,17 @@ export interface GameSessionDocument {
   assessments: AssessmentAttemptDocument[];
   surveyResponse: SurveyResponseDocument | null;
   createdAt: Date;
+  /** Optimistic-concurrency version. Absent on sessions stored before versioning (read as 0). */
+  version?: number;
+}
+
+/**
+ * Matches a session only while it is still at the expected version. A missing
+ * version field is matched by `null`, so legacy sessions match version 0.
+ */
+export interface GameSessionVersionFilter {
+  _id: string;
+  version: number | { $in: readonly (number | null)[] };
 }
 
 export interface GameSessionCollectionLike {
@@ -73,10 +84,11 @@ export interface GameSessionCollectionLike {
     filter?: Partial<GameSessionDocument>,
   ) => Promise<GameSessionDocument[]>;
   create: (doc: GameSessionDocument) => Promise<void>;
+  /** Applies `$set: update` to the matching session and reports how many matched. */
   updateOne: (
-    filter: Pick<GameSessionDocument, "_id">,
+    filter: GameSessionVersionFilter,
     update: Partial<Omit<GameSessionDocument, "_id">>,
-  ) => Promise<void>;
+  ) => Promise<{ matchedCount: number }>;
 }
 
 export interface MongoGameSessionRepositoryOptions {

@@ -13,6 +13,7 @@ import type {
   SurveyResponseDocument,
 } from "./mongo-game-session-repository.types.js";
 import type { AssessmentAttempt, AssessmentStage, LikertRating, McqAnswerChoice, SurveyResponse } from "../../domain/game-session/game-session.types.js";
+import { ConcurrentUpdateConflictError } from "../../domain/errors/domain-errors.js";
 import { ConceptChain } from "../../domain/game-session/concept-chain.js";
 import { GameSession } from "../../domain/game-session/game-session.js";
 import {
@@ -76,7 +77,8 @@ export class MongoGameSessionRepository implements GameSessionRepositoryPort {
             await model.create(doc);
           },
           updateOne: async (filter, update) => {
-            await model.updateOne(filter, { $set: update }).exec();
+            const result = await model.updateOne(filter, { $set: update }).exec();
+            return { matchedCount: result.matchedCount };
           },
         };
       },
@@ -85,7 +87,8 @@ export class MongoGameSessionRepository implements GameSessionRepositoryPort {
 
   public async create(session: GameSession): Promise<void> {
     const collection = await this.#getCollection();
-    await collection.create(MongoGameSessionRepository.#toDocument(session));
+    const doc = MongoGameSessionRepository.#toDocument(session);
+    await collection.create({ ...doc, version: 0 });
   }
 
   public async findById(sessionId: SessionId): Promise<GameSession | null> {
@@ -100,11 +103,30 @@ export class MongoGameSessionRepository implements GameSessionRepositoryPort {
     return doc ? MongoGameSessionRepository.#toDomain(doc) : null;
   }
 
+  /**
+   * Saves the session only if the stored copy is still at the version it was
+   * loaded at, storing version + 1 in the same operation. Throws
+   * ConcurrentUpdateConflictError if another write got there first or the
+   * session is not stored.
+   */
   public async update(session: GameSession): Promise<void> {
     const collection = await this.#getCollection();
     const doc = MongoGameSessionRepository.#toDocument(session);
     const { _id, ...updateFields } = doc;
-    await collection.updateOne({ _id }, updateFields);
+    const expectedVersion = session.version;
+    // `null` also matches a missing field: legacy sessions are at version 0.
+    const versionFilter = expectedVersion === 0
+      ? {
+          $in: [0, null],
+        }
+      : expectedVersion;
+    const { matchedCount } = await collection.updateOne(
+      { _id, version: versionFilter },
+      { ...updateFields, version: expectedVersion + 1 },
+    );
+    if (matchedCount === 0) {
+      throw new ConcurrentUpdateConflictError(_id, expectedVersion);
+    }
   }
 
   static #toDomain(doc: GameSessionDocument): GameSession {
@@ -163,6 +185,7 @@ export class MongoGameSessionRepository implements GameSessionRepositoryPort {
       })),
       activeRoundNumber: doc.activeRoundNumber,
       createdAt: doc.createdAt,
+      version: doc.version ?? 0,
       _chains: chains,
       _assessments: assessments,
       _surveyResponse: surveyResponse,

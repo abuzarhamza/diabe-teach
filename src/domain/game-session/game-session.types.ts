@@ -70,6 +70,11 @@ export interface GameSessionProps {
   readonly participants?: readonly Participant[];
   readonly activeRoundNumber?: 1 | 2 | null;
   readonly createdAt?: Date;
+  /**
+   * Stored version for optimistic concurrency. New sessions start at 0;
+   * sessions stored before versioning have none and load as 0.
+   */
+  readonly version?: number;
   /** Used for rehydration from persistence - bypasses phase validation */
   readonly _chains?: readonly import("./concept-chain.js").ConceptChain[];
   /** Used for rehydration from persistence - bypasses phase validation */

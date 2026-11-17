@@ -6,7 +6,7 @@ See spec: `.scratch/session-write-integrity/spec.md`.
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [ ] `GameSession` exposes a version (new sessions: 0; loaded sessions: the stored value, or 0 if absent)
 - [ ] The repository update is conditional on the expected version and increments it atomically (Mongo: filter on id + version, treating a missing field as 0, in the same operation)

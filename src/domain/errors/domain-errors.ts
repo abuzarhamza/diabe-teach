@@ -223,3 +223,19 @@ export class InvalidTimerConfigError extends DomainError {
     );
   }
 }
+
+/**
+ * A Game Session save found the stored session at a different version than
+ * the one that was loaded (or no stored session at all), so another write got
+ * there first. Nothing was overwritten; the request is safe to retry.
+ */
+export class ConcurrentUpdateConflictError extends DomainError {
+  public readonly code = "CONCURRENT_UPDATE_CONFLICT" as const;
+
+  public constructor(sessionId: string, expectedVersion: number) {
+    super(
+      `Game Session '${sessionId}' was changed by another request. Reload it and try again.`,
+      { sessionId, expectedVersion },
+    );
+  }
+}

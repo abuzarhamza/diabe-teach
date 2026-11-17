@@ -42,6 +42,7 @@ export class GameSession {
   readonly #participants: Participant[];
   readonly #chains: ConceptChain[];
   readonly #assessments: Map<AssessmentStage, AssessmentAttempt>;
+  readonly #version: number;
 
   #surveyResponse: SurveyResponse | null;
   #currentPhase: PhaseIdentifier;
@@ -72,6 +73,7 @@ export class GameSession {
       : [];
     this.#activeRoundNumber = props.activeRoundNumber ?? null;
     this.#createdAt = props.createdAt ?? new Date();
+    this.#version = props.version ?? 0;
     // Support rehydration from persistence with existing chains
     this.#chains = props._chains ? [...props._chains] : [];
     // Support rehydration from persistence with existing assessments
@@ -83,12 +85,12 @@ export class GameSession {
   }
 
   /**
-   * Starts a new session. Rejects an invalid timer config with
+   * Starts a new session at version 0. Rejects an invalid timer config with
    * InvalidTimerConfigError.
    */
   public static create(props: GameSessionProps): GameSession {
     GameSession.#assertValidTimerConfig(props.timerConfig);
-    return new GameSession(props);
+    return new GameSession({ ...props, version: 0 });
   }
 
   /**
@@ -159,6 +161,14 @@ export class GameSession {
 
   public get createdAt(): Date {
     return this.#createdAt;
+  }
+
+  /**
+   * The stored version this session was loaded at (0 for a new session).
+   * A save succeeds only while the stored session is still at this version.
+   */
+  public get version(): number {
+    return this.#version;
   }
 
   public transitionTo(targetPhase: PhaseIdentifier, now: Date): void {
