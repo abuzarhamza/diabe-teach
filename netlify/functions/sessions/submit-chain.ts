@@ -1,5 +1,6 @@
 import type { APIGatewayProxyEvent, APIGatewayProxyResult } from "aws-lambda";
 import type { CapabilityTokenPort, VerifiedCapability } from "../../../src/application/ports/capability-token.port.js";
+import type { ClockPort } from "../../../src/application/ports/clock.port.js";
 import type { GameSessionRepositoryPort } from "../../../src/application/ports/game-session-repository.port.js";
 import type { SubmitConceptChainCommand } from "../../../src/application/ports/submit-concept-chain.port.js";
 import middy from "@middy/core";
@@ -13,6 +14,7 @@ import { ForbiddenRoleError, UnauthorizedTokenError } from "../../../src/domain/
 export interface SubmitChainHandlerDependencies {
   readonly sessionRepo: GameSessionRepositoryPort;
   readonly tokenVerifier: CapabilityTokenPort;
+  readonly clock?: ClockPort;
   readonly minChainLength?: number;
   readonly apiKey?: string;
   readonly requireApiKey?: boolean;
@@ -22,15 +24,17 @@ export function createSubmitChainHandler(
   dependencies?: SubmitChainHandlerDependencies,
 ) {
   const prodDeps = AppRuntime.getProductionDependencies();
-  const deps = dependencies ?? {
+  const deps: SubmitChainHandlerDependencies = dependencies ?? {
     sessionRepo: prodDeps.sessionRepo!,
     tokenVerifier: prodDeps.tokenVerifier!,
     apiKey: prodDeps.apiKey,
     requireApiKey: prodDeps.requireApiKey,
   };
+  const clock = deps.clock ?? prodDeps.clock!;
 
   const useCase = new SubmitConceptChainUseCase({
     sessionRepo: deps.sessionRepo,
+    clock,
     minChainLength: deps.minChainLength,
   });
 

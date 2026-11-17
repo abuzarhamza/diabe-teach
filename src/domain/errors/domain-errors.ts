@@ -66,10 +66,23 @@ export class ForbiddenRoleError extends DomainError {
 export class PhaseClosedForSubmissionsError extends DomainError {
   public readonly code = "PHASE_CLOSED_FOR_SUBMISSIONS" as const;
 
-  public constructor(currentPhase: string) {
+  // `deadline` is set when the phase accepts submissions but its deadline
+  // (`phaseEndsAt` plus the grace period) has passed.
+  public constructor(
+    currentPhase: string,
+    deadline?: { readonly phaseEndsAt: Date; readonly gracePeriodSec: number },
+  ) {
     super(
-      `Chain submissions are not allowed during phase '${currentPhase}'.`,
-      { currentPhase },
+      deadline
+        ? `Chain submissions for phase '${currentPhase}' are closed: the phase ended at ${deadline.phaseEndsAt.toISOString()} (plus a ${deadline.gracePeriodSec}s grace period).`
+        : `Chain submissions are not allowed during phase '${currentPhase}'.`,
+      deadline
+        ? {
+            currentPhase,
+            phaseEndsAt: deadline.phaseEndsAt.toISOString(),
+            gracePeriodSec: deadline.gracePeriodSec,
+          }
+        : { currentPhase },
     );
   }
 }

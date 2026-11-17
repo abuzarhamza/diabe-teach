@@ -73,6 +73,12 @@ export interface GameSessionProps {
   readonly _surveyResponse?: SurveyResponse;
 }
 
+/**
+ * How long after `phaseEndsAt` a Chain-Mapping phase still accepts
+ * Concept Chains, to absorb network delay on last-second submissions.
+ */
+export const SUBMISSION_GRACE_PERIOD_SEC = 5;
+
 export const DEFAULT_TIMER_CONFIG: SessionTimerConfig = {
   pretestSec: 900,
   trialOrientationSec: 900,

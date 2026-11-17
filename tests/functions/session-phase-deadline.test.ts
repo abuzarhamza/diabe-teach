@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { createCreateSessionHandler } from "../../netlify/functions/sessions/create-session.js";
 import { createGetSessionHandler } from "../../netlify/functions/sessions/get-session.js";
 import { createJoinSessionHandler } from "../../netlify/functions/sessions/join-session.js";
+import { createSubmitChainHandler } from "../../netlify/functions/sessions/submit-chain.js";
 import { createTransitionPhaseHandler } from "../../netlify/functions/sessions/transition-phase.js";
 import { FakeCapabilityTokenAdapter } from "../../src/adapters/outbound/fake-capability-token-adapter.js";
 import { FakeClock } from "../../src/adapters/outbound/fake-clock.js";
@@ -57,6 +58,11 @@ function makeHandlers(clock: FakeClock) {
     join: createJoinSessionHandler({ sessionRepo, tokenSigner: tokenAdapter }),
     get: createGetSessionHandler({ sessionRepo, tokenVerifier: tokenAdapter }),
     transition: createTransitionPhaseHandler({
+      sessionRepo,
+      tokenVerifier: tokenAdapter,
+      clock,
+    }),
+    submitChain: createSubmitChainHandler({
       sessionRepo,
       tokenVerifier: tokenAdapter,
       clock,
@@ -146,5 +152,149 @@ describe("session phase deadline (phaseEndsAt)", () => {
       body: { roomCode: created.body.roomCode, displayName: "Bob" },
     }));
     expect(joined.body.state.phaseEndsAt).toBe("2026-03-01T09:15:00.000Z");
+  });
+});
+
+describe("chain-mapping deadline enforcement", () => {
+  const ROUND_MAPPING_SEC = 300;
+
+  /**
+   * Creates a classroom session with a 5-minute Chain-Mapping phase, joins one
+   * participant, and advances to round 1 Chain-Mapping, which starts at
+   * 09:00:00 and ends at 09:05:00.
+   */
+  async function startTimedRound() {
+    const clock = new FakeClock(new Date("2026-03-01T08:59:00.000Z"));
+    const handlers = makeHandlers(clock);
+
+    const created = await invoke(handlers.create, makeEvent("POST", "/api/v1/sessions", {
+      body: {
+        packId: "diabe-teach",
+        mode: "classroom",
+        adjudicationMode: "peer-instructor",
+        timerConfig: { roundMappingSec: ROUND_MAPPING_SEC },
+      },
+    }));
+    const { sessionId, roomCode, instructorToken } = created.body;
+    const sessionPath = `/api/v1/sessions/${sessionId}`;
+
+    const joined = await invoke(handlers.join, makeEvent("POST", "/api/v1/sessions/join", {
+      body: { roomCode, displayName: "Alice" },
+    }));
+    const participantToken: string = joined.body.participantToken;
+
+    const advance = async () =>
+      invoke(handlers.transition, makeEvent("POST", `${sessionPath}/phase`, {
+        body: { action: "advance" },
+        pathParameters: { sessionId },
+        token: instructorToken,
+      }));
+
+    await advance(); // trial-orientation
+    clock.setNow(new Date("2026-03-01T09:00:00.000Z"));
+    const toMapping = await advance();
+    expect(toMapping.body.state.currentPhase).toBe("round-1:chain-mapping");
+    expect(toMapping.body.state.phaseEndsAt).toBe("2026-03-01T09:05:00.000Z");
+
+    const submitChain = async () =>
+      invoke(handlers.submitChain, makeEvent("POST", `${sessionPath}/rounds/1/chains`, {
+        body: {
+          path: [
+            { row: 0, col: 0 },
+            { row: 0, col: 1 },
+            { row: 1, col: 1 },
+            { row: 1, col: 2 },
+          ],
+          keywordIds: ["kw-1", "kw-2", "kw-3", "kw-4"],
+          narrativeExplanation: "These concepts connect because...",
+        },
+        pathParameters: { sessionId, roundNumber: "1" },
+        token: participantToken,
+      }));
+
+    const getState = async () =>
+      invoke(handlers.get, makeEvent("GET", sessionPath, {
+        pathParameters: { sessionId },
+        token: instructorToken,
+      }));
+
+    return {
+      clock,
+      advance,
+      submitChain,
+      getState,
+    };
+  }
+
+  it("rejects a chain submitted more than 5 seconds after phaseEndsAt", async () => {
+    const round = await startTimedRound();
+
+    round.clock.setNow(new Date("2026-03-01T09:05:05.001Z"));
+    const late = await round.submitChain();
+
+    expect(late.statusCode).toBe(409);
+    expect(late.body.code).toBe("PHASE_CLOSED_FOR_SUBMISSIONS");
+    expect(late.body.details).toEqual({
+      currentPhase: "round-1:chain-mapping",
+      phaseEndsAt: "2026-03-01T09:05:00.000Z",
+      gracePeriodSec: 5,
+    });
+  });
+
+  it("accepts a chain submitted before phaseEndsAt", async () => {
+    const round = await startTimedRound();
+
+    round.clock.setNow(new Date("2026-03-01T09:04:59.000Z"));
+    const onTime = await round.submitChain();
+
+    expect(onTime.statusCode).toBe(201);
+    expect(onTime.body.chain.status).toBe("pending-review");
+  });
+
+  it("accepts a chain submitted within the 5-second grace window after phaseEndsAt", async () => {
+    const round = await startTimedRound();
+
+    round.clock.setNow(new Date("2026-03-01T09:05:02.000Z"));
+    const insideGrace = await round.submitChain();
+    expect(insideGrace.statusCode).toBe(201);
+
+    round.clock.setNow(new Date("2026-03-01T09:05:05.000Z"));
+    const atGraceEnd = await round.submitChain();
+    expect(atGraceEnd.statusCode).toBe(201);
+  });
+
+  it("keeps the phase in chain-mapping after the deadline until the instructor transitions", async () => {
+    const round = await startTimedRound();
+
+    round.clock.setNow(new Date("2026-03-01T09:30:00.000Z"));
+    const rejected = await round.submitChain();
+    expect(rejected.body.code).toBe("PHASE_CLOSED_FOR_SUBMISSIONS");
+
+    const state = await round.getState();
+    expect(state.statusCode).toBe(200);
+    expect(state.body.state.currentPhase).toBe("round-1:chain-mapping");
+    expect(state.body.state.phaseEndsAt).toBe("2026-03-01T09:05:00.000Z");
+  });
+
+  it("lets the instructor transition to peer-adjudication before the deadline", async () => {
+    const round = await startTimedRound();
+
+    round.clock.setNow(new Date("2026-03-01T09:02:00.000Z"));
+    const early = await round.advance();
+
+    expect(early.statusCode).toBe(200);
+    expect(early.body.state.currentPhase).toBe("round-1:peer-adjudication");
+    expect(early.body.state.phaseStartedAt).toBe("2026-03-01T09:02:00.000Z");
+  });
+
+  it("lets the instructor transition to peer-adjudication after the deadline", async () => {
+    const round = await startTimedRound();
+
+    round.clock.setNow(new Date("2026-03-01T09:30:00.000Z"));
+    const late = await round.advance();
+
+    expect(late.statusCode).toBe(200);
+    expect(late.body.state.currentPhase).toBe("round-1:peer-adjudication");
+    expect(late.body.state.phaseStartedAt).toBe("2026-03-01T09:30:00.000Z");
   });
 });

@@ -6,7 +6,7 @@ See spec: `.scratch/session-phase-deadlines/spec.md`.
 
 **Blocked by:** 01 (session-owned phase deadline and clock)
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [ ] Handler test: a chain submitted before `phaseEndsAt` is accepted
 - [ ] Handler test: a chain submitted within 5s after `phaseEndsAt` is accepted
@@ -15,4 +15,8 @@ See spec: `.scratch/session-phase-deadlines/spec.md`.
 - [ ] The current phase remains `chain-mapping` after expiry until the instructor transitions
 - [ ] The grace period is a single domain constant
 - [ ] OpenAPI documents the `PHASE_CLOSED_FOR_SUBMISSIONS` response on chain submission
-- [ ] Cucumber classroom scenario: a timed round where a late chain is rejected (fake clock)
+- [ ] Submit-chain handler factory accepts an optional `ClockPort` (default: system clock via AppRuntime), and the use case passes `clock.now()` into the aggregate
+
+## Comments
+
+**2026-11-17 (chief of staff):** The Cucumber criterion was dropped. As of `8fe821f`, the BDD suite calls a separate `netlify dev` process over HTTP, so a fake clock in the test world cannot control server time, and a test-only time override would be a workaround. Deadline behaviour is proven at the handler seam with `FakeClock`. See wiki `decision-test-seam-handlers-plus-clock.md`.

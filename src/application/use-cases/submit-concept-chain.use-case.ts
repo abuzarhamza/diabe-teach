@@ -1,4 +1,5 @@
 import type { GridCoord } from "../../domain/game-session/concept-chain.js";
+import type { ClockPort } from "../ports/clock.port.js";
 import type { GameSessionRepositoryPort } from "../ports/game-session-repository.port.js";
 import type {
   SubmitConceptChainCommand,
@@ -18,16 +19,21 @@ import { SessionId } from "../../domain/game-session/session-id.js";
 export class SubmitConceptChainUseCase
 implements SubmitConceptChainUseCasePort {
   readonly #sessionRepo: GameSessionRepositoryPort;
+  readonly #clock: ClockPort;
   readonly #minChainLength: number;
 
   public constructor(deps: SubmitConceptChainDependencies) {
     this.#sessionRepo = deps.sessionRepo;
+    this.#clock = deps.clock;
     this.#minChainLength = deps.minChainLength ?? 4;
   }
 
   public async execute(
     command: SubmitConceptChainCommand,
   ): Promise<SubmitConceptChainResult> {
+    // Read the time on arrival so storage latency does not eat the grace period.
+    const receivedAt = this.#clock.now();
+
     if (command.verifiedCapability.role !== "participant") {
       throw new ForbiddenRoleError("Only participants can submit chains.");
     }
@@ -55,7 +61,7 @@ implements SubmitConceptChainUseCasePort {
       stepRationales: command.stepRationales,
     });
 
-    session.addChain(chain);
+    session.addChain(chain, receivedAt);
     await this.#sessionRepo.update(session);
 
     const chainDto: SubmittedChainDto = {

@@ -23,6 +23,7 @@ import {
   DEFAULT_TIMER_CONFIG,
   PHASE_TIMER_FIELD,
   PHASE_TRANSITIONS,
+  SUBMISSION_GRACE_PERIOD_SEC,
 } from "./game-session.types.js";
 import { RoomCode } from "./room-code.js";
 import { SessionId } from "./session-id.js";
@@ -180,9 +181,22 @@ export class GameSession {
     return this.#chains;
   }
 
-  public addChain(chain: ConceptChain): void {
+  /**
+   * Records a Concept Chain. Only allowed during a Chain-Mapping phase, and
+   * no later than `phaseEndsAt` plus the submission grace period. An expired
+   * phase stays current (closed) until the instructor transitions it.
+   */
+  public addChain(chain: ConceptChain, now: Date): void {
     if (!this.isChainMappingPhase()) {
       throw new PhaseClosedForSubmissionsError(this.#currentPhase);
+    }
+    const phaseEndsAt = this.phaseEndsAt;
+    const closesAtMs = phaseEndsAt.getTime() + SUBMISSION_GRACE_PERIOD_SEC * 1000;
+    if (now.getTime() > closesAtMs) {
+      throw new PhaseClosedForSubmissionsError(this.#currentPhase, {
+        phaseEndsAt,
+        gracePeriodSec: SUBMISSION_GRACE_PERIOD_SEC,
+      });
     }
     this.#chains.push(chain);
   }

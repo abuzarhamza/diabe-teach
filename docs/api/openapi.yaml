@@ -289,7 +289,12 @@ paths:
         "404":
           $ref: "#/components/responses/NotFoundError"
         "409":
-          description: Round is not in the chain-mapping sub-phase (PHASE_CLOSED_FOR_SUBMISSIONS)
+          description: >-
+            PHASE_CLOSED_FOR_SUBMISSIONS. Either the round is not in the
+            chain-mapping sub-phase, or the chain arrived more than 5 seconds
+            (the fixed grace period) after the session's `phaseEndsAt`. An
+            expired chain-mapping phase stays current, closed for submissions,
+            until the instructor transitions to peer-adjudication.
           content:
             application/json:
               schema:

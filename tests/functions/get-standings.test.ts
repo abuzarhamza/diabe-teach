@@ -62,7 +62,7 @@ describe("get /api/v1/sessions/{sessionId}/rounds/{n}/standings", () => {
       decidedBy: "instructor",
       decidedAt: new Date(),
     });
-    session.addChain(aliceChain);
+    session.addChain(aliceChain, new Date());
 
     const bobChain = ConceptChain.create({
       participantId: bob.participantId,
@@ -82,7 +82,7 @@ describe("get /api/v1/sessions/{sessionId}/rounds/{n}/standings", () => {
       decidedBy: "instructor",
       decidedAt: new Date(),
     });
-    session.addChain(bobChain);
+    session.addChain(bobChain, new Date());
 
     return { session, alice, bob };
   };
