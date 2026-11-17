@@ -18,6 +18,8 @@ Separately, a Concept Chain can be submitted to a round that is not running, for
 - **Automatic retry in the application layer.** When a write conflicts, the use case reloads the session and re-applies the command against the fresh state, up to a small fixed number of attempts. Because the command is re-validated against fresh state, a chain that raced a phase transition is correctly rejected with `PHASE_CLOSED_FOR_SUBMISSIONS`, and two simultaneous chains are both kept. Only if every attempt conflicts does the client get a 409 `CONCURRENT_UPDATE_CONFLICT`, which it may safely retry.
 - **Round check on chain submission.** A Concept Chain is accepted only if the round number in the request matches the session's active round. Otherwise it is rejected with `PHASE_CLOSED_FOR_SUBMISSIONS`, since that round is not open for submissions.
 
+- **No repeat chains per team.** (Added 2026-11-17 at the user's request.) A participant cannot submit a Concept Chain they already submitted in the same round (same cells, same or reverse order); the repeat gets 409 `CHAIN_ALREADY_SUBMITTED`. Different teams may still submit the same chain and are scored independently.
+
 ## User Stories
 
 1. As an instructor, I want ending Chain-Mapping to be final, so that a late submission cannot reopen the round.
@@ -33,6 +35,7 @@ Separately, a Concept Chain can be submitted to a round that is not running, for
 11. As a maintainer, I want the in-memory and MongoDB repositories to behave identically under concurrent writes, so that fast tests reflect production behaviour.
 12. As a maintainer, I want existing sessions stored without a version number to keep working, so that the change needs no data migration.
 13. As an operator, I want conflict retries bounded, so that a hot session cannot cause unbounded work.
+14. As a participant, I want a duplicate of my own chain rejected, so that scores reflect distinct discoveries; and as a team, I want to still be credited for a chain another team also found.
 
 ## Implementation Decisions
 
