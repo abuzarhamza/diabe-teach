@@ -6,13 +6,13 @@ See spec: `.scratch/per-participant-assessments/spec.md`.
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] Handler test: two participants each submit a Pretest → both 201
-- [ ] Handler test: the same participant submits a Pretest twice → `ASSESSMENT_ALREADY_SUBMITTED`
-- [ ] Handler test: participant B, who has no Pretest, cannot submit a Posttest even though A has one
-- [ ] Handler test: A and B with different Pretests each get a Posttest report reflecting their own Pretest answers
-- [ ] Repository contract suite (in-memory + Mongo): several participants' Pretests and Posttests round-trip intact
-- [ ] No use case reads a session-wide or stage-only assessment lookup
-- [ ] Cucumber classroom scenario: two participants both complete the Pretest and the Posttest
-- [ ] Existing tests, BDD and lint baselines unchanged
+- [x] Handler test: two participants each submit a Pretest → both 201
+- [x] Handler test: the same participant submits a Pretest twice → `ASSESSMENT_ALREADY_SUBMITTED`
+- [x] Handler test: participant B, who has no Pretest, cannot submit a Posttest even though A has one
+- [x] Handler test: A and B with different Pretests each get a Posttest report reflecting their own Pretest answers
+- [x] Repository contract suite (in-memory + Mongo): several participants' Pretests and Posttests round-trip intact
+- [x] No use case reads a session-wide or stage-only assessment lookup
+- [x] Cucumber classroom scenario: two participants both complete the Pretest and the Posttest
+- [x] Existing tests, BDD and lint baselines unchanged

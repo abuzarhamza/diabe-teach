@@ -42,7 +42,8 @@ export class GameSession {
   readonly #createdAt: Date;
   readonly #participants: Participant[];
   readonly #chains: ConceptChain[];
-  readonly #assessments: Map<AssessmentStage, AssessmentAttempt>;
+  /** Assessment Attempts keyed by participant, then by stage. */
+  readonly #assessments: Map<string, Map<AssessmentStage, AssessmentAttempt>>;
   readonly #version: number;
 
   #surveyResponse: SurveyResponse | null;
@@ -78,9 +79,10 @@ export class GameSession {
     // Support rehydration from persistence with existing chains
     this.#chains = props._chains ? [...props._chains] : [];
     // Support rehydration from persistence with existing assessments
-    this.#assessments = props._assessments
-      ? new Map(props._assessments)
-      : new Map();
+    this.#assessments = new Map();
+    for (const attempt of props._assessments ?? []) {
+      this.#recordAssessment(attempt);
+    }
     // Support rehydration from persistence with existing survey response
     this.#surveyResponse = props._surveyResponse ?? null;
   }
@@ -256,8 +258,13 @@ export class GameSession {
     );
   }
 
-  public get assessments(): ReadonlyMap<AssessmentStage, AssessmentAttempt> {
-    return this.#assessments;
+  /** Every participant's Assessment Attempts, for persistence. */
+  public get assessmentAttempts(): readonly AssessmentAttempt[] {
+    const attempts: AssessmentAttempt[] = [];
+    for (const byStage of this.#assessments.values()) {
+      attempts.push(...byStage.values());
+    }
+    return attempts;
   }
 
   public submitAssessment(
@@ -265,9 +272,8 @@ export class GameSession {
     stage: AssessmentStage,
     answers: ReadonlyMap<string, McqAnswerChoice>,
   ): AssessmentAttempt {
-    if (this.#assessments.has(stage)) {
-      const existing = this.#assessments.get(stage)!;
-      throw new AssessmentAlreadySubmittedError(existing.participantId, stage);
+    if (this.getAssessment(participantId, stage)) {
+      throw new AssessmentAlreadySubmittedError(participantId, stage);
     }
 
     const attempt: AssessmentAttempt = {
@@ -277,19 +283,24 @@ export class GameSession {
       submittedAt: new Date(),
     };
 
-    this.#assessments.set(stage, attempt);
+    this.#recordAssessment(attempt);
     return attempt;
+  }
+
+  #recordAssessment(attempt: AssessmentAttempt): void {
+    let byStage = this.#assessments.get(attempt.participantId);
+    if (!byStage) {
+      byStage = new Map();
+      this.#assessments.set(attempt.participantId, byStage);
+    }
+    byStage.set(attempt.stage, attempt);
   }
 
   public getAssessment(
     participantId: string,
     stage: AssessmentStage,
   ): AssessmentAttempt | undefined {
-    const attempt = this.#assessments.get(stage);
-    if (attempt && attempt.participantId === participantId) {
-      return attempt;
-    }
-    return undefined;
+    return this.#assessments.get(participantId)?.get(stage);
   }
 
   public get surveyResponse(): SurveyResponse | null {

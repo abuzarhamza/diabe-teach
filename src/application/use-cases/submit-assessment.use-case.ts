@@ -161,7 +161,10 @@ export class SubmitAssessmentUseCase implements SubmitAssessmentUseCasePort {
     posttestAttempt: AssessmentAttempt,
   ): PosttestSubmissionResult {
     const questions = pack.assessmentInstrument?.questions ?? [];
-    const pretestAttempt = session.assessments.get("pretest");
+    const pretestAttempt = session.getAssessment(
+      posttestAttempt.participantId,
+      "pretest",
+    );
 
     // Build answer key review with both pretest and posttest choices
     const answerKeyReview = this.#buildAnswerKeyReview(

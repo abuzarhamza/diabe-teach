@@ -85,7 +85,7 @@ implements GameSessionRepositoryPort {
         verdict: chain.verdict,
         submittedAt: chain.submittedAt,
       })),
-      _assessments: session.assessments,
+      _assessments: session.assessmentAttempts,
       ...(session.surveyResponse !== null && { _surveyResponse: session.surveyResponse }),
     });
   }

@@ -12,7 +12,7 @@ import type {
   ParticipantDocument,
   SurveyResponseDocument,
 } from "./mongo-game-session-repository.types.js";
-import type { AssessmentAttempt, AssessmentStage, LikertRating, McqAnswerChoice, SurveyResponse } from "../../domain/game-session/game-session.types.js";
+import type { AssessmentAttempt, LikertRating, McqAnswerChoice, SurveyResponse } from "../../domain/game-session/game-session.types.js";
 import { ConcurrentUpdateConflictError } from "../../domain/errors/domain-errors.js";
 import { ConceptChain } from "../../domain/game-session/concept-chain.js";
 import { GameSession } from "../../domain/game-session/game-session.js";
@@ -148,16 +148,14 @@ export class MongoGameSessionRepository implements GameSessionRepositoryPort {
     );
 
     // Restore assessments for rehydration
-    const assessments = new Map<AssessmentStage, AssessmentAttempt>();
-    for (const attemptDoc of doc.assessments ?? []) {
-      const attempt: AssessmentAttempt = {
+    const assessments: AssessmentAttempt[] = (doc.assessments ?? []).map(
+      (attemptDoc): AssessmentAttempt => ({
         participantId: attemptDoc.participantId,
         stage: attemptDoc.stage,
         answers: new Map(Object.entries(attemptDoc.answers)) as ReadonlyMap<string, McqAnswerChoice>,
         submittedAt: attemptDoc.submittedAt,
-      };
-      assessments.set(attemptDoc.stage, attempt);
-    }
+      }),
+    );
 
     // Restore survey response for rehydration
     const surveyResponse: SurveyResponse | undefined = doc.surveyResponse
@@ -211,7 +209,7 @@ export class MongoGameSessionRepository implements GameSessionRepositoryPort {
       chains: session.chains.map((c) =>
         MongoGameSessionRepository.#chainToDocument(c),
       ),
-      assessments: MongoGameSessionRepository.#assessmentsToDocument(session.assessments),
+      assessments: MongoGameSessionRepository.#assessmentsToDocument(session.assessmentAttempts),
       surveyResponse: MongoGameSessionRepository.#surveyResponseToDocument(session.surveyResponse),
       createdAt: session.createdAt,
     };
@@ -232,18 +230,14 @@ export class MongoGameSessionRepository implements GameSessionRepositoryPort {
   }
 
   static #assessmentsToDocument(
-    assessments: ReadonlyMap<AssessmentStage, AssessmentAttempt>,
+    assessments: readonly AssessmentAttempt[],
   ): AssessmentAttemptDocument[] {
-    const docs: AssessmentAttemptDocument[] = [];
-    for (const [stage, attempt] of assessments) {
-      docs.push({
-        participantId: attempt.participantId,
-        stage,
-        answers: Object.fromEntries(attempt.answers) as Record<string, McqAnswerChoice>,
-        submittedAt: attempt.submittedAt,
-      });
-    }
-    return docs;
+    return assessments.map(attempt => ({
+      participantId: attempt.participantId,
+      stage: attempt.stage,
+      answers: Object.fromEntries(attempt.answers) as Record<string, McqAnswerChoice>,
+      submittedAt: attempt.submittedAt,
+    }));
   }
 
   static #chainToDocument(chain: ConceptChain): ConceptChainDocument {

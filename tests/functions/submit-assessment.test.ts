@@ -858,6 +858,120 @@ describe("POST /api/v1/sessions/{sessionId}/assessments/{stage}", () => {
     });
   });
 
+  describe("per-participant attempts", () => {
+    function setUpTwoParticipants(session: GameSession) {
+      const alice = session.addParticipant("Alice");
+      const bob = session.addParticipant("Bob");
+      const sessionRepo = new InMemoryGameSessionRepository([session]);
+      const tokenAdapter = new FakeCapabilityTokenAdapter();
+      const handler = createSubmitAssessmentHandler({
+        sessionRepo,
+        packRepo: new InMemoryCurriculumPackRepository(),
+        tokenVerifier: tokenAdapter,
+      });
+      const tokenFor = (participantId: string) => tokenAdapter.signToken({
+        role: "participant",
+        sessionId: session.sessionId.value,
+        participantId,
+      });
+      const submit = async (
+        participantId: string,
+        stage: "pretest" | "posttest",
+        answers: Record<string, 0 | 1 | 2 | 3 | "I_DONT_KNOW">,
+      ) => handler(
+        makeEvent(
+          session.sessionId.value,
+          stage,
+          { answers },
+          { authorization: `Bearer ${await tokenFor(participantId)}` },
+        ),
+        {} as never,
+      );
+      const advanceToPosttest = async () => {
+        const current = await sessionRepo.findById(session.sessionId);
+        for (const phase of [
+          "trial-orientation",
+          "round-1:chain-mapping",
+          "round-1:peer-adjudication",
+          "round-1:round-summary",
+          "round-2:chain-mapping",
+          "round-2:peer-adjudication",
+          "round-2:round-summary",
+          "posttest",
+        ] as const) {
+          current!.transitionTo(phase, new Date());
+        }
+        await sessionRepo.update(current!);
+      };
+      return {
+        alice,
+        bob,
+        submit,
+        advanceToPosttest,
+      };
+    }
+
+    it("accepts a Pretest from each of two participants", async () => {
+      const { alice, bob, submit } = setUpTwoParticipants(makePretestSession());
+
+      const aliceResponse = await submit(alice.participantId, "pretest", makeAllIdkAnswers());
+      const bobResponse = await submit(bob.participantId, "pretest", makeAllCorrectAnswers());
+
+      expect(aliceResponse.statusCode).toBe(201);
+      expect(bobResponse.statusCode).toBe(201);
+      expect(JSON.parse(bobResponse.body).participantId).toBe(bob.participantId);
+    });
+
+    it("still rejects a participant's second Pretest after another participant submitted", async () => {
+      const { alice, bob, submit } = setUpTwoParticipants(makePretestSession());
+
+      await submit(alice.participantId, "pretest", makeAllIdkAnswers());
+      await submit(bob.participantId, "pretest", makeAllIdkAnswers());
+      const repeat = await submit(bob.participantId, "pretest", makeAllCorrectAnswers());
+
+      expect(repeat.statusCode).toBe(409);
+      expect(JSON.parse(repeat.body).code).toBe("ASSESSMENT_ALREADY_SUBMITTED");
+    });
+
+    it("rejects a Posttest from a participant without their own Pretest, even when another participant has one", async () => {
+      const { alice, bob, submit, advanceToPosttest } = setUpTwoParticipants(makePretestSession());
+
+      await submit(alice.participantId, "pretest", makeAllIdkAnswers());
+      await advanceToPosttest();
+      const bobPosttest = await submit(bob.participantId, "posttest", makeAllCorrectAnswers());
+
+      expect(bobPosttest.statusCode).toBe(409);
+      expect(JSON.parse(bobPosttest.body).code).toBe("PHASE_CLOSED_FOR_SUBMISSIONS");
+    });
+
+    it("compares each participant's Posttest report against their own Pretest", async () => {
+      const { alice, bob, submit, advanceToPosttest } = setUpTwoParticipants(makePretestSession());
+
+      await submit(alice.participantId, "pretest", makeAllIdkAnswers());
+      await submit(bob.participantId, "pretest", makeAllWrongGuessAnswers());
+      await advanceToPosttest();
+      const alicePosttest = await submit(alice.participantId, "posttest", makeAllCorrectAnswers());
+      const bobPosttest = await submit(bob.participantId, "posttest", makeAllCorrectAnswers());
+
+      expect(alicePosttest.statusCode).toBe(201);
+      expect(bobPosttest.statusCode).toBe(201);
+      const aliceBody = JSON.parse(alicePosttest.body) as PosttestSubmissionResult;
+      const bobBody = JSON.parse(bobPosttest.body) as PosttestSubmissionResult;
+
+      // Alice: all "I don't know" before, all correct after.
+      expect(aliceBody.report.pretest?.iDontKnowCount).toBe(10);
+      expect(aliceBody.report.pretest?.wrongGuessCount).toBe(0);
+      expect(aliceBody.report.guessingReductionDelta).toBe(0);
+      expect(aliceBody.answerKeyReview[0]!.pretestChoice).toBe("I_DONT_KNOW");
+
+      // Bob: all wrong guesses before (dm-mcq-01 answered 1), all correct after.
+      expect(bobBody.report.pretest?.wrongGuessCount).toBe(10);
+      expect(bobBody.report.pretest?.iDontKnowCount).toBe(0);
+      expect(bobBody.report.guessingReductionDelta).toBe(100);
+      expect(bobBody.answerKeyReview[0]!.pretestChoice).toBe(1);
+    });
+  });
+
   describe("authorization", () => {
     it("returns 401 without token", async () => {
       const session = makePretestSession();

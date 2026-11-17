@@ -236,3 +236,13 @@ Then(
     expect(firstItem).to.have.property("posttestChoice");
   },
 );
+
+Then(
+  "the metacognitive report should include a pretest summary",
+  function (this: TestWorld) {
+    const body = this.lastResponseBody as {
+      report?: { pretest?: { stage?: string } | null };
+    };
+    expect(body.report?.pretest?.stage).to.equal("pretest");
+  },
+);

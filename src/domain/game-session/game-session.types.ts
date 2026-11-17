@@ -78,7 +78,7 @@ export interface GameSessionProps {
   /** Used for rehydration from persistence - bypasses phase validation */
   readonly _chains?: readonly import("./concept-chain.js").ConceptChain[];
   /** Used for rehydration from persistence - bypasses phase validation */
-  readonly _assessments?: ReadonlyMap<AssessmentStage, AssessmentAttempt>;
+  readonly _assessments?: readonly AssessmentAttempt[];
   /** Used for rehydration from persistence - bypasses phase validation */
   readonly _surveyResponse?: SurveyResponse;
 }

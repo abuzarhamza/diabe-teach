@@ -1,4 +1,5 @@
 import type { GameSessionRepositoryPort } from "../../src/application/ports/game-session-repository.port.js";
+import type { McqAnswerChoice } from "../../src/domain/game-session/game-session.types.js";
 import mongoose from "mongoose";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { InMemoryGameSessionRepository } from "../../src/adapters/outbound/in-memory-game-session-repository.js";
@@ -36,6 +37,11 @@ function newSession(): GameSession {
     mode: "classroom",
     adjudicationMode: "peer-instructor",
   });
+}
+
+/** An answer set holding a single answer to question "dm-mcq-01". */
+function firstAnswer(choice: McqAnswerChoice): ReadonlyMap<string, McqAnswerChoice> {
+  return new Map<string, McqAnswerChoice>().set("dm-mcq-01", choice);
 }
 
 function defineGameSessionRepositoryContract(
@@ -119,6 +125,42 @@ function defineGameSessionRepositoryContract(
       expect(reloaded?.version).toBe(1);
       expect(reloaded?.currentPhase).toBe("trial-orientation");
       await expect(harness.repo.update(stale!)).rejects.toBeInstanceOf(ConcurrentUpdateConflictError);
+    });
+
+    it("round-trips every participant's Pretest and Posttest", async () => {
+      const session = newSession();
+      await harness.repo.create(session);
+      const pretestPhase = await harness.repo.findById(session.sessionId);
+      const alice = pretestPhase!.addParticipant("Alice");
+      const bob = pretestPhase!.addParticipant("Bob");
+      pretestPhase!.submitAssessment(alice.participantId, "pretest", firstAnswer("I_DONT_KNOW"));
+      pretestPhase!.submitAssessment(bob.participantId, "pretest", firstAnswer(2));
+      await harness.repo.update(pretestPhase!);
+
+      const posttestPhase = await harness.repo.findById(session.sessionId);
+      for (const phase of [
+        "trial-orientation",
+        "round-1:chain-mapping",
+        "round-1:peer-adjudication",
+        "round-1:round-summary",
+        "round-2:chain-mapping",
+        "round-2:peer-adjudication",
+        "round-2:round-summary",
+        "posttest",
+      ] as const) {
+        posttestPhase!.transitionTo(phase, new Date("2026-03-01T10:00:00.000Z"));
+      }
+      posttestPhase!.submitAssessment(alice.participantId, "posttest", firstAnswer(0));
+      posttestPhase!.submitAssessment(bob.participantId, "posttest", firstAnswer(1));
+      await harness.repo.update(posttestPhase!);
+
+      const reloaded = await harness.repo.findById(session.sessionId);
+      const answersOf = (participantId: string, stage: "pretest" | "posttest") =>
+        reloaded!.getAssessment(participantId, stage)?.answers.get("dm-mcq-01");
+      expect(answersOf(alice.participantId, "pretest")).toBe("I_DONT_KNOW");
+      expect(answersOf(bob.participantId, "pretest")).toBe(2);
+      expect(answersOf(alice.participantId, "posttest")).toBe(0);
+      expect(answersOf(bob.participantId, "posttest")).toBe(1);
     });
 
     it("reports a conflict when updating a session that was never stored", async () => {
