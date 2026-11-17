@@ -67,14 +67,16 @@ const participantSchema = new Schema(
   { _id: false },
 );
 
+// Not `required`: Mongoose's required validator rejects `null`, which marks an
+// instructor-driven (untimed) phase. The domain always writes every field.
 const timerConfigSchema = new Schema(
   {
-    pretestSec: { type: Number, required: true },
-    trialOrientationSec: { type: Number, required: true },
-    roundMappingSec: { type: Number, required: true },
-    roundAdjudicationSec: { type: Number, required: true },
-    posttestSec: { type: Number, required: true },
-    feedbackSurveySec: { type: Number, required: true },
+    pretestSec: { type: Number },
+    trialOrientationSec: { type: Number },
+    roundMappingSec: { type: Number },
+    roundAdjudicationSec: { type: Number },
+    posttestSec: { type: Number },
+    feedbackSurveySec: { type: Number },
   },
   { _id: false },
 );

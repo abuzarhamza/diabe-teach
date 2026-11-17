@@ -38,13 +38,18 @@ export type PhaseIdentifier
     | "feedback-survey"
     | "completed";
 
+/**
+ * Phase durations in whole seconds (at least 1). `null` makes the phase
+ * instructor-driven: it has no deadline and ends only when the instructor
+ * transitions it.
+ */
 export interface SessionTimerConfig {
-  readonly pretestSec: number;
-  readonly trialOrientationSec: number;
-  readonly roundMappingSec: number;
-  readonly roundAdjudicationSec: number;
-  readonly posttestSec: number;
-  readonly feedbackSurveySec: number;
+  readonly pretestSec: number | null;
+  readonly trialOrientationSec: number | null;
+  readonly roundMappingSec: number | null;
+  readonly roundAdjudicationSec: number | null;
+  readonly posttestSec: number | null;
+  readonly feedbackSurveySec: number | null;
 }
 
 export interface Participant {
@@ -87,6 +92,22 @@ export const DEFAULT_TIMER_CONFIG: SessionTimerConfig = {
   posttestSec: 900,
   feedbackSurveySec: 900,
 };
+
+/** The fields of SessionTimerConfig, in declaration order. */
+export const TIMER_FIELDS: readonly (keyof SessionTimerConfig)[] = [
+  "pretestSec",
+  "trialOrientationSec",
+  "roundMappingSec",
+  "roundAdjudicationSec",
+  "posttestSec",
+  "feedbackSurveySec",
+];
+
+/**
+ * Longest allowed phase duration (24 hours). Keeps `phaseEndsAt` a valid
+ * date; a phase that should run longer can be untimed (`null`).
+ */
+export const MAX_TIMER_DURATION_SEC = 86_400;
 
 /**
  * Which timer-config field sets each phase's duration. `null` means the phase

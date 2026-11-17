@@ -66,6 +66,14 @@ Then(
 );
 
 Then(
+  "the current phase should have no deadline",
+  function (this: TestWorld) {
+    const body = this.lastResponseBody as { state?: { phaseEndsAt?: string | null } };
+    expect(body.state).to.have.property("phaseEndsAt", null);
+  },
+);
+
+Then(
   "the participant count should be {int}",
   function (this: TestWorld, expectedCount: number) {
     const body = this.lastResponseBody as {

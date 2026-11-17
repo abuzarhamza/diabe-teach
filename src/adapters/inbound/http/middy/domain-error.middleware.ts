@@ -9,6 +9,7 @@ import {
   ForbiddenRoleError,
   InvalidPhaseTransitionError,
   InvalidSurveyResponseError,
+  InvalidTimerConfigError,
   PackAlreadyArchivedError,
   PackAlreadyExistsError,
   PackIsSystemPackError,
@@ -31,6 +32,9 @@ export function domainErrorMiddleware(): MiddlewareObj<any, any> {
         let statusCode = 500;
         if (error instanceof UnauthorizedTokenError) {
           statusCode = 401;
+        }
+        else if (error instanceof InvalidTimerConfigError) {
+          statusCode = 400;
         }
         else if (
           error instanceof PackNotFoundError

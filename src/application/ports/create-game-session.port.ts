@@ -34,7 +34,8 @@ export interface PublicSessionStateDto {
   readonly currentPhase: PhaseIdentifier;
   readonly activeRoundNumber: 1 | 2 | null;
   readonly phaseStartedAt: string;
-  readonly phaseEndsAt: string;
+  /** `null` while the current phase is instructor-driven (no timer). */
+  readonly phaseEndsAt: string | null;
   readonly participantCount: number;
 }
 

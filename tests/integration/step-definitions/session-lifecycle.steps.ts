@@ -10,26 +10,42 @@ Given(
   },
 );
 
+async function createClassroomSession(
+  world: TestWorld,
+  packId: string,
+  timerConfig?: Record<string, number | null>,
+): Promise<void> {
+  world.lastResponse = await createSession({
+    packId,
+    mode: "classroom",
+    adjudicationMode: "peer-instructor",
+    timerConfig,
+  });
+  world.parseLastResponse();
+
+  if (world.lastResponse.statusCode === 201) {
+    const body = world.lastResponseBody as {
+      sessionId: string;
+      roomCode: string;
+      instructorToken: string;
+    };
+    world.currentSessionId = body.sessionId;
+    world.roomCode = body.roomCode;
+    world.instructorToken = body.instructorToken;
+  }
+}
+
 When(
   "the instructor creates a classroom session with pack {string}",
   async function (this: TestWorld, packId: string) {
-    this.lastResponse = await createSession({
-      packId,
-      mode: "classroom",
-      adjudicationMode: "peer-instructor",
-    });
-    this.parseLastResponse();
+    await createClassroomSession(this, packId);
+  },
+);
 
-    if (this.lastResponse.statusCode === 201) {
-      const body = this.lastResponseBody as {
-        sessionId: string;
-        roomCode: string;
-        instructorToken: string;
-      };
-      this.currentSessionId = body.sessionId;
-      this.roomCode = body.roomCode;
-      this.instructorToken = body.instructorToken;
-    }
+When(
+  "the instructor creates a classroom session with pack {string} and an instructor-driven chain-mapping phase",
+  async function (this: TestWorld, packId: string) {
+    await createClassroomSession(this, packId, { roundMappingSec: null });
   },
 );
 

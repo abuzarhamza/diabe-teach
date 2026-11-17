@@ -852,24 +852,43 @@ components:
 
     SessionTimerConfig:
       type: object
+      additionalProperties: false
+      description: >
+        Phase durations in whole seconds (1 to 86400). Omitted fields use the default.
+        Set a field to `null` to make that phase instructor-driven: it has no
+        deadline (`phaseEndsAt` is `null`) and lasts until the instructor
+        transitions it. An out-of-range duration or an unknown field is
+        rejected with `INVALID_REQUEST_BODY`.
       properties:
         pretestSec:
-          type: integer
+          type: [integer, "null"]
+          minimum: 1
+          maximum: 86400
           default: 900
         trialOrientationSec:
-          type: integer
+          type: [integer, "null"]
+          minimum: 1
+          maximum: 86400
           default: 900
         roundMappingSec:
-          type: integer
+          type: [integer, "null"]
+          minimum: 1
+          maximum: 86400
           default: 1200
         roundAdjudicationSec:
-          type: integer
+          type: [integer, "null"]
+          minimum: 1
+          maximum: 86400
           default: 600
         posttestSec:
-          type: integer
+          type: [integer, "null"]
+          minimum: 1
+          maximum: 86400
           default: 900
         feedbackSurveySec:
-          type: integer
+          type: [integer, "null"]
+          minimum: 1
+          maximum: 86400
           default: 900
 
     CreateSessionRequest:
@@ -991,8 +1010,11 @@ components:
           type: string
           format: date-time
         phaseEndsAt:
-          type: string
+          type: [string, "null"]
           format: date-time
+          description: >
+            When the current phase is scheduled to end. `null` when the
+            phase is instructor-driven (its timer is set to `null`).
         activeBoard:
           oneOf:
             - $ref: "#/components/schemas/BoardGridView"

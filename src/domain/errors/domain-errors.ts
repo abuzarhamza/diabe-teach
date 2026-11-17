@@ -212,3 +212,14 @@ export class InvalidSurveyResponseError extends DomainError {
     );
   }
 }
+
+export class InvalidTimerConfigError extends DomainError {
+  public readonly code = "INVALID_REQUEST_BODY" as const;
+
+  public constructor(field: string, value: unknown) {
+    super(
+      `Invalid timer config '${field}': timerConfig must be an object of known phase durations, each a whole number of seconds from 1 to 86400, or null for an instructor-driven phase.`,
+      { field, value },
+    );
+  }
+}

@@ -147,7 +147,7 @@ export class MongoGameSessionRepository implements GameSessionRepositoryPort {
         }
       : undefined;
 
-    return GameSession.create({
+    return GameSession.rehydrate({
       sessionId: doc._id,
       roomCode: doc.roomCode,
       packId: doc.packId,

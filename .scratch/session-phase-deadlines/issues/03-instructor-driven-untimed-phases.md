@@ -6,12 +6,17 @@ See spec: `.scratch/session-phase-deadlines/spec.md`.
 
 **Blocked by:** 02 (enforce Chain-Mapping deadline)
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] Handler test: creating with `roundMappingSec: null` yields `phaseEndsAt: null` once in chain-mapping (create, join, get-state, transition)
-- [ ] Handler test: in an untimed chain-mapping phase, a chain submitted long after the phase started is accepted
-- [ ] Handler test: a mixed config (chain-mapping timed, peer-adjudication `null`) behaves per phase
-- [ ] Omitted timer fields still use the defaults; explicit `null` survives the merge
-- [ ] The MongoDB schema accepts and round-trips `null` timer fields; existing numeric documents remain valid
-- [ ] OpenAPI: nullable `SessionTimerConfig` fields and nullable (still required) `phaseEndsAt`
-- [ ] Cucumber classroom scenario: an instructor-driven round where submissions are accepted until the instructor transitions
+- [x] Handler test: creating with `roundMappingSec: null` yields `phaseEndsAt: null` once in chain-mapping (create, join, get-state, transition)
+- [x] Handler test: in an untimed chain-mapping phase, a chain submitted long after the phase started is accepted
+- [x] Handler test: a mixed config (chain-mapping timed, peer-adjudication `null`) behaves per phase
+- [x] Omitted timer fields still use the defaults; explicit `null` survives the merge
+- [x] The MongoDB schema accepts and round-trips `null` timer fields; existing numeric documents remain valid
+- [x] OpenAPI: nullable `SessionTimerConfig` fields and nullable (still required) `phaseEndsAt`
+- [x] Numeric timer durations below 1 are rejected at create time with `INVALID_REQUEST_BODY` (OpenAPI `minimum: 1`), so `null` is the only way to switch a timer off
+- [x] Cucumber classroom scenario: an instructor-driven round where submissions are accepted until the instructor transitions
+
+## Comments
+
+**2026-11-17 (chief of staff):** Added the minimum-duration criterion after the ticket 02 review found that 0 or negative durations were accepted (the agent also reported in ticket 01 that negative or huge values make `toISOString()` throw in create, join, get and transition). This keeps `null` as the single, explicit "no timer" signal.

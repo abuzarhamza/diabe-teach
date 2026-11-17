@@ -12,7 +12,7 @@ export class PublicSessionStateProjector {
       currentPhase: session.currentPhase,
       activeRoundNumber: session.activeRoundNumber,
       phaseStartedAt: session.phaseStartedAt.toISOString(),
-      phaseEndsAt: session.phaseEndsAt.toISOString(),
+      phaseEndsAt: session.phaseEndsAt?.toISOString() ?? null,
       participantCount: session.participantCount,
     };
   }

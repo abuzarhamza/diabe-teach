@@ -23,6 +23,7 @@ export async function createSession(body: {
   mode: "solo" | "classroom" | "study-rct";
   adjudicationMode: "ai" | "peer-instructor" | "hybrid";
   creatorDisplayName?: string;
+  timerConfig?: Record<string, number | null>;
 }) {
   const res = await request(BASE_URL)
     .post("/api/v1/sessions")
