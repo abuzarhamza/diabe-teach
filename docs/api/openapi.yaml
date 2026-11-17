@@ -291,7 +291,8 @@ paths:
         "409":
           description: >-
             PHASE_CLOSED_FOR_SUBMISSIONS. Either the round is not in the
-            chain-mapping sub-phase, or the chain arrived more than 5 seconds
+            chain-mapping sub-phase, the chain was sent to a round other than
+            the session's active round, or the chain arrived more than 5 seconds
             (the fixed grace period) after the session's `phaseEndsAt`. An
             expired chain-mapping phase stays current, closed for submissions,
             until the instructor transitions to peer-adjudication.

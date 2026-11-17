@@ -209,14 +209,21 @@ export class GameSession {
   }
 
   /**
-   * Records a Concept Chain. Only allowed during a Chain-Mapping phase, and
-   * no later than `phaseEndsAt` plus the submission grace period. An expired
-   * phase stays current (closed) until the instructor transitions it. An
-   * instructor-driven phase (no `phaseEndsAt`) accepts chains until then.
+   * Records a Concept Chain. Only allowed during a Chain-Mapping phase, for
+   * the active round, and no later than `phaseEndsAt` plus the submission
+   * grace period. An expired phase stays current (closed) until the
+   * instructor transitions it. An instructor-driven phase (no `phaseEndsAt`)
+   * accepts chains until then.
    */
   public addChain(chain: ConceptChain, now: Date): void {
     if (!this.isChainMappingPhase()) {
       throw new PhaseClosedForSubmissionsError(this.#currentPhase);
+    }
+    if (chain.roundNumber !== this.#activeRoundNumber) {
+      throw new PhaseClosedForSubmissionsError(this.#currentPhase, {
+        requestedRoundNumber: chain.roundNumber,
+        activeRoundNumber: this.#activeRoundNumber,
+      });
     }
     const phaseEndsAt = this.phaseEndsAt;
     if (phaseEndsAt === null) {

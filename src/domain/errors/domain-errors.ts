@@ -1,3 +1,5 @@
+import type { PhaseClosedReason } from "./domain-errors.types.js";
+
 export abstract class DomainError extends Error {
   public abstract readonly code: string;
   public readonly details?: Readonly<Record<string, unknown>>;
@@ -66,24 +68,43 @@ export class ForbiddenRoleError extends DomainError {
 export class PhaseClosedForSubmissionsError extends DomainError {
   public readonly code = "PHASE_CLOSED_FOR_SUBMISSIONS" as const;
 
-  // `deadline` is set when the phase accepts submissions but its deadline
-  // (`phaseEndsAt` plus the grace period) has passed.
-  public constructor(
-    currentPhase: string,
-    deadline?: { readonly phaseEndsAt: Date; readonly gracePeriodSec: number },
-  ) {
+  // Without `reason`, the current phase does not accept submissions at all.
+  // `phaseEndsAt` means the phase's deadline (plus the grace period) passed;
+  // `requestedRoundNumber` means the chain was sent to a round that is not
+  // the active one.
+  public constructor(currentPhase: string, reason?: PhaseClosedReason) {
     super(
-      deadline
-        ? `Chain submissions for phase '${currentPhase}' are closed: the phase ended at ${deadline.phaseEndsAt.toISOString()} (plus a ${deadline.gracePeriodSec}s grace period).`
-        : `Chain submissions are not allowed during phase '${currentPhase}'.`,
-      deadline
-        ? {
-            currentPhase,
-            phaseEndsAt: deadline.phaseEndsAt.toISOString(),
-            gracePeriodSec: deadline.gracePeriodSec,
-          }
-        : { currentPhase },
+      PhaseClosedForSubmissionsError.#message(currentPhase, reason),
+      PhaseClosedForSubmissionsError.#details(currentPhase, reason),
     );
+  }
+
+  static #message(currentPhase: string, reason?: PhaseClosedReason): string {
+    if (reason === undefined) {
+      return `Chain submissions are not allowed during phase '${currentPhase}'.`;
+    }
+    if ("phaseEndsAt" in reason) {
+      return `Chain submissions for phase '${currentPhase}' are closed: the phase ended at ${reason.phaseEndsAt.toISOString()} (plus a ${reason.gracePeriodSec}s grace period).`;
+    }
+    return `Chain submissions for round ${reason.requestedRoundNumber} are closed: the active round is ${reason.activeRoundNumber ?? "none"} (phase '${currentPhase}').`;
+  }
+
+  static #details(currentPhase: string, reason?: PhaseClosedReason): Record<string, unknown> {
+    if (reason === undefined) {
+      return { currentPhase };
+    }
+    if ("phaseEndsAt" in reason) {
+      return {
+        currentPhase,
+        phaseEndsAt: reason.phaseEndsAt.toISOString(),
+        gracePeriodSec: reason.gracePeriodSec,
+      };
+    }
+    return {
+      currentPhase,
+      requestedRoundNumber: reason.requestedRoundNumber,
+      activeRoundNumber: reason.activeRoundNumber,
+    };
   }
 }
 

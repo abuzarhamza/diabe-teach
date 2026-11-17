@@ -247,3 +247,80 @@ describe("post /api/v1/sessions/{sessionId}/rounds/{n}/chains", () => {
     expect(updated?.chains[0]?.participantId).toBe(participant.participantId);
   });
 });
+
+describe("post /api/v1/sessions/{sessionId}/rounds/{n}/chains for a round that is not running", () => {
+  const validChain = {
+    path: [
+      { row: 0, col: 0 },
+      { row: 0, col: 1 },
+      { row: 1, col: 1 },
+      { row: 1, col: 2 },
+    ],
+    keywordIds: ["kw-1", "kw-2", "kw-3", "kw-4"],
+    narrativeExplanation: "These concepts connect because...",
+  };
+
+  const setUp = async (activeRound: 1 | 2) => {
+    const session = GameSession.create({
+      packId: "diabe-teach",
+      mode: "classroom",
+      adjudicationMode: "peer-instructor",
+    });
+    const participant = session.addParticipant("Alice");
+    session.transitionTo("trial-orientation", new Date());
+    session.transitionTo("round-1:chain-mapping", new Date());
+    if (activeRound === 2) {
+      session.transitionTo("round-1:peer-adjudication", new Date());
+      session.transitionTo("round-1:round-summary", new Date());
+      session.transitionTo("round-2:chain-mapping", new Date());
+    }
+    const sessionRepo = new InMemoryGameSessionRepository([session]);
+    const tokenAdapter = new FakeCapabilityTokenAdapter();
+    const token = await tokenAdapter.signToken({
+      role: "participant",
+      sessionId: session.sessionId.value,
+      participantId: participant.participantId,
+    });
+    const handler = createSubmitChainHandler({ sessionRepo, tokenVerifier: tokenAdapter });
+    const submitTo = async (roundNumber: number) => handler(
+      makeEvent(session.sessionId.value, roundNumber, validChain, {
+        authorization: `Bearer ${token}`,
+      }),
+      {} as any,
+    );
+    const storedChains = async () => (await sessionRepo.findById(session.sessionId))?.chains ?? [];
+    return { submitTo, storedChains };
+  };
+
+  it("rejects a chain sent to Round 2 during Round 1's Chain-Mapping and records nothing", async () => {
+    const { submitTo, storedChains } = await setUp(1);
+
+    const response = await submitTo(2);
+
+    expect(response.statusCode).toBe(409);
+    expect(JSON.parse(response.body).code).toBe("PHASE_CLOSED_FOR_SUBMISSIONS");
+    expect(await storedChains()).toHaveLength(0);
+  });
+
+  it("rejects a chain sent to Round 1 during Round 2's Chain-Mapping and records nothing", async () => {
+    const { submitTo, storedChains } = await setUp(2);
+
+    const response = await submitTo(1);
+
+    expect(response.statusCode).toBe(409);
+    expect(JSON.parse(response.body).code).toBe("PHASE_CLOSED_FOR_SUBMISSIONS");
+    expect(await storedChains()).toHaveLength(0);
+  });
+
+  it("accepts a chain sent to the active round", async () => {
+    const { submitTo, storedChains } = await setUp(2);
+
+    const response = await submitTo(2);
+
+    expect(response.statusCode).toBe(201);
+    expect(JSON.parse(response.body).chain.roundNumber).toBe(2);
+    const chains = await storedChains();
+    expect(chains).toHaveLength(1);
+    expect(chains[0]?.roundNumber).toBe(2);
+  });
+});

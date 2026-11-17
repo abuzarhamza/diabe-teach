@@ -6,9 +6,9 @@ See spec: `.scratch/session-write-integrity/spec.md`.
 
 **Blocked by:** None (can start immediately). Sequenced after 02 by the chief of staff only to avoid edit conflicts in the chain-recording code.
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] Handler test: submitting to the inactive round returns `PHASE_CLOSED_FOR_SUBMISSIONS` and records nothing
-- [ ] Handler test: submitting to the active round still succeeds
-- [ ] Cucumber classroom scenario: a chain sent to the wrong round is rejected
-- [ ] Existing tests, BDD and lint baselines unchanged
+- [x] Handler test: submitting to the inactive round returns `PHASE_CLOSED_FOR_SUBMISSIONS` and records nothing
+- [x] Handler test: submitting to the active round still succeeds
+- [x] Cucumber classroom scenario: a chain sent to the wrong round is rejected
+- [x] Existing tests, BDD and lint baselines unchanged
