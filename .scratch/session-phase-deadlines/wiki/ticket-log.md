@@ -7,3 +7,4 @@
 - **2026-11-17:** Ticket 03 gained a "durations must be ≥ 1" criterion (see the ticket's Comments).
 - **2026-11-17:** Ticket 03 resolved in `63e6099`. Verified by the chief of staff: typecheck passes and vitest gives 156/156. The agent reported BDD 30/30 and lint/boundaries unchanged at baseline. Added nullable per-phase timers, `phaseEndsAt: null`, the 1..86400s bounds, a 400 on unknown or non-object `timerConfig`, `GameSession.rehydrate` (no validation for legacy documents), and a real Mongo repository test on mongodb-memory-server.
 - **2026-11-17:** All three tickets resolved. The effort is complete pending user decisions (see the backlog).
+- **2026-11-17:** Follow-up effort created: [session-write-integrity spec](../../session-write-integrity/spec.md), with 4 tickets addressing the lost-update race and the round-number check from the [backlog](environment-backlog.md).
