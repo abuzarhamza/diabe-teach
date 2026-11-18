@@ -624,5 +624,179 @@
     ],
   };
 
+  // ---- live samples ----
+  // operations[op].sample(state, ctx) builds request/response JSON from the demo session, in API shapes.
+  // Pure and deterministic: no DOM, no clock, no randomness. A pinned card re-renders on every redraw and
+  // its copy buttons copy exactly what this returns.
+  //   state = CC.get():  { session: PublicSessionState (+ activeBoard), participants: [], chains: SubmittedChain-like[] }
+  //   ctx (built by api-overlay.js, plain data only):
+  //     variant        the step/target variant (e.g. "peer-challenge", "instructor-reject")
+  //     chainId        the Concept Chain under the cursor (from the nearest [data-api-chain]), or null
+  //     participantId  this tab's learner, when the page knows it
+  //     draft          learner's chain being built: { path: GridCoord[], links: string[], story: string }
+  //     voteNotes      { [chainId]: comment draft }  (learner)
+  //     rulings        { [chainId]: { feedback, score } }  (teacher's ruling drafts)
+  // Returns { path?, request?, response? }; anything left out falls back to the fixed example.
+  // Values the demo can't know (tokens, ids and times the server assigns) stay as <placeholders>.
+  const PHASES = ["pretest", "trial-orientation", "round-1:chain-mapping", "round-1:peer-adjudication", "round-1:round-summary",
+    "round-2:chain-mapping", "round-2:peer-adjudication", "round-2:round-summary", "posttest", "feedback-survey", "completed"];
+  const TIMER_SEC = { "chain-mapping": 300, "peer-adjudication": 240 }; // the createGameSession sample's timerConfig
+
+  const fillPath = (template, params) => template.replace(/\{(\w+)\}/g, (whole, name) => (params[name] ?? null) === null ? whole : String(params[name]));
+
+  function publicState(state) {
+    const ss = state.session;
+    return {
+      sessionId: ss.sessionId, roomCode: ss.roomCode, packId: ss.packId, mode: ss.mode, adjudicationMode: ss.adjudicationMode,
+      currentPhase: ss.currentPhase, activeRoundNumber: ss.activeRoundNumber ?? null,
+      phaseStartedAt: ss.phaseStartedAt, phaseEndsAt: ss.phaseEndsAt ?? null,
+      participantCount: state.participants.length, // no activeBoard: the backend never returns it
+    };
+  }
+
+  function publicChain(c) {
+    return {
+      chainId: c.chainId, sessionId: c.sessionId, roundNumber: c.roundNumber, participantId: c.participantId,
+      path: c.path, keywordIds: c.keywordIds, narrativeExplanation: c.narrativeExplanation,
+      stepRationales: c.stepRationales ?? [], status: c.status, verdict: c.verdict ?? null,
+      peerVotes: c.peerVotes ?? [], submittedAt: c.submittedAt,
+    };
+  }
+
+  const roundOf = (state, ctxChain) => ctxChain?.roundNumber ?? state.session.activeRoundNumber ?? null;
+  const chainById = (state, id) => (id ? state.chains.find((c) => c.chainId === id) ?? null : null);
+
+  // The learner's draft chain as a SubmitChainRequest (same conversion as participant.html's submit()).
+  function draftRequest(draft) {
+    const path = (draft?.path ?? []).map((c) => ({ row: c.row, col: c.col }));
+    if (!path.length) return null;
+    return {
+      path,
+      narrativeExplanation: (draft.story ?? "").trim(),
+      stepRationales: path.slice(1).map((c, i) => ({ fromCoord: path[i], toCoord: c, rationale: (draft.links?.[i] ?? "").trim() })),
+    };
+  }
+
+  // Ranking as the demo shows it: longest approved Concept Chain, then number approved, then name.
+  function standingsFor(state, round) {
+    return state.participants.map((p) => {
+      const ok = state.chains.filter((c) => c.roundNumber === round && c.participantId === p.participantId && c.status === "approved");
+      return { participantId: p.participantId, displayName: p.displayName, longestValidChainLength: Math.max(0, ...ok.map((c) => c.path.length)),
+        totalValidChainsCount: ok.length, cumulativeRationaleScore: 0, approvedChainIds: ok.map((c) => c.chainId) };
+    }).sort((a, b) => b.longestValidChainLength - a.longestValidChainLength || b.totalValidChainsCount - a.totalValidChainsCount || a.displayName.localeCompare(b.displayName))
+      .map((r, i) => ({ rank: i + 1, ...r }));
+  }
+
+  function nextState(state) {
+    const cur = publicState(state), i = PHASES.indexOf(cur.currentPhase);
+    if (i < 0 || i >= PHASES.length - 1) return cur; // completed: 200 with the state unchanged (see deviations)
+    const phase = PHASES[i + 1], m = /^round-(\d)/.exec(phase), sec = TIMER_SEC[phase.split(":")[1]];
+    return { ...cur, currentPhase: phase, activeRoundNumber: m ? Number(m[1]) : null, phaseStartedAt: "<server time>",
+      phaseEndsAt: sec ? `<phaseStartedAt + ${sec} s>` : null };
+  }
+
+  const ops = catalog.operations;
+  const sid = (state) => ({ sessionId: state.session.sessionId });
+
+  ops.createGameSession.sample = (state) => {
+    const st = publicState(state), fresh = st.currentPhase === "pretest";
+    return {
+      response: { status: 201, body: {
+        sessionId: st.sessionId, roomCode: st.roomCode, instructorToken: "<instructorToken>", participantId: null, participantToken: null,
+        state: { ...st, currentPhase: "pretest", activeRoundNumber: null, phaseStartedAt: fresh ? st.phaseStartedAt : "<createdAt>", phaseEndsAt: fresh ? st.phaseEndsAt : null, participantCount: 0 },
+      } },
+    };
+  };
+
+  ops.joinGameSession.sample = (state, ctx = {}) => {
+    const me = state.participants.find((p) => p.participantId === ctx.participantId);
+    return {
+      request: { roomCode: state.session.roomCode, displayName: me?.displayName ?? "Amira" },
+      response: { status: 200, body: { sessionId: state.session.sessionId, participantId: me?.participantId ?? "<participantId>", participantToken: "<participantToken>", state: publicState(state) } },
+    };
+  };
+
+  ops.getGameSessionState.sample = (state) => ({
+    path: fillPath(ops.getGameSessionState.path, sid(state)),
+    response: { status: 200, body: { state: publicState(state) } },
+  });
+
+  ops.streamGameSessionEvents.sample = (state) => {
+    const st = publicState(state);
+    return {
+      path: fillPath(ops.streamGameSessionEvents.path, sid(state)),
+      response: { status: 200, body: { event: "phase.changed", data: { currentPhase: st.currentPhase, activeRoundNumber: st.activeRoundNumber, phaseStartedAt: st.phaseStartedAt, phaseEndsAt: st.phaseEndsAt } } },
+    };
+  };
+
+  ops.transitionSessionPhase.sample = (state) => ({
+    path: fillPath(ops.transitionSessionPhase.path, sid(state)),
+    response: { status: 200, body: { state: nextState(state) } },
+  });
+
+  ops.submitConceptChain.sample = (state, ctx = {}) => {
+    const round = roundOf(state, null), request = draftRequest(ctx.draft);
+    const out = { path: fillPath(ops.submitConceptChain.path, { ...sid(state), roundNumber: round }) };
+    if (!request) return out; // nothing built yet: fixed example body
+    const board = state.session.activeBoard;
+    out.request = request;
+    out.response = { status: 201, body: { chain: {
+      chainId: "<chainId>", sessionId: state.session.sessionId, roundNumber: round ?? "<roundNumber>", participantId: ctx.participantId ?? "<participantId>",
+      path: request.path, keywordIds: request.path.map((c) => board?.cells?.[c.row]?.[c.col]?.keywordId ?? "<keywordId>"),
+      narrativeExplanation: request.narrativeExplanation, stepRationales: request.stepRationales,
+      status: "pending-review", verdict: null, peerVotes: [], submittedAt: "<submittedAt>",
+    } } };
+    return out;
+  };
+
+  ops.listRoundChains.sample = (state) => {
+    const round = roundOf(state, null);
+    if (round === null) return { path: fillPath(ops.listRoundChains.path, sid(state)) };
+    return {
+      path: fillPath(ops.listRoundChains.path, { ...sid(state), roundNumber: round }),
+      response: { status: 200, body: { roundNumber: round, chains: state.chains.filter((c) => c.roundNumber === round).map(publicChain) } },
+    };
+  };
+
+  ops.adjudicateConceptChain.sample = (state, ctx = {}) => {
+    const chain = chainById(state, ctx.chainId), round = roundOf(state, chain);
+    const out = { path: fillPath(ops.adjudicateConceptChain.path, { ...sid(state), roundNumber: round, chainId: chain?.chainId ?? null }) };
+    if (!chain) return out;
+    const action = ctx.variant ?? "peer-approve", base = publicChain(chain);
+    if (action.startsWith("peer-")) {
+      const decision = action === "peer-challenge" ? "challenge" : "approve";
+      const comment = (ctx.voteNotes?.[chain.chainId] ?? "").trim();
+      const voter = ctx.participantId ?? "<participantId>";
+      out.request = comment ? { action, comment } : { action };
+      out.response = { status: 200, body: { chain: { ...base,
+        peerVotes: [...base.peerVotes.filter((v) => v.voterParticipantId !== voter), { voterParticipantId: voter, decision, comment: comment || null, votedAt: "<votedAt>" }] } } };
+      return out;
+    }
+    if (chain.verdict?.isLocked) { // already ruled (G.verdict): the call that produced this verdict
+      const v = chain.verdict;
+      out.request = { action: v.isApproved ? "instructor-approve" : "instructor-reject", feedback: v.overallFeedback, qualityScore: v.qualityScore };
+      out.response = { status: 200, body: { chain: base } };
+      return out;
+    }
+    const draft = ctx.rulings?.[chain.chainId] ?? {}, approve = action === "instructor-approve";
+    const feedback = (draft.feedback ?? "").trim() || "<feedback (required)>", qualityScore = Number(draft.score ?? 7);
+    out.request = { action, feedback, qualityScore };
+    out.response = { status: 200, body: { chain: { ...base, status: approve ? "approved" : "rejected",
+      verdict: { isApproved: approve, adjudicatorType: "instructor-final", isLocked: true, qualityScore, transitionEvaluations: [], overallFeedback: feedback, suggestedRefinements: null } } } };
+    return out;
+  };
+
+  ops.getRoundStandings.sample = (state) => {
+    const round = roundOf(state, null);
+    if (round === null) return { path: fillPath(ops.getRoundStandings.path, sid(state)) };
+    const summary = PHASES.indexOf(`round-${round}:round-summary`);
+    return {
+      path: fillPath(ops.getRoundStandings.path, { ...sid(state), roundNumber: round }),
+      response: { status: 200, body: { roundNumber: round, isFinalized: PHASES.indexOf(state.session.currentPhase) >= summary, standings: standingsFor(state, round) } },
+    };
+  };
+
+  catalog.phases = PHASES;
+
   root.CC_API_CATALOG = catalog;
 })(typeof globalThis !== "undefined" ? globalThis : this);

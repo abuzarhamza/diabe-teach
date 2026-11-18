@@ -176,6 +176,7 @@ function render() {
 }
 
 $("notMe").onclick = () => { sessionStorage.removeItem(ME_KEY); location.replace("participant.html"); };
+CCOverlay.setContext(() => ({ participantId: me(CC.get())?.participantId ?? null })); // live API overlay samples
 CC.subscribe(render);
 window.addEventListener("resize", render);
 render();

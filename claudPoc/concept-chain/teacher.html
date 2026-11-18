@@ -144,7 +144,7 @@ function chainCard(s, c) {
   const comments = c.peerVotes.filter((v) => v.comment).map((v) => `<li>${CC.esc(name(s, v.voterParticipantId))} (${v.decision}): ${CC.esc(v.comment)}</li>`).join("");
   const d = drafts[c.chainId] ?? { feedback: "", score: "7" };
   const locked = c.verdict?.isLocked;
-  return `<article class="chain ${cls}${c.chainId === selected ? " sel" : ""}" data-id="${c.chainId}">
+  return `<article class="chain ${cls}${c.chainId === selected ? " sel" : ""}" data-id="${c.chainId}" data-api-chain="${c.chainId}">
     <div class="row between"><span class="by">${CC.esc(name(s, c.participantId))} · ${c.path.length} keywords</span>${CC.statusBadge(c)}</div>
     <div class="text">${CC.chainText(c)}</div>
     <p class="story">${CC.esc(c.narrativeExplanation)}</p>
@@ -199,6 +199,8 @@ function armReset(btn) {
 $("reset").onclick = () => armReset($("reset"));
 $("resetTop").onclick = () => armReset($("resetTop"));
 
+// Live API overlay samples: the ruling drafts (feedback and score) typed into each chain card.
+CCOverlay.setContext(() => ({ rulings: drafts }));
 CC.subscribe(render);
 window.addEventListener("resize", () => render());
 setInterval(() => tick(), 1000);

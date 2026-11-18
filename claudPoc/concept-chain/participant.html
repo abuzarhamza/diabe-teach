@@ -190,7 +190,7 @@ function myCard(s, c) {
   const cls = { "pending-review": "pending", approved: "valid", rejected: "invalid" }[c.status];
   const up = c.peerVotes.filter((v) => v.decision === "approve").length, down = c.peerVotes.length - up;
   const notes = c.peerVotes.filter((v) => v.comment).map((v) => `<li>${v.decision === "approve" ? "👍" : "✋"} ${CC.esc(v.comment)}</li>`).join("");
-  return `<article class="chain ${cls}${c.chainId === selected ? " sel" : ""}">
+  return `<article class="chain ${cls}${c.chainId === selected ? " sel" : ""}" data-api-chain="${c.chainId}">
     <div class="row between"><span class="by">${c.path.length} keywords</span>${CC.statusBadge(c)}</div>
     <div class="text">${CC.chainText(c)}</div>
     ${c.peerVotes.length ? `<div class="tally">Class votes: 👍 ${up} · ✋ ${down}</div>` : ""}
@@ -204,7 +204,7 @@ function reviewCard(s, p, c) {
   const cls = { "pending-review": "pending", approved: "valid", rejected: "invalid" }[c.status];
   const myVote = c.peerVotes.find((v) => v.voterParticipantId === p.participantId)?.decision;
   const locked = c.verdict?.isLocked;
-  return `<article class="chain ${cls}${c.chainId === selected ? " sel" : ""}">
+  return `<article class="chain ${cls}${c.chainId === selected ? " sel" : ""}" data-api-chain="${c.chainId}">
     <div class="row between"><span class="by">${CC.esc(name(s, c.participantId))} · ${c.path.length} keywords</span>${CC.statusBadge(c)}</div>
     <div class="text">${CC.chainText(c)}</div>
     <p class="story">${CC.esc(c.narrativeExplanation)}</p>
@@ -271,6 +271,8 @@ function tick(s = CC.get()) {
   wasOpen = open;
 }
 
+// Live API overlay samples: who this tab is, the draft chain being built and vote comments.
+CCOverlay.setContext(() => ({ participantId: me(CC.get())?.participantId ?? null, draft, voteNotes }));
 CC.subscribe(() => render());
 window.addEventListener("resize", () => render());
 setInterval(() => { if (!$("gameView").hidden) tick(); }, 1000);

@@ -21,6 +21,11 @@
 // buttons for the path, sample request and sample response body; Esc or × closes it and focus goes
 // back to the tag. Cards are kept inside the viewport.
 //
+// Live samples: an operation's sample(CC.get(), ctx) fills path, request and response from the demo
+// session. ctx = page data from CCOverlay.setContext(fn) + { variant, key, chainId }, where chainId is
+// the nearest [data-api-chain] around the element. Cards refresh on page re-renders, typing in page
+// fields and demo-session changes in other tabs (storage events).
+//
 // The overlay draws in its own layer (appended to <html>, outside the page root), re-scans after
 // page re-renders via a MutationObserver on <body>, and never calls preventDefault on page elements.
 /* eslint-disable */
@@ -38,6 +43,7 @@ const CCOverlay = (() => {
   const marks = new Map(); // mark key ("<data-api>#<n>") -> { el, wrap, box, tag }
   const keyOf = new WeakMap(); // page element -> its mark key (set on every draw)
   const toggles = [];
+  let contextProvider = null; // set by the page: () => plain data for live samples (see setContext)
   const remember = (value) => { try { if (value) sessionStorage.setItem(STORE_KEY, "on"); else sessionStorage.removeItem(STORE_KEY); } catch {} };
   const remembered = () => { try { return sessionStorage.getItem(STORE_KEY) === "on"; } catch { return false; } };
   const pressed = () => toggles.forEach((t) => t.setAttribute("aria-pressed", String(on)));
@@ -126,32 +132,43 @@ const CCOverlay = (() => {
     return `<button type="button" class="cc-api-copy" data-copy="${copyData.length - 1}">Copy ${esc(what)}</button>`;
   }
 
-  function opHtml(opId, variant) {
+  function opHtml(opId, variant, ctx) {
     const c = cat(), base = c.operations?.[opId];
     // A step/target variant (e.g. "instructor-reject") replaces request/response/errors and appends notes.
     const v = variant ? base?.variants?.[variant] : null;
     const op = v ? { ...base, ...v, notes: [...(base.notes ?? []), ...(v.notes ?? [])] } : base;
     if (!op) return `<section class="cc-api-op"><p class="cc-api-dev">Unknown operation ${esc(opId)}</p></section>`;
     let live = null;
-    if (typeof op.sample === "function" && window.CC) { try { live = op.sample(window.CC.get(), {}); } catch { live = null; } }
-    const req = live?.request ?? op.request, res = live?.response ?? op.response;
-    const tag = live ? ` <span class="cc-api-live">example from demo session</span>` : "";
+    // shared.js declares `const CC` (a global binding, not a window property), so look it up by name.
+    const demo = typeof CC !== "undefined" ? CC : null;
+    if (typeof op.sample === "function" && demo) { try { live = op.sample(demo.get(), { ...ctx, variant }); } catch { live = null; } }
+    const req = live?.request ?? op.request, res = live?.response ?? op.response, path = live?.path ?? op.path;
+    const liveTag = (part) => (live?.[part] !== undefined ? ` <span class="cc-api-live">example from demo session</span>` : "");
     const copy = (value, what) => (pinned ? copyBtn(typeof value === "string" ? value : JSON.stringify(value, null, 2), what) : "");
     const list = (items, cls = "") => items?.length ? `<ul class="${cls}">${items.map((d) => `<li>${esc(d)}</li>`).join("")}</ul>` : "";
     const statusCls = { implemented: "good", partial: "warn", "specced-only": "warn", missing: "bad" }[op.status] ?? "warn";
     return `<section class="cc-api-op">
       <div class="cc-api-head"><code class="cc-api-opid">${esc(op.status === "missing" ? `${opId} (proposed)` : opId)}</code><span class="cc-api-status ${statusCls}">${esc(c.statusLabels?.[op.status] ?? op.status)}</span></div>
-      ${op.method ? `<div class="cc-api-path"><span><b>${esc(op.method)}</b> <code>${esc(op.path)}</code></span>${copy(op.path, "path")}</div>` : ""}
+      ${op.method ? `<div class="cc-api-path"><span><b>${esc(op.method)}</b> <code>${esc(path)}</code>${liveTag("path")}</span>${copy(path, "path")}</div>${path !== op.path ? `<div class="cc-api-tpl"><code>${esc(op.path)}</code></div>` : ""}` : ""}
       ${op.auth?.length ? `<h4>Auth</h4>${list(op.auth.map((a) => c.authLabels?.[a] ?? a))}` : ""}
-      ${req !== undefined && req !== null ? `<div class="cc-api-sub"><h4>Sample request${tag}</h4>${copy(req, "request")}</div><pre>${json(req)}</pre>` : ""}
-      ${res ? `<div class="cc-api-sub"><h4>Sample response${tag}</h4>${res.body !== undefined ? copy(res.body, "response") : ""}</div><pre>${esc(res.status)} ${json(res.body)}</pre>` : ""}
+      ${req !== undefined && req !== null ? `<div class="cc-api-sub"><h4>Sample request${liveTag("request")}</h4>${copy(req, "request")}</div><pre>${json(req)}</pre>` : ""}
+      ${res ? `<div class="cc-api-sub"><h4>Sample response${liveTag("response")}</h4>${res.body !== undefined ? copy(res.body, "response") : ""}</div><pre>${esc(res.status)} ${json(res.body)}</pre>` : ""}
       ${op.errors?.length ? `<h4>Errors</h4><ul class="cc-api-errs">${op.errors.map((e) => `<li><b>${esc(e.status)}</b> <code>${esc(e.code)}</code></li>`).join("")}</ul>` : ""}
       ${op.notes?.length ? `<h4>Notes</h4>${list(op.notes)}` : ""}
       ${op.deviations?.length ? `<h4>Code vs spec</h4>${list(op.deviations, "cc-api-dev")}` : ""}
     </section>`;
   }
 
-  function cardHtml(info) {
+  // Context for live samples: the page's own state (from setContext) plus what the element says,
+  // i.e. the Concept Chain it sits in (nearest [data-api-chain]). Plain data only.
+  function sampleCtx(el) {
+    let page = {};
+    try { page = (typeof contextProvider === "function" && contextProvider()) || {}; } catch { page = {}; }
+    return { ...page, key: el?.dataset.api ?? null, chainId: el?.closest("[data-api-chain]")?.dataset.apiChain ?? null };
+  }
+
+  function cardHtml(info, el) {
+    const ctx = sampleCtx(el);
     copyData = [];
     const actor = info.actor ? cat().actors?.[info.actor] : null;
     const head = info.kind === "gap"
@@ -160,7 +177,7 @@ const CCOverlay = (() => {
     const close = pinned ? `<button type="button" class="cc-api-close" aria-label="Close API card">×</button>` : "";
     return `<div class="cc-api-title"><span class="cc-api-title-text" id="cc-api-card-title">${head}</span>${close}</div>`
       + (info.note ? `<p class="cc-api-note">${esc(info.note)}</p>` : "")
-      + info.ops.map((op) => opHtml(op, info.variant)).join("")
+      + info.ops.map((op) => opHtml(op, info.variant, ctx)).join("")
       + (pinned ? `<p class="cc-api-copied visually-hidden" role="status"></p>` : "");
   }
 
@@ -169,7 +186,7 @@ const CCOverlay = (() => {
   function refreshCard() {
     const m = marks.get(currentKey); if (!m) return;
     const info = resolve(m.el.dataset.api); if (!info) return;
-    const html = cardHtml(info);
+    const html = cardHtml(info, m.el);
     if (html === cardHtmlNow) return;
     const buttons = () => [...card.querySelectorAll("button")];
     const focusIdx = card.contains(document.activeElement) ? buttons().indexOf(document.activeElement) : -2;
@@ -402,7 +419,9 @@ const CCOverlay = (() => {
     const key = tag.dataset.key;
     if (pinned && currentKey === key) closeCard(true); else { closeCard(false); pin(key); }
   }
-  const LISTENERS = [["mouseover", onOver], ["mouseout", onOut], ["focusin", onFocusIn], ["focusout", onFocusOut], ["keydown", onKey]];
+  // Typing in a page field changes page state (draft chain, comments, feedback) without a DOM change.
+  const onInput = () => schedule();
+  const LISTENERS = [["mouseover", onOver], ["mouseout", onOut], ["focusin", onFocusIn], ["focusout", onFocusOut], ["keydown", onKey], ["input", onInput], ["change", onInput]];
   const onScroll = () => placeCard();
 
   // ---- on / off ----
@@ -419,6 +438,7 @@ const CCOverlay = (() => {
     LISTENERS.forEach(([t, fn]) => document.addEventListener(t, fn, true));
     window.addEventListener("resize", schedule);
     window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("storage", schedule); // demo session changed in another tab
     observer = new MutationObserver(schedule);
     observer.observe(document.body, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ["data-api", "data-api-io", "hidden", "class", "style"] });
     remember(true); pressed();
@@ -431,6 +451,7 @@ const CCOverlay = (() => {
     LISTENERS.forEach(([t, fn]) => document.removeEventListener(t, fn, true));
     window.removeEventListener("resize", schedule);
     window.removeEventListener("scroll", onScroll);
+    window.removeEventListener("storage", schedule);
     observer?.disconnect(); observer = null;
     if (frame) cancelAnimationFrame(frame); frame = 0;
     clearFlash();
@@ -458,5 +479,10 @@ const CCOverlay = (() => {
 
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init); else init();
 
-  return { enable, disable, isOn: () => on, resolve };
+  // Pages register a provider of plain data for live samples, e.g. the learner's draft chain:
+  //   CCOverlay.setContext(() => ({ participantId, draft, voteNotes }))
+  // It is called on every card render, so it must be cheap and side-effect free.
+  function setContext(fn) { contextProvider = typeof fn === "function" ? fn : null; schedule(); }
+
+  return { enable, disable, isOn: () => on, resolve, setContext, refresh: schedule };
 })();

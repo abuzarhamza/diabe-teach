@@ -184,3 +184,4 @@ table.lb{width:100%;border-collapse:collapse;font-size:14px;font-variant-numeric
 @media (prefers-reduced-motion:no-preference){[data-api-flash]{animation:cc-api-el-flash .5s ease-in-out 3}}
 @keyframes cc-api-el-flash{50%{outline-color:transparent}}
 [data-api-io=read][data-api-flash]{outline-color:var(--api-read) !important}
+.cc-api-tpl{font-size:11px;color:var(--muted);margin-top:2px;word-break:break-all} /* path template under a live path */
