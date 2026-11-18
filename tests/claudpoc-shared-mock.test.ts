@@ -38,6 +38,8 @@ interface DemoMock {
   packOf: (s: DemoState) => { packId: string; name: string; level: string; objective: string; keywords: string[] } | null;
   getPack: (id: string) => Pack | null;
   dealBoard: (args: { packId?: string; boardSize?: number; seed: string }) => Board;
+  newSeed: () => string;
+  nextPhaseLabel: (phase: string) => string | null;
   createSession: (settings?: Record<string, unknown>) => DemoState;
   reset: () => DemoState;
   get: () => DemoState;
@@ -173,6 +175,40 @@ describe("shared demo mock: boards and seeds", () => {
     expect(r2?.seed).not.toBe("preview-42");
     expect(r2?.rows).toBe(6);
     expect(r2?.cells).not.toEqual(r1?.cells);
+  });
+});
+
+describe("shared demo mock: Game setup board preview and rounds", () => {
+  it("starts Round 1 on exactly the previewed board after Shuffle, and deals Round 2 a different one", () => {
+    // Game setup: preview with one seed, Shuffle to another, change pack and size (re-deals with the current seed), then Start game.
+    const first = cc.newSeed();
+    const shuffled = cc.newSeed();
+    expect(shuffled).not.toBe(first);
+    expect(cc.dealBoard({ packId: "thyroid", boardSize: 5, seed: shuffled }).cells)
+      .not
+      .toEqual(cc.dealBoard({ packId: "thyroid", boardSize: 5, seed: first }).cells);
+    const preview = cc.dealBoard({ packId: "sle", boardSize: 6, seed: shuffled });
+    cc.createSession({
+      packId: "sle",
+      boardSize: 6,
+      seed: shuffled,
+      mode: "classroom",
+      adjudicationMode: "peer-instructor",
+    });
+
+    const r1 = advanceTo(cc, "round-1:chain-mapping").session.activeBoard;
+    expect(r1).toEqual(preview);
+    expect(advanceTo(cc, "round-1:round-summary").session.activeBoard).toEqual(preview);
+    const r2 = advanceTo(cc, "round-2:chain-mapping").session.activeBoard;
+    expect(r2?.rows).toBe(6);
+    expect(r2?.cells).not.toEqual(preview.cells);
+  });
+
+  it("labels the end-of-Round-1 button as a new round with a new board, and leaves the others alone", () => {
+    expect(cc.nextPhaseLabel("round-1:round-summary")).toBe("Start Round 2 · new board →");
+    expect(cc.nextPhaseLabel("trial-orientation")).toBe("Start R1 · Chain mapping →");
+    expect(cc.nextPhaseLabel("round-2:round-summary")).toBe("Start Post-test →");
+    expect(cc.nextPhaseLabel("completed")).toBeNull();
   });
 });
 

@@ -341,6 +341,13 @@ const CC = (() => {
     return { text: `${String(Math.floor(t / 60)).padStart(2, "0")}:${String(t % 60).padStart(2, "0")}`, note: ms <= 0 ? "Time's up" : "remaining", over: ms <= 0, low: ms > 0 && ms < 30000 };
   }
 
+  // The teacher's phase-button label for moving on from `phase`. Starting Round 2 deals a fresh board, so it says so.
+  function nextPhaseLabel(phase) {
+    const next = PHASES[PHASES.indexOf(phase) + 1];
+    if (!next) return null;
+    return next === "round-2:chain-mapping" ? "Start Round 2 · new board →" : `Start ${PHASE_LABEL[next]} →`;
+  }
+
   // Renders the board grid plus an SVG overlay drawing `path` (array of {row,col}).
   function renderBoard(shell, board, { path = [], color = "var(--pick)", onTap, tappable } = {}) {
     if (!board) { shell.innerHTML = `<div class="board-empty">The board appears when a round starts.</div>`; return; }
@@ -376,5 +383,5 @@ const CC = (() => {
     MIN_PACK_KEYWORDS, listPacks, getPack, cleanKeywords, savePack, deletePack, lastSetup, rememberSetup, packOf, dealBoard, newSeed, normalizeSettings, settingsOf, createSession, timerFromMinutes, timerLabel, TIMER_MAX_MIN,
     teacher, signIn, signOut, requireTeacher,
     get, subscribe, reset, advance, extend, join, submitChain, vote, rule, standings, seedSampleLearners,
-    topologyError, submissionsOpen, adjacent, clock, renderBoard, statusBadge, chainText, esc };
+    topologyError, submissionsOpen, adjacent, clock, nextPhaseLabel, renderBoard, statusBadge, chainText, esc };
 })();

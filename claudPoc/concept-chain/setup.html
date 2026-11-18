@@ -54,6 +54,7 @@ dl.sum dt{color:var(--muted)} dl.sum dd{margin:0;font-weight:700}
 .mins select{width:auto}
 #file:focus-visible+label{outline:2px solid var(--accent);outline-offset:2px}
 label.btn{cursor:pointer}
+.rounds{font-size:20px;font-weight:800;font-family:var(--font-display);margin:0}
 [hidden]{display:none !important} /* .panel/.col set display:flex, which would override the hidden attribute */
 </style>
 </head>
@@ -99,6 +100,11 @@ label.btn{cursor:pointer}
           <div class="row"><button class="btn primary" id="savePack" type="button">Save pack</button><button class="btn" id="cancelPack" type="button">Cancel</button></div>
         </div>
       </section>
+      <section class="panel" aria-labelledby="pvH">
+        <div class="row between"><h2 id="pvH">Board preview</h2><button class="btn sm" id="shuffle" type="button" aria-describedby="pvNote">Shuffle ↻</button></div>
+        <p class="note" id="pvNote" role="status" aria-live="polite"></p>
+        <div class="board-shell board-readonly" id="preview" aria-label="Board preview"></div>
+      </section>
       <section class="panel" aria-labelledby="kwH">
         <div class="row between"><h2 id="kwH">Keywords in <span id="kwPack"></span></h2><span class="eyebrow" id="kwCount"></span></div>
         <div class="chips" id="keywords"></div>
@@ -131,6 +137,11 @@ label.btn{cursor:pointer}
           <div class="mins"><input type="number" id="minChain" min="2" step="1" inputmode="numeric" aria-describedby="minErr"><label for="minChain">keywords</label></div>
           <p class="err" id="minErr" role="alert"></p>
         </fieldset>
+        <fieldset>
+          <legend>Rounds</legend>
+          <p class="rounds" id="rounds">Rounds: 2</p>
+          <p class="note">Each round gets a freshly shuffled board. Round 1 uses the board in the preview.</p>
+        </fieldset>
         <p class="note">Pre-test, trial round, round summary, post-test and survey stay teacher-paced.</p>
       </section>
 
@@ -150,6 +161,8 @@ const $ = (id) => document.getElementById(id);
 const teacher = CC.teacher();
 const defaults = CC.DEFAULT_TIMER_CONFIG;
 let packId = CC.DEFAULT_PACK_ID;
+let seed = CC.newSeed(); // the board preview's seed; Shuffle replaces it, Start game sends it as CreateSessionRequest.seed
+let shuffles = 0;
 let wantSize = 7; // the teacher's chosen board size; capped by what the chosen pack can fill
 const draft = { keywords: [], duplicates: 0, empty: 0 };
 const sizeOf = (pack) => Math.min(10, Math.floor(Math.sqrt(pack.keywords.length)));
@@ -167,7 +180,7 @@ function readForm() {
     errors.min = `Enter a whole number from 2 to ${size * size} (a ${size}×${size} board).`;
   if (!CC.getPack(packId)) errors.pack = "Choose a pack.";
   if (Object.keys(errors).length) return { errors };
-  const settings = { packId, mode: "classroom", adjudicationMode: "peer-instructor", creatorDisplayName: teacher.name, timerConfig, boardSize: size, minChainLength: minChain };
+  const settings = { packId, mode: "classroom", adjudicationMode: "peer-instructor", creatorDisplayName: teacher.name, timerConfig, seed, boardSize: size, minChainLength: minChain };
   try { CC.normalizeSettings(settings); } catch (e) { return { errors: { start: e.message } }; }
   return { settings };
 }
@@ -225,6 +238,7 @@ function render() {
   $("keywords").innerHTML = pack ? pack.keywords.map((k) => `<span>${CC.esc(k)}</span>`).join("") : `<p class="empty">Choose a pack to see its keywords.</p>`;
 
   const size = boardSize(), most = pack ? sizeOf(pack) : 10;
+  renderPreview(pack, size);
   $("size").innerHTML = Array.from({ length: Math.max(0, most - 2) }, (_, i) => i + 3).map((n) => `<option value="${n}" ${n === size ? "selected" : ""}>${n}×${n} (${n * n} keywords)</option>`).join("");
   $("sizeNote").textContent = pack ? `${pack.name} has ${pack.keywords.length} keywords: up to ${most}×${most}.` : "";
   $("minChain").max = size * size;
@@ -240,6 +254,7 @@ function render() {
     <dt>Pack</dt><dd>${CC.esc(pack?.name ?? "—")}</dd>
     ${pack?.objective ? `<dt>Objective</dt><dd>${CC.esc(pack.objective)}</dd>` : ""}
     <dt>Board</dt><dd>${pack ? `${size}×${size}` : "—"}</dd>
+    <dt>Rounds</dt><dd>2 · a fresh board each</dd>
     <dt>Shortest chain</dt><dd>${errors.min ? "—" : `${$("minChain").value} keywords`}</dd>
     <dt>Chain-building</dt><dd>${time("map")}</dd>
     <dt>Peer review</dt><dd>${time("rev")}</dd>
@@ -247,6 +262,14 @@ function render() {
   $("start").disabled = !settings;
   if (settings) CC.rememberSetup(settings);
   if (!$("editor").hidden) renderEditor();
+}
+
+// Deals the board the class will get from the chosen pack, size and preview seed (same inputs, same board).
+function renderPreview(pack, size) {
+  CC.renderBoard($("preview"), pack ? CC.dealBoard({ pack, boardSize: size, seed }) : null);
+  if (!pack) $("preview").querySelector(".board-empty").textContent = "Choose a pack to preview its board.";
+  const note = pack ? `${size}×${size} board from ${pack.name}${shuffles ? ` · shuffled ${shuffles}×` : ""}. Round 1 starts with exactly this board; Round 2 gets a fresh shuffle.` : "";
+  if ($("pvNote").textContent !== note) $("pvNote").textContent = note; // don't re-announce on unrelated edits
 }
 
 // Pre-fills from the last visit (CC.lastSetup), else the demo defaults.
@@ -279,6 +302,8 @@ if (teacher) {
   for (const id of ["mapMin", "mapPaced", "revMin", "revPaced", "minChain"]) $(id).addEventListener("input", render);
   $("size").addEventListener("change", () => { wantSize = Number($("size").value); render(); });
   $("signOut").addEventListener("click", () => CC.signOut());
+  $("shuffle").onclick = () => { seed = CC.newSeed(); shuffles++; render(); };
+  window.addEventListener("resize", () => renderPreview(CC.getPack(packId), boardSize()));
 
   $("newPack").onclick = () => openEditor($("editor").hidden);
   $("cancelPack").onclick = () => { openEditor(false); $("newPack").focus(); };
