@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Concept Chain · Teacher view</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Atkinson+Hyperlegible:wght@400;700&family=IBM+Plex+Mono:wght@500&display=swap">
+<link rel="stylesheet" href="shared.css">
+<style>
+.rule{display:grid;grid-template-columns:1fr auto;gap:6px;align-items:start;border-top:1px dashed var(--line);padding-top:8px}
+.rule textarea{grid-column:1/-1;min-height:48px}
+.rule label{font-size:12px;color:var(--muted);display:flex;gap:6px;align-items:center}
+.rule select{width:auto}
+.filters{display:flex;gap:4px}
+.filters button[aria-pressed=true]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.roster{display:flex;flex-wrap:wrap;gap:6px}
+.roster span{background:var(--sunk);border-radius:999px;padding:3px 10px;font-size:13px}
+.roster b{font-family:var(--font-mono);font-size:12px;margin-left:4px;color:var(--accent)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <h1>Concept <span>Chain</span></h1>
+      <p>Teacher view · Diabetes mellitus pack · Classroom game, peer + teacher review</p>
+    </div>
+    <div class="room">
+      <span class="eyebrow">Room code</span>
+      <span class="code" id="roomCode" data-api="A.roomCode" data-api-io="read">——————</span>
+      <span class="note"><span id="pCount" data-api="C.count" data-api-io="read">0</span> joined · <a href="participant.html" target="_blank" rel="noopener">open learner screen ↗</a></span>
+    </div>
+  </header>
+
+  <section class="bar" aria-label="Session phase">
+    <ol class="steps" id="steps" data-api="C.phase" data-api-io="read"></ol>
+    <div class="row">
+      <div class="timer" data-api="C.timer" data-api-io="read"><span class="clock" id="clock">—:—</span><span class="note" id="clockNote"></span></div>
+      <button class="btn sm" id="extend" data-api="gap.extend" data-api-io="write" title="Add one minute to this phase">+1 min</button>
+      <button class="btn sm bad" id="resetTop" data-api="A" data-api-io="write" title="Discard this session and start a new one with a new room code">Reset session</button>
+      <button class="btn primary" id="advance" data-api="D" data-api-io="write">Next phase →</button>
+    </div>
+  </section>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <div class="main">
+    <div class="col">
+      <div class="row between">
+        <div><span class="eyebrow">Board</span> <span class="note" id="boardNote"></span></div>
+        <button class="btn sm" id="clearSel" hidden>Clear highlight</button>
+      </div>
+      <div class="board-shell board-readonly" id="board" data-api="C.board" data-api-io="read"></div>
+      <div class="panel">
+        <div class="row between"><h2>Learners</h2><span class="eyebrow">chains this round</span></div>
+        <div class="roster" id="roster" data-api="C.roster" data-api-io="read"></div>
+      </div>
+    </div>
+
+    <aside class="col">
+      <div class="panel">
+        <div class="row between">
+          <h2>Chains to review</h2>
+          <div class="filters" role="group" aria-label="Filter chains">
+            <button class="btn sm" data-f="pending-review" aria-pressed="true">To check</button>
+            <button class="btn sm" data-f="all" aria-pressed="false">All</button>
+          </div>
+        </div>
+        <p class="note">Learners vote during peer review. Your ruling is final and locks the chain.</p>
+        <div class="chains" id="chains" data-api="C.review" data-api-io="read"></div>
+      </div>
+      <div class="panel">
+        <div class="row between"><h2>Standings</h2><span class="eyebrow" id="lbRound"></span></div>
+        <table class="lb" data-api="H" data-api-io="read"><thead><tr><th>#</th><th>Learner</th><th class="n">Longest</th><th class="n">Approved</th><th class="n">To check</th></tr></thead><tbody id="lb"></tbody></table>
+        <p class="note">Ranked by longest approved chain, then number of approved chains.</p>
+      </div>
+      <div class="panel">
+        <h2>Demo controls</h2>
+        <p class="note">This prototype stores the session in your browser. Open the learner screen in more tabs to play along.</p>
+        <div class="row">
+          <button class="btn sm" id="seed">Add sample learners & chains</button>
+          <button class="btn sm bad" id="reset" data-api="A" data-api-io="write">Start a new session</button>
+        </div>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<script src="shared.js"></script>
+<script src="api-catalog.js"></script>
+<script src="api-overlay.js"></script>
+<script>
+const $ = (id) => document.getElementById(id);
+let filter = "pending-review", selected = null;
+const drafts = {}; // chainId -> { feedback, score }
+
+function toast(msg, kind = "ok") { const t = $("toast"); t.textContent = msg; t.className = `toast ${kind}`; clearTimeout(toast.t); toast.t = setTimeout(() => { t.textContent = ""; }, 4000); }
+function act(fn, ok) { try { fn(); if (ok) toast(ok); } catch (e) { toast(e.message, "err"); } }
+const name = (s, id) => s.participants.find((p) => p.participantId === id)?.displayName ?? "Unknown";
+
+function keepFocus(fn) {
+  const a = document.activeElement, id = a?.id, sel = a && "selectionStart" in a ? [a.selectionStart, a.selectionEnd] : null;
+  fn();
+  const b = id && $(id); if (b && b !== a) { b.focus({ preventScroll: true }); if (sel) try { b.setSelectionRange(...sel); } catch {} }
+}
+
+function render(s = CC.get()) { keepFocus(() => {
+  const ss = s.session, round = ss.activeRoundNumber, idx = CC.PHASES.indexOf(ss.currentPhase);
+  $("roomCode").textContent = ss.roomCode;
+  $("pCount").textContent = s.participants.length;
+  $("steps").innerHTML = CC.PHASES.map((p, i) => `<li class="${i < idx ? "done" : i === idx ? "now" : ""}" ${i === idx ? 'aria-current="step"' : ""}>${CC.PHASE_LABEL[p]}</li>`).join("");
+  const done = idx === CC.PHASES.length - 1;
+  $("advance").textContent = done ? "Start a new session ↺" : `Start ${CC.PHASE_LABEL[CC.PHASES[idx + 1]]} →`;
+  $("advance").dataset.api = done ? "A" : "D"; // from Completed it creates a new Game Session
+  $("extend").hidden = !ss.phaseEndsAt;
+
+  const roundChains = s.chains.filter((c) => c.roundNumber === round);
+  const sel = roundChains.find((c) => c.chainId === selected);
+  if (!sel) selected = null;
+  CC.renderBoard($("board"), ss.activeBoard, { path: sel?.path ?? [] });
+  $("boardNote").textContent = !ss.activeBoard ? "" : sel ? `Showing ${name(s, sel.participantId)}'s chain` : `Round ${round} · select a chain to trace it`;
+  $("clearSel").hidden = !sel;
+
+  $("roster").innerHTML = s.participants.length ? s.participants.map((p) => `<span>${CC.esc(p.displayName)}<b>${roundChains.filter((c) => c.participantId === p.participantId).length}</b></span>`).join("")
+    : `<span class="empty">No one has joined yet. Share room code ${ss.roomCode}.</span>`;
+
+  document.querySelectorAll(".filters button").forEach((b) => b.setAttribute("aria-pressed", b.dataset.f === filter));
+  const list = roundChains.filter((c) => filter === "all" || c.status === filter).sort((a, b) => a.submittedAt.localeCompare(b.submittedAt));
+  $("chains").innerHTML = !round ? `<p class="empty">Chains show up here once a round starts.</p>`
+    : !list.length ? `<p class="empty">${filter === "all" ? "No chains submitted yet this round." : "Nothing waiting for review."}</p>`
+    : list.map((c) => chainCard(s, c)).join("");
+
+  $("lbRound").textContent = round ? `Round ${round}` : "";
+  const rows = round ? CC.standings(s, round) : [];
+  $("lb").innerHTML = rows.length ? rows.map((r) => `<tr><td>${r.rank}</td><td>${CC.esc(r.displayName)}</td><td class="n">${r.longestValidChainLength}</td><td class="n">${r.totalValidChainsCount}</td><td class="n">${r.pendingCount}</td></tr>`).join("")
+    : `<tr><td colspan="5" class="empty">${round ? "No learners yet." : "Standings appear during a round."}</td></tr>`;
+  tick(s);
+}); }
+
+function chainCard(s, c) {
+  const cls = { "pending-review": "pending", approved: "valid", rejected: "invalid" }[c.status];
+  const up = c.peerVotes.filter((v) => v.decision === "approve").length, down = c.peerVotes.length - up;
+  const comments = c.peerVotes.filter((v) => v.comment).map((v) => `<li>${CC.esc(name(s, v.voterParticipantId))} (${v.decision}): ${CC.esc(v.comment)}</li>`).join("");
+  const d = drafts[c.chainId] ?? { feedback: "", score: "7" };
+  const locked = c.verdict?.isLocked;
+  return `<article class="chain ${cls}${c.chainId === selected ? " sel" : ""}" data-id="${c.chainId}">
+    <div class="row between"><span class="by">${CC.esc(name(s, c.participantId))} · ${c.path.length} keywords</span>${CC.statusBadge(c)}</div>
+    <div class="text">${CC.chainText(c)}</div>
+    <p class="story">${CC.esc(c.narrativeExplanation)}</p>
+    ${c.stepRationales?.some((r) => r.rationale) ? `<ol class="steps-r">${c.stepRationales.map((r, i) => `<li>${CC.esc(c.labels[i])} → ${CC.esc(c.labels[i + 1])}: ${CC.esc(r.rationale || "—")}</li>`).join("")}</ol>` : ""}
+    <div class="tally">Peer votes: 👍 ${up} · ✋ ${down}</div>
+    ${comments ? `<ul class="steps-r">${comments}</ul>` : ""}
+    <div class="row"><button class="btn sm" data-trace="${c.chainId}">${c.chainId === selected ? "Hide on board" : "Trace on board"}</button></div>
+    ${locked ? `<div class="feedback" data-api="G.verdict" data-api-io="read"><b>Your ruling (${c.verdict.qualityScore}/10):</b> ${CC.esc(c.verdict.overallFeedback)}</div>` : `
+    <div class="rule">
+      <label class="visually-hidden" for="fb-${c.chainId}">Feedback for ${CC.esc(name(s, c.participantId))}</label>
+      <textarea id="fb-${c.chainId}" data-fb="${c.chainId}" placeholder="Feedback for the learner (required)">${CC.esc(d.feedback)}</textarea>
+      <label for="sc-${c.chainId}">Quality <select id="sc-${c.chainId}" data-sc="${c.chainId}">${Array.from({ length: 10 }, (_, i) => `<option ${String(i + 1) === d.score ? "selected" : ""}>${i + 1}</option>`).join("")}</select> /10</label>
+      <div class="row"><button class="btn sm good" data-rule="${c.chainId}" data-ok="1" data-api="G.approve" data-api-io="write">Approve</button><button class="btn sm bad" data-rule="${c.chainId}" data-ok="0" data-api="G.reject" data-api-io="write">Reject</button></div>
+    </div>`}
+  </article>`;
+}
+
+function tick(s = CC.get()) {
+  const k = CC.clock(s);
+  $("clock").textContent = k.text; $("clock").className = `clock${k.over ? " over" : k.low ? " low" : ""}`;
+  $("clockNote").textContent = k.over && s.session.currentPhase.endsWith(":chain-mapping") ? "Time's up — submissions closed" : k.note;
+}
+
+$("chains").addEventListener("input", (e) => {
+  const id = e.target.dataset.fb || e.target.dataset.sc; if (!id) return;
+  drafts[id] ??= { feedback: "", score: "7" };
+  if (e.target.dataset.fb) drafts[id].feedback = e.target.value; else drafts[id].score = e.target.value;
+});
+$("chains").addEventListener("click", (e) => {
+  const t = e.target.closest("button"); if (!t) return;
+  if (t.dataset.trace) { selected = selected === t.dataset.trace ? null : t.dataset.trace; render(); return; }
+  if (t.dataset.rule) {
+    const id = t.dataset.rule, d = drafts[id] ?? { feedback: "", score: "7" };
+    if (!d.feedback.trim()) { toast("Write some feedback before ruling.", "err"); $(`fb-${id}`)?.focus(); return; }
+    act(() => CC.rule(id, t.dataset.ok === "1", d.feedback, Number(d.score)), t.dataset.ok === "1" ? "Chain approved and locked." : "Chain rejected and locked.");
+    delete drafts[id];
+  }
+});
+document.querySelectorAll(".filters button").forEach((b) => b.addEventListener("click", () => { filter = b.dataset.f; render(); }));
+$("clearSel").onclick = () => { selected = null; render(); };
+function newSession() { CC.reset(); selected = null; filter = "pending-review"; for (const k in drafts) delete drafts[k]; toast("New session created. Share the new room code."); }
+$("advance").onclick = () => CC.get().session.currentPhase === "completed" ? newSession() : act(() => CC.advance(), null);
+$("extend").onclick = () => act(() => CC.extend(60), "Added one minute.");
+$("seed").onclick = () => act(() => CC.seedSampleLearners(), "Sample learners added.");
+// Two-click confirm so a live class isn't wiped by accident.
+function armReset(btn) {
+  const label = btn.dataset.label ??= btn.textContent;
+  if (btn.dataset.armed) { delete btn.dataset.armed; btn.textContent = label; newSession(); return; }
+  btn.dataset.armed = 1; btn.textContent = "Click again to confirm";
+  setTimeout(() => { delete btn.dataset.armed; btn.textContent = label; }, 3000);
+}
+$("reset").onclick = () => armReset($("reset"));
+$("resetTop").onclick = () => armReset($("resetTop"));
+
+CC.subscribe(render);
+window.addEventListener("resize", () => render());
+setInterval(() => tick(), 1000);
+render();
+</script>
+</body>
+</html>
