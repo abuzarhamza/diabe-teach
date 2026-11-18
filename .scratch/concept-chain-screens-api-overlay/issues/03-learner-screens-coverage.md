@@ -6,9 +6,13 @@
 
 **Status:** ready-for-agent
 
-- [ ] Each element listed above has the right letter, actor badge and read/write outline
-- [ ] Submit card lists 409 `PHASE_CLOSED_FOR_SUBMISSIONS` and 422 `CHAIN_TOPOLOGY_INVALID`
-- [ ] Peer vote card notes learners can't vote on their own chain (403) or a locked chain (409)
-- [ ] "Not you? Join again" is untagged
-- [ ] Turning the overlay on in the join form keeps it on in the lobby and the game screen after automatic redirects
-- [ ] Drift test covers every non-missing operation used on these screens and passes
+- [x] Each element listed above has the right letter, actor badge and read/write outline
+- [x] Submit card lists 409 `PHASE_CLOSED_FOR_SUBMISSIONS` and 422 `CHAIN_TOPOLOGY_INVALID`
+- [x] Peer vote card notes learners can't vote on their own chain (403) or a locked chain (409)
+- [x] "Not you? Join again" is untagged
+- [x] Turning the overlay on in the join form keeps it on in the lobby and the game screen after automatic redirects
+- [x] Drift test covers every non-missing operation used on these screens and passes
+
+## Comments
+
+2026-11-17: Implemented. Tags: join form `B` (write); lobby phase pill `C.phase`, "N joined" `C.count`, classmates `C.classmates` (points to `participant.joined`), timeline `C.timeline` (all read); learner phase pill `C.phase`, timer `C.timer`, board `C.board`, classmates' chains `C.classChains` and My chains `C.myChains` (read, red: need missing `listRoundChains`), builder panel `E.builder` + Submit `E` (write), Approve/Challenge `F.approve`/`F.challenge` (write, variants `peer-approve`/`peer-challenge`, which override `auth` to participant and carry their own errors/notes/deviations), locked ruling `G.verdict` (read), round results `H` (read). "Not you? Join again", "Show on board", Undo/Clear untagged. Catalog: steps B, E, F; ops `joinGameSession`, `submitConceptChain`. Overlay: toggle goes into every `header.top` and every `[data-api-toggle]` (join view has one), kept in sync; on/off persisted in sessionStorage key `cc-api-overlay`. `placeCard` now never covers its element (below, above, right, left, else shorter scrollable card), since a focus card clamped over the join form swallowed the Join click. Fixed a pre-existing participant.html bug: `.panel`/`.col` `display:flex` overrode `hidden`, so the empty game header showed under the join form and the join form under the game (page-scoped `[hidden]{display:none !important}`). Drift test covers teacher/participant/lobby: 53 passing; eslint and tsc clean. Chrome over http://127.0.0.1 (dark mode): overlay on in join form stays on after join → lobby → game (teacher advanced in another tab); submit, vote, ruling, round summary all work with tags kept. New findings vs RESEARCH.md: join 404 code is `ROOM_CODE_NOT_FOUND` and join is accepted in any phase; submit now checks the path roundNumber against the active round (RESEARCH stale), needs >= 4 cells, accepts empty narrative, returns 403 for instructor/other-session tokens (undeclared); peer votes are not rejected on own chain, are appended (not replaced), aren't phase-gated, and never produce a peer-consensus verdict. Not verified: light mode, keyboard-only flow, narrow/touch viewports, hover on every card (Submit card errors checked via catalog/test, not visually).
