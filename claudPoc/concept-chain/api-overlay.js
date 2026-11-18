@@ -451,7 +451,7 @@ const CCOverlay = (() => {
   // Typing in a page field changes page state (draft chain, comments, feedback) without a DOM change.
   const onInput = () => schedule();
   const LISTENERS = [["mouseover", onOver], ["mouseout", onOut], ["focusin", onFocusIn], ["focusout", onFocusOut], ["keydown", onKey], ["input", onInput], ["change", onInput]];
-  const onScroll = () => placeCard();
+  const onScroll = () => { schedule(); placeCard(); }; // redraw too: sticky elements (Game setup's Start box) move as the page scrolls
 
   // ---- on / off ----
   function enable() {
@@ -469,7 +469,7 @@ const CCOverlay = (() => {
     window.addEventListener("scroll", onScroll, { passive: true });
     window.addEventListener("storage", schedule); // demo session changed in another tab
     observer = new MutationObserver(schedule);
-    observer.observe(document.body, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ["data-api", "data-api-io", "hidden", "class", "style"] });
+    observer.observe(document.body, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ["data-api", "data-api-io", "hidden", "class", "style", "open"] });
     remember(true); pressed();
     draw();
   }

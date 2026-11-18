@@ -24,6 +24,7 @@ Teacher login  ──►  Game setup  ──[Start game]──►  Teacher scree
    - **Board preview**: the board the class will get, dealt from the chosen pack at the chosen size, with a **Shuffle** button the teacher can press until they're happy with it. This replaces the shuffle half of the old "New round".
    - **Time allotment**: chain-building time and explaining (peer review) time per Gameplay Round, with an option to let either phase be **teacher-paced** (no timer). It also has the shortest chain allowed and the board size, and shows **"Rounds: 2"** as a fixed, read-only value with the note "Each round gets a freshly shuffled board". This replaces the old "as many rounds as you like".
    - A single **"Start game"** button (replacing "Create session" / "Start session") creates the Game Session with the chosen pack, timings and previewed board, then opens the teacher screen showing the new room code.
+   - **Revised 2026-11-18 ("Don't make me think"):** the page is laid out as three numbered steps: **1 Pick a topic**, **2 How long?**, **3 Start**. Step 3 stays on screen while the teacher scrolls. Each timer is a single dropdown, and the rarely changed settings sit under a closed **"More options"**. The defaults are good enough to press Start straight away. See *Game setup layout (revised 2026-11-18)* under Implementation Decisions.
 3. **Wording changes** across the teacher pages:
    - "Create session" / "Start session" → **"Start game"**.
    - "New round" is removed. Its "start another round" half moves to the teacher screen's phase button: at the end of Round 1 it reads **"Start Round 2 · new board →"**, so the teacher knows a fresh shuffle is coming.
@@ -85,6 +86,22 @@ Teacher login  ──►  Game setup  ──[Start game]──►  Teacher scree
 50. As a developer, I want the Shuffle button tagged with the `seed` field of `createGameSession`, marked "partial" because the backend ignores `seed`, so that I know a previewed board can't be reproduced server-side yet.
 51. As a developer, I want the "Start game" sample request to include the previewed board's `seed`, so that the request matches what the teacher saw.
 
+Added 2026-11-18 after a "Don't make me think" review of Game setup:
+
+52. As a teacher, I want "Start game" visible at all times on Game setup, so that I never have to scroll to find how to begin.
+53. As a teacher, I want the page to show three numbered steps (pick a topic, how long, start), so that I know what to do and in what order without reading.
+54. As a teacher, I want to press "Start game" straight away with the pre-filled choices, so that a normal lesson takes one click.
+55. As a teacher, I want each timer to be one dropdown (3, 4, 5, 8, 10 or 15 minutes, or "No timer – I'll move them on"), so that I don't have to work out how a minutes box and a checkbox interact.
+56. As a teacher, I want board size and shortest chain tucked under "More options", so that the settings I rarely change don't slow me down.
+57. As a teacher, I want the shortest chain as a dropdown ("Chains need at least N words"), so that I can't type an invalid number.
+58. As a teacher, I want pack cards to show just the pack name, with the chosen pack's word count and description shown once, so that the list is quick to scan.
+59. As a teacher, I want "+ New pack" as the last card in the pack list, so that I find it where I'm already looking.
+60. As a teacher, I want learner level and learning objective marked "(optional)" in the pack editor, so that I know I can skip them.
+61. As a teacher, I want the board preview kept small, with the full word list behind a "See all N words" link, so that the page stays short.
+62. As a teacher, I want one plain sentence next to "Start game" summing up my choices (topic, times, 2 rounds), so that I can check them at a glance.
+63. As a teacher, I want plain words instead of our internal terms (no "Game Session", "Gameplay Round", "Time allotment" or "keywords per side"), so that the page reads like a lesson plan.
+64. As a teacher, I want "Rounds: 2" shown as part of the summary sentence instead of as a box that looks like a setting, so that I don't look for a way to change it.
+
 ## Implementation Decisions
 
 - **Scope of change:** prototype files only, plus tests: two new pages next to the existing teacher, lobby and learner screens, changes to the teacher screen and the shared mock, and new catalog entries for the API overlay. No backend, OpenAPI or domain changes.
@@ -102,6 +119,13 @@ Teacher login  ──►  Game setup  ──[Start game]──►  Teacher scree
   - registering a pack needs an instructor token that only `createGameSession` issues;
   - the earlier research says register and validate responses drift from the spec;
   - shortest chain is fixed server-side and not read from the pack.
+- **Game setup layout (revised 2026-11-18, user stories 52–64):** replaces the first layout from tickets 02–04 without changing what is sent.
+  - Left column: **1 Pick a topic** (pack cards showing the name only, plus a "Yours" tag on teacher-made packs; the last card is "+ New pack", which opens the editor), then the board preview capped at about 360px wide, with Shuffle, a one-line "N words · description" for the chosen pack, and a closed "See all N words" list.
+  - Right column, sticky: **2 How long?** with "Building chains" and "Reviewing chains" dropdowns (3, 4, 5, 8, 10, 15 min, "No timer – I'll move them on"), a closed **More options** (Board: N × N; Chains need at least N words, 2–6), then **3 Start** with the summary sentence, "Start game →" and "You'll get a room code to share with your class."
+  - A remembered value that isn't in a dropdown's list (for example 7 minutes) is added to that list, so the teacher's last choice is never lost.
+  - The fixed "Rounds: 2" box, the "15 packs" count, the separate keyword list panel and the label/value summary list are removed. Their information is in the summary sentence or the chosen pack's line.
+  - If Start can't run, the message names what to fix (for example "Choose a topic first.").
+  - Unchanged: the `CreateSessionRequest` that is sent, remembered settings, the pack editor's behaviour, element ids that tests rely on, and every `data-api` tag (the tags move with their elements).
 - **Navigation:** the learner screens are unchanged. The teacher's starting page is Teacher login; the teacher screen is reached through "Start game".
 
 ## Testing Decisions
@@ -128,5 +152,6 @@ Teacher login  ──►  Game setup  ──[Start game]──►  Teacher scree
   - "New round" removed from setup, with new rounds started from the teacher screen. On 2026-11-17 the user asked what replaces it, and this spec adopts Claude's answer: a board preview with Shuffle on Game setup, a fixed "Rounds: 2" display, and the "Start Round 2 · new board →" button label;
   - the overlay added to both new pages.
   Confirm these, and anything that came after "time allotment", before implementation starts.
+- On 2026-11-18 the user asked for Game setup to follow "Don't make me think" and approved the review's recommendations (sticky Start, numbered steps, timer dropdowns, More options, plain wording, slimmer pack cards and preview). Recorded as user stories 52–64 and ticket 06.
 - Learner level and learning objective have no field on a Game Session or Curriculum Pack in the API. The closest is the pack `description`, so the overlay card should say so.
 - Teacher-created packs in the prototype are plain keyword lists. A real `registerCurriculumPack` needs Keyword Card ids, Semantic Domains and an adjudication rubric, so this is a known gap, not a bug.

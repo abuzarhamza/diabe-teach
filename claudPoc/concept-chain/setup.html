@@ -15,26 +15,32 @@
 .who a{color:var(--muted);font-size:13px}
 .packs{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px}
 .group{grid-column:1/-1;margin-top:6px}
-.pack{display:flex;gap:8px;align-items:flex-start;border:1px solid var(--line);border-radius:8px;padding:8px 10px;background:var(--surface);cursor:pointer}
+.pack{display:flex;gap:8px;align-items:center;border:1px solid var(--line);border-radius:8px;padding:8px 10px;background:var(--surface);cursor:pointer}
 .pack:hover{border-color:var(--accent)}
 .pack:has(input:checked){border-color:var(--accent);box-shadow:0 0 0 1px var(--accent);background:color-mix(in srgb,var(--accent) 8%,var(--surface))}
-.pack input{margin-top:3px;accent-color:var(--accent)}
+.pack input{margin:0;accent-color:var(--accent)}
 .pack .nm{font-weight:700;display:block}
-.pack .ds{font-size:13px;color:var(--muted);display:block}
 .chips{display:flex;flex-wrap:wrap;gap:4px}
 .chips span{background:var(--sunk);border-radius:999px;padding:2px 9px;font-size:13px}
-fieldset{border:1px solid var(--line);border-radius:8px;padding:10px;margin:0;display:flex;flex-direction:column;gap:6px}
-legend{font-weight:700;padding:0 4px}
-.mins{display:flex;align-items:center;gap:8px}
-.mins input[type=number]{width:96px}
-.mins input[type=number][aria-invalid=true]{border-color:var(--bad)}
-.check{display:flex;gap:6px;align-items:center;font-size:14px}
-.check input{accent-color:var(--accent)}
 .err{color:var(--bad);font-size:13px;font-weight:700;min-height:0;margin:0}
 .err:empty{display:none}
-dl.sum{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;margin:0;font-size:14px}
-dl.sum dt{color:var(--muted)} dl.sum dd{margin:0;font-weight:700}
-#start{font-size:17px;padding:10px 18px}
+#start{font-size:17px;padding:12px 18px;width:100%}
+.step{display:inline-grid;place-items:center;width:26px;height:26px;border-radius:50%;background:var(--accent);color:var(--surface);font-size:14px;margin-right:8px;vertical-align:2px}
+.side{align-self:stretch} /* full row height, so the Start box can stick while the left column scrolls */
+.startp{position:sticky;top:12px}
+@media (max-width:920px){.startp{position:static}}
+.field{display:flex;flex-direction:column;gap:4px}
+.field>label{font-weight:700;font-size:14px}
+.opt{font-weight:400;color:var(--muted)}
+details>summary{cursor:pointer;font-weight:700;font-size:14px;color:var(--accent)}
+details[open]>summary{margin-bottom:8px}
+#more{display:flex;flex-direction:column;gap:10px}
+#more .field+.field{margin-top:10px}
+.sum{margin:0;font-size:15px;line-height:1.5}
+.sum b{font-size:16px}
+#preview{max-width:440px;margin:0}
+.newcard{justify-content:center;align-items:center;border-style:dashed;font-weight:700;color:var(--accent)}
+.tag{background:var(--sunk);border-radius:999px;padding:1px 8px;font-size:12px;font-weight:700;margin-left:6px;color:var(--muted)}
 .packitem{display:flex;flex-direction:column;gap:4px}
 .packitem .pack{flex:1}
 .packitem .del{align-self:flex-end}
@@ -51,106 +57,80 @@ dl.sum dt{color:var(--muted)} dl.sum dd{margin:0;font-weight:700}
 .count{font-size:14px;font-weight:700}
 .warn{color:var(--warn);font-size:14px;margin:0}
 .ok{color:var(--good);font-size:14px;margin:0}
-.mins select{width:auto}
 #file:focus-visible+label{outline:2px solid var(--accent);outline-offset:2px}
 label.btn{cursor:pointer}
-.rounds{font-size:20px;font-weight:800;font-family:var(--font-display);margin:0}
 [hidden]{display:none !important} /* .panel/.col set display:flex, which would override the hidden attribute */
 </style>
 </head>
 <body>
 <div class="wrap">
   <header class="top">
-    <div class="brand"><h1>Concept <span>Chain</span></h1><p>Game setup · choose a pack and how long each phase lasts</p></div>
+    <div class="brand"><h1>Concept <span>Chain</span></h1><p>Game setup · three steps and your class is playing</p></div>
     <div class="who" data-api="gap.signIn" data-api-io="read"><span>Signed in as <b id="who"></b></span><a href="login.html" id="signOut">Sign out</a></div>
   </header>
 
   <div class="main">
     <div class="col">
       <section class="panel" aria-labelledby="packH">
-        <div class="row between"><h2 id="packH">Choose a pack</h2><span class="eyebrow" id="packCount"></span></div>
+        <h2 id="packH"><span class="step" aria-hidden="true">1</span>Pick a topic</h2>
         <div class="packs" id="packs" role="radiogroup" aria-labelledby="packH" data-api="P.list" data-api-io="read"></div>
-        <div class="row between"><button class="btn" id="newPack" type="button" aria-expanded="false" aria-controls="editor">+ Create a new pack</button>
-          <p class="note" id="packMsg" role="status" aria-live="polite"></p></div>
+        <p class="note" id="packMsg" role="status" aria-live="polite"></p>
       </section>
       <section class="panel" id="editor" aria-labelledby="edH" data-api="P.create" data-api-io="write" hidden>
-        <div class="row between"><h2 id="edH">Create a new pack</h2><span class="eyebrow">Saved in this browser</span></div>
+        <div class="row between"><h2 id="edH">New pack</h2><span class="eyebrow">Saved in this browser</span></div>
         <div class="editor">
           <div class="field">
             <span class="lbl" id="fromLbl">Start from an existing pack</span>
-            <div class="row"><select id="from" aria-labelledby="fromLbl"></select><button class="btn sm" id="fromAdd" type="button">Copy its keywords</button></div>
+            <div class="row"><select id="from" aria-labelledby="fromLbl"></select><button class="btn sm" id="fromAdd" type="button">Copy its words</button></div>
           </div>
           <div class="field">
-            <label for="paste">Paste keywords</label>
+            <label for="paste">Paste words</label>
             <textarea id="paste" placeholder="One per line, or separated by commas"></textarea>
-            <div class="row"><button class="btn sm" id="pasteAdd" type="button">Add pasted keywords</button>
+            <div class="row"><button class="btn sm" id="pasteAdd" type="button">Add pasted words</button>
               <input type="file" id="file" accept=".txt,.csv,text/plain,text/csv" class="visually-hidden"><label class="btn sm" for="file">Upload .txt or .csv…</label></div>
           </div>
           <div class="field">
-            <div class="row between"><span class="count" id="edCount">0 keywords</span><button class="btn sm" id="clearKw" type="button">Clear all</button></div>
-            <div class="kwchips" id="edChips" aria-label="Keywords in the new pack"></div>
+            <div class="row between"><span class="count" id="edCount">0 words</span><button class="btn sm" id="clearKw" type="button">Clear all</button></div>
+            <div class="kwchips" id="edChips" aria-label="Words in the new pack"></div>
             <p class="note" id="edAdded" role="status" aria-live="polite"></p>
             <p class="warn" id="edWarn"></p>
           </div>
           <div class="field"><label for="pkName">Pack name</label><input type="text" id="pkName" maxlength="80" autocomplete="off"></div>
-          <div class="field" data-api="gap.packMeta" data-api-io="write"><label for="pkLevel">Learner level</label><input type="text" id="pkLevel" list="levels" maxlength="60" placeholder="e.g. Year 2 medicine">
+          <div class="field" data-api="gap.packMeta" data-api-io="write"><label for="pkLevel">Learner level <span class="opt">(optional)</span></label><input type="text" id="pkLevel" list="levels" maxlength="60" placeholder="e.g. Year 2 medicine">
             <datalist id="levels"><option value="Pre-clinical"><option value="Year 1 undergraduate"><option value="Year 2 undergraduate"><option value="Clinical years"><option value="Postgraduate"><option value="Interprofessional"></datalist></div>
-          <div class="field" data-api="gap.packMeta" data-api-io="write"><label for="pkObj">Learning objective</label><textarea id="pkObj" maxlength="300" placeholder="e.g. Explain how insulin resistance leads to type 2 diabetes complications"></textarea></div>
+          <div class="field" data-api="gap.packMeta" data-api-io="write"><label for="pkObj">Learning objective <span class="opt">(optional)</span></label><textarea id="pkObj" maxlength="300" placeholder="e.g. Explain how insulin resistance leads to type 2 diabetes complications"></textarea></div>
           <p class="err" id="edErr" role="alert"></p>
           <div class="row"><button class="btn primary" id="savePack" type="button" data-api="P.create" data-api-io="write">Save pack</button><button class="btn" id="cancelPack" type="button">Cancel</button></div>
         </div>
       </section>
       <section class="panel" aria-labelledby="pvH">
         <div class="row between"><h2 id="pvH">Board preview</h2><button class="btn sm" id="shuffle" type="button" aria-describedby="pvNote" data-api="A.seed" data-api-io="write">Shuffle ↻</button></div>
-        <p class="note" id="pvNote" role="status" aria-live="polite"></p>
+        <p class="note" id="packInfo"></p>
         <div class="board-shell board-readonly" id="preview" aria-label="Board preview" data-api="gap.boardPreview" data-api-io="read"></div>
-      </section>
-      <section class="panel" aria-labelledby="kwH" data-api="P.keywords" data-api-io="read">
-        <div class="row between"><h2 id="kwH">Keywords in <span id="kwPack"></span></h2><span class="eyebrow" id="kwCount"></span></div>
-        <div class="chips" id="keywords"></div>
+        <p class="note" id="pvNote" role="status" aria-live="polite"></p>
+        <details id="kwMore" data-api="P.keywords" data-api-io="read"><summary id="kwSum">See all words</summary><div class="chips" id="keywords"></div></details>
       </section>
     </div>
 
-    <aside class="col">
+    <aside class="col side">
       <section class="panel" aria-labelledby="timeH">
-        <h2 id="timeH">Time allotment</h2>
-        <p class="note">Per Gameplay Round; both rounds use the same times. A teacher-paced phase has no timer: you move the class on with Next phase.</p>
-        <fieldset data-api="A.timerConfig" data-api-io="write">
-          <legend>Chain-building</legend>
-          <div class="mins"><input type="number" id="mapMin" min="1" max="1440" step="1" inputmode="numeric" aria-describedby="mapErr"><label for="mapMin">minutes</label></div>
-          <label class="check"><input type="checkbox" id="mapPaced"> Teacher-paced (no timer)</label>
-          <p class="err" id="mapErr" role="alert"></p>
-        </fieldset>
-        <fieldset data-api="A.timerConfig" data-api-io="write">
-          <legend>Peer review</legend>
-          <div class="mins"><input type="number" id="revMin" min="1" max="1440" step="1" inputmode="numeric" aria-describedby="revErr"><label for="revMin">minutes</label></div>
-          <label class="check"><input type="checkbox" id="revPaced"> Teacher-paced (no timer)</label>
-          <p class="err" id="revErr" role="alert"></p>
-        </fieldset>
-        <fieldset data-api="gap.boardSize" data-api-io="write">
-          <legend>Board size</legend>
-          <div class="mins"><select id="size" aria-describedby="sizeNote"></select><label for="size">keywords per side</label></div>
-          <p class="note" id="sizeNote"></p>
-        </fieldset>
-        <fieldset data-api="gap.minChain" data-api-io="write">
-          <legend>Shortest chain allowed</legend>
-          <div class="mins"><input type="number" id="minChain" min="2" step="1" inputmode="numeric" aria-describedby="minErr"><label for="minChain">keywords</label></div>
-          <p class="err" id="minErr" role="alert"></p>
-        </fieldset>
-        <fieldset>
-          <legend>Rounds</legend>
-          <p class="rounds" id="rounds">Rounds: 2</p>
-          <p class="note">Each round gets a freshly shuffled board. Round 1 uses the board in the preview.</p>
-        </fieldset>
-        <p class="note">Pre-test, trial round, round summary, post-test and survey stay teacher-paced.</p>
+        <h2 id="timeH"><span class="step" aria-hidden="true">2</span>How long?</h2>
+        <div class="field" data-api="A.timerConfig" data-api-io="write"><label for="mapSel">Building chains</label><select id="mapSel"></select></div>
+        <div class="field" data-api="A.timerConfig" data-api-io="write"><label for="revSel">Reviewing chains</label><select id="revSel"></select></div>
+        <p class="note">Same times for both rounds.</p>
+        <details id="more">
+          <summary>More options</summary>
+          <div class="field" data-api="gap.boardSize" data-api-io="write"><label for="size">Board</label><select id="size" aria-describedby="sizeNote"></select><p class="note" id="sizeNote"></p></div>
+          <div class="field" data-api="gap.minChain" data-api-io="write"><label for="minChain">Chains need at least</label><select id="minChain"></select></div>
+        </details>
       </section>
 
-      <section class="panel" aria-labelledby="sumH">
-        <h2 id="sumH">Summary</h2>
-        <dl class="sum" id="summary"></dl>
+      <section class="panel startp" aria-labelledby="sumH">
+        <h2 id="sumH"><span class="step" aria-hidden="true">3</span>Start</h2>
+        <p class="sum" id="summary"></p>
         <button class="btn primary" id="start" type="button" data-api="A" data-api-io="write">Start game →</button>
         <p class="err" id="startErr" role="status" aria-live="polite"></p>
-        <p class="note">Starts a new Game Session with a new room code and opens the teacher screen.</p>
+        <p class="note">You'll get a room code to share with your class.</p>
       </section>
     </aside>
   </div>
@@ -162,6 +142,10 @@ label.btn{cursor:pointer}
 const $ = (id) => document.getElementById(id);
 const teacher = CC.teacher();
 const defaults = CC.DEFAULT_TIMER_CONFIG;
+const TIMER_MINUTES = [3, 4, 5, 8, 10, 15]; // the timer dropdowns' choices; a remembered off-list value is added
+const MIN_CHAIN_CHOICES = [2, 3, 4, 5, 6];
+const PACED = "paced"; // dropdown value for "No timer – I'll move them on" (timerConfig null)
+const TIMERS = [["map", "roundMappingSec"], ["rev", "roundAdjudicationSec"]];
 let packId = CC.DEFAULT_PACK_ID;
 let seed = CC.newSeed(); // the board preview's seed; Shuffle replaces it, Start game sends it as CreateSessionRequest.seed
 let shuffles = 0;
@@ -169,35 +153,44 @@ let wantSize = 7; // the teacher's chosen board size; capped by what the chosen 
 const draft = { keywords: [], duplicates: 0, empty: 0 };
 const sizeOf = (pack) => Math.min(10, Math.floor(Math.sqrt(pack.keywords.length)));
 const boardSize = () => { const p = CC.getPack(packId); return p ? Math.max(3, Math.min(wantSize, sizeOf(p))) : wantSize; };
+const plural = (n, one, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 
-// Reads the form; returns { settings } when valid, else { errors }. Settings mirror CreateSessionRequest (+ boardSize, minChainLength).
+// A timer dropdown's value as timerConfig seconds (null = no timer).
+const timerSec = (key) => $(`${key}Sel`).value === PACED ? null : Number($(`${key}Sel`).value);
+function fillTimer(key, sec) {
+  const secs = TIMER_MINUTES.map((m) => m * 60);
+  if (sec != null && !secs.includes(sec)) secs.push(sec), secs.sort((a, b) => a - b);
+  $(`${key}Sel`).innerHTML = secs.map((v) => `<option value="${v}">${CC.timerLabel(v)}</option>`).join("")
+    + `<option value="${PACED}">No timer – I'll move them on</option>`;
+  $(`${key}Sel`).value = sec == null ? PACED : String(sec);
+}
+function fillMinChain(n) {
+  const list = MIN_CHAIN_CHOICES.includes(n) ? MIN_CHAIN_CHOICES : [...MIN_CHAIN_CHOICES, n].sort((a, b) => a - b);
+  $("minChain").innerHTML = list.map((v) => `<option value="${v}">${v} words</option>`).join("");
+  $("minChain").value = String(n);
+}
+
+// Reads the form; returns { settings } when valid, else { error } naming what to fix. Settings mirror CreateSessionRequest (+ boardSize, minChainLength).
 function readForm() {
-  const errors = {}, timerConfig = {};
-  for (const [key, field] of [["map", "roundMappingSec"], ["rev", "roundAdjudicationSec"]]) {
-    try { timerConfig[field] = CC.timerFromMinutes($(`${key}Min`).value, $(`${key}Paced`).checked); }
-    catch (e) { errors[key] = e.message; }
-  }
+  if (!CC.getPack(packId)) return { error: "Choose a topic first." };
+  const timerConfig = Object.fromEntries(TIMERS.map(([key, field]) => [field, timerSec(key)]));
   const size = boardSize(), minChain = Number($("minChain").value);
-  if ($("minChain").value.trim() === "" || !Number.isInteger(minChain) || minChain < 2 || minChain > size * size)
-    errors.min = `Enter a whole number from 2 to ${size * size} (a ${size}×${size} board).`;
-  if (!CC.getPack(packId)) errors.pack = "Choose a pack.";
-  if (Object.keys(errors).length) return { errors };
+  if (minChain > size * size) return { error: `Chains of ${minChain} words don't fit a ${size} × ${size} board. Pick a shorter chain in More options.` };
   const settings = { packId, mode: "classroom", adjudicationMode: "peer-instructor", creatorDisplayName: teacher.name, timerConfig, seed, boardSize: size, minChainLength: minChain };
-  try { CC.normalizeSettings(settings); } catch (e) { return { errors: { start: e.message } }; }
+  try { CC.normalizeSettings(settings); } catch (e) { return { error: e.message }; }
   return { settings };
 }
 
 function renderPacks() {
   const packs = CC.listPacks();
-  const own = packs.filter((p) => !p.builtIn).length;
-  $("packCount").textContent = `${packs.length} packs${own ? ` · ${own} yours` : ""}`;
   let html = "", group = null;
   for (const p of packs) {
     if (p.group !== group) { group = p.group; html += `<span class="eyebrow group">${CC.esc(group)}</span>`; }
-    const label = `<label class="pack"><input type="radio" name="pack" value="${CC.esc(p.packId)}" ${p.packId === packId ? "checked" : ""}>
-      <span><span class="nm">${CC.esc(p.name)}</span><span class="ds">${p.keywords.length} keywords · ${CC.esc(p.description)}</span></span></label>`;
+    const label = `<label class="pack" title="${CC.esc(`${p.keywords.length} words · ${p.description}`)}"><input type="radio" name="pack" value="${CC.esc(p.packId)}" ${p.packId === packId ? "checked" : ""}>
+      <span class="nm">${CC.esc(p.name)}${p.builtIn ? "" : `<span class="tag">Yours</span>`}</span></label>`;
     html += p.builtIn ? label : `<div class="packitem">${label}<button class="btn sm bad del" type="button" data-del="${CC.esc(p.packId)}" data-api="gap.deletePack" data-api-io="write" aria-label="Delete pack ${CC.esc(p.name)}">Delete</button></div>`;
   }
+  html += `<button class="pack newcard" id="newPack" type="button" aria-expanded="${String(!$("editor").hidden)}" aria-controls="editor">+ New pack</button>`;
   $("packs").innerHTML = html;
   $("from").innerHTML = packs.map((p) => `<option value="${CC.esc(p.packId)}">${CC.esc(p.name)} (${p.keywords.length})</option>`).join("");
   $("from").value = packId;
@@ -205,17 +198,17 @@ function renderPacks() {
 
 function renderEditor(added) {
   const n = draft.keywords.length, size = boardSize(), need = size * size;
-  $("edCount").textContent = `${n} keyword${n === 1 ? "" : "s"}`;
+  $("edCount").textContent = plural(n, "word");
   $("edChips").innerHTML = n ? draft.keywords.map((k, i) => `<span class="chip"><span>${CC.esc(k)}</span><button type="button" data-rm="${i}" aria-label="Remove ${CC.esc(k)}">×</button></span>`).join("")
-    : `<p class="empty">No keywords yet. Paste, upload or copy from a pack.</p>`;
-  const removed = [draft.duplicates && `${draft.duplicates} duplicate${draft.duplicates === 1 ? "" : "s"}`, draft.empty && `${draft.empty} empty entr${draft.empty === 1 ? "y" : "ies"}`].filter(Boolean);
+    : `<p class="empty">No words yet. Paste, upload or copy from a pack.</p>`;
+  const removed = [draft.duplicates && plural(draft.duplicates, "duplicate"), draft.empty && plural(draft.empty, "empty entry", "empty entries")].filter(Boolean);
   if (added != null) $("edAdded").textContent = `Added ${added}.${removed.length ? ` Removed so far: ${removed.join(" and ")}.` : ""}`;
   else if (!n) $("edAdded").textContent = "";
   const most = Math.min(10, Math.floor(Math.sqrt(n)));
   $("edWarn").className = n >= need ? "ok" : "warn";
-  $("edWarn").textContent = n >= need ? `Enough for the chosen ${size}×${size} board (needs ${need}).`
-    : n < CC.MIN_PACK_KEYWORDS ? `A ${size}×${size} board needs ${need} keywords; you have ${n}. A pack needs at least ${CC.MIN_PACK_KEYWORDS} (a 3×3 board) to save.`
-    : `A ${size}×${size} board needs ${need} keywords; you have ${n} (${need - n} short). This pack can fill up to a ${most}×${most} board.`;
+  $("edWarn").textContent = n >= need ? `Enough for a ${size} × ${size} board (needs ${need}).`
+    : n < CC.MIN_PACK_KEYWORDS ? `Add at least ${CC.MIN_PACK_KEYWORDS - n} more to save (a pack needs ${CC.MIN_PACK_KEYWORDS}). A ${size} × ${size} board needs ${need}.`
+    : `A ${size} × ${size} board needs ${need} words; you have ${n}. This pack fills up to ${most} × ${most}.`;
 }
 
 function addKeywords(input) {
@@ -229,38 +222,27 @@ function addKeywords(input) {
 
 function openEditor(open) {
   $("editor").hidden = !open; $("newPack").setAttribute("aria-expanded", String(open));
-  if (open) { renderEditor(); $("paste").focus(); }
+  if (open) { renderEditor(); $("editor").scrollIntoView({ block: "nearest", behavior: "smooth" }); $("paste").focus({ preventScroll: true }); }
   else { Object.assign(draft, { keywords: [], duplicates: 0, empty: 0 }); for (const id of ["paste", "pkName", "pkLevel", "pkObj"]) $(id).value = ""; $("edErr").textContent = ""; $("edAdded").textContent = ""; }
 }
 
 function render() {
   const pack = CC.getPack(packId);
-  $("kwPack").textContent = pack?.name ?? "—";
-  $("kwCount").textContent = pack ? `${pack.keywords.length} keywords` : "";
-  $("keywords").innerHTML = pack ? pack.keywords.map((k) => `<span>${CC.esc(k)}</span>`).join("") : `<p class="empty">Choose a pack to see its keywords.</p>`;
+  $("packInfo").textContent = pack ? `${pack.name} · ${plural(pack.keywords.length, "word")} · ${pack.builtIn ? pack.group : pack.description}` : "";
+  $("kwSum").textContent = pack ? `See all ${plural(pack.keywords.length, "word")}` : "See all words";
+  $("keywords").innerHTML = pack ? pack.keywords.map((k) => `<span>${CC.esc(k)}</span>`).join("") : `<p class="empty">Choose a topic to see its words.</p>`;
 
   const size = boardSize(), most = pack ? sizeOf(pack) : 10;
   renderPreview(pack, size);
-  $("size").innerHTML = Array.from({ length: Math.max(0, most - 2) }, (_, i) => i + 3).map((n) => `<option value="${n}" ${n === size ? "selected" : ""}>${n}×${n} (${n * n} keywords)</option>`).join("");
-  $("sizeNote").textContent = pack ? `${pack.name} has ${pack.keywords.length} keywords: up to ${most}×${most}.` : "";
-  $("minChain").max = size * size;
+  $("size").innerHTML = Array.from({ length: Math.max(0, most - 2) }, (_, i) => i + 3).map((n) => `<option value="${n}" ${n === size ? "selected" : ""}>${n} × ${n} (${n * n} words)</option>`).join("");
+  $("sizeNote").textContent = pack ? `${pack.name} has ${plural(pack.keywords.length, "word")}: up to ${most} × ${most}.` : "";
 
-  for (const key of ["map", "rev"]) $(`${key}Min`).disabled = $(`${key}Paced`).checked;
-  const { settings, errors = {} } = readForm();
-  for (const key of ["map", "rev"]) { $(`${key}Err`).textContent = errors[key] ?? ""; $(`${key}Min`).setAttribute("aria-invalid", String(!!errors[key])); }
-  $("minErr").textContent = errors.min ?? ""; $("minChain").setAttribute("aria-invalid", String(!!errors.min));
-  $("startErr").textContent = errors.start ?? errors.pack ?? (settings ? "" : "Fix the settings above to start.");
-
-  const time = (key) => errors[key] ? "—" : CC.timerLabel(CC.timerFromMinutes($(`${key}Min`).value, $(`${key}Paced`).checked));
-  $("summary").innerHTML = `<dt>Teacher</dt><dd>${CC.esc(teacher.name)}</dd>
-    <dt>Pack</dt><dd>${CC.esc(pack?.name ?? "—")}</dd>
-    ${pack?.objective ? `<dt>Objective</dt><dd>${CC.esc(pack.objective)}</dd>` : ""}
-    <dt>Board</dt><dd>${pack ? `${size}×${size}` : "—"}</dd>
-    <dt>Rounds</dt><dd>2 · a fresh board each</dd>
-    <dt>Shortest chain</dt><dd>${errors.min ? "—" : `${$("minChain").value} keywords`}</dd>
-    <dt>Chain-building</dt><dd>${time("map")}</dd>
-    <dt>Peer review</dt><dd>${time("rev")}</dd>
-    <dt>Game</dt><dd>Classroom · peer votes + your final ruling</dd>`;
+  const { settings, error } = readForm();
+  $("startErr").textContent = error ?? "";
+  const time = (key) => { const sec = timerSec(key); return sec == null ? "no timer" : CC.timerLabel(sec); };
+  $("summary").innerHTML = pack
+    ? `<b>${CC.esc(pack.name)}</b><br>Building chains: ${time("map")} · Reviewing: ${time("rev")}<br>${size} × ${size} board · chains of ${CC.esc($("minChain").value)}+ words · 2 rounds, each with a new board`
+    : "Pick a topic in step 1.";
   $("start").disabled = !settings;
   if (settings) CC.rememberSetup(settings);
   if (!$("editor").hidden) renderEditor();
@@ -269,8 +251,8 @@ function render() {
 // Deals the board the class will get from the chosen pack, size and preview seed (same inputs, same board).
 function renderPreview(pack, size) {
   CC.renderBoard($("preview"), pack ? CC.dealBoard({ pack, boardSize: size, seed }) : null);
-  if (!pack) $("preview").querySelector(".board-empty").textContent = "Choose a pack to preview its board.";
-  const note = pack ? `${size}×${size} board from ${pack.name}${shuffles ? ` · shuffled ${shuffles}×` : ""}. Round 1 starts with exactly this board; Round 2 gets a fresh shuffle.` : "";
+  if (!pack) $("preview").querySelector(".board-empty").textContent = "Choose a topic to preview its board.";
+  const note = pack ? `Round 1 uses this exact board${shuffles ? ` (shuffled ${shuffles}×)` : ""}. Round 2 gets a new shuffle.` : "";
   if ($("pvNote").textContent !== note) $("pvNote").textContent = note; // don't re-announce on unrelated edits
 }
 
@@ -279,11 +261,8 @@ function prefill() {
   const last = CC.lastSetup() ?? {}, tc = { ...defaults, ...(last.timerConfig ?? {}) };
   if (last.packId && CC.getPack(last.packId)) packId = last.packId;
   if (Number.isInteger(last.boardSize)) wantSize = last.boardSize;
-  for (const [key, field] of [["map", "roundMappingSec"], ["rev", "roundAdjudicationSec"]]) {
-    $(`${key}Paced`).checked = tc[field] == null;
-    $(`${key}Min`).value = (tc[field] ?? defaults[field] ?? 300) / 60;
-  }
-  $("minChain").value = Number.isInteger(last.minChainLength) ? last.minChainLength : 2;
+  for (const [key, field] of TIMERS) fillTimer(key, tc[field]);
+  fillMinChain(Number.isInteger(last.minChainLength) && last.minChainLength >= 2 ? last.minChainLength : 2);
 }
 
 if (teacher) {
@@ -292,6 +271,7 @@ if (teacher) {
   renderPacks();
   $("packs").addEventListener("change", (e) => { if (e.target.name === "pack") { packId = e.target.value; render(); } });
   $("packs").addEventListener("click", (e) => {
+    if (e.target.closest("#newPack")) { openEditor($("editor").hidden); return; }
     const b = e.target.closest("[data-del]"); if (!b) return;
     if (b.dataset.armed !== "1") { b.dataset.armed = "1"; b.textContent = "Confirm delete"; setTimeout(() => { if (b.isConnected) { b.dataset.armed = ""; b.textContent = "Delete"; } }, 6000); return; }
     const p = CC.getPack(b.dataset.del);
@@ -301,13 +281,12 @@ if (teacher) {
     $("packMsg").textContent = `Deleted “${p?.name ?? "pack"}”.`;
     document.querySelector('#packs input[name="pack"]:checked')?.focus();
   });
-  for (const id of ["mapMin", "mapPaced", "revMin", "revPaced", "minChain"]) $(id).addEventListener("input", render);
+  for (const id of ["mapSel", "revSel", "minChain"]) $(id).addEventListener("change", render);
   $("size").addEventListener("change", () => { wantSize = Number($("size").value); render(); });
   $("signOut").addEventListener("click", () => CC.signOut());
   $("shuffle").onclick = () => { seed = CC.newSeed(); shuffles++; render(); };
   window.addEventListener("resize", () => renderPreview(CC.getPack(packId), boardSize()));
 
-  $("newPack").onclick = () => openEditor($("editor").hidden);
   $("cancelPack").onclick = () => { openEditor(false); $("newPack").focus(); };
   $("fromAdd").onclick = () => {
     const p = CC.getPack($("from").value); if (!p) return;
@@ -335,18 +314,20 @@ if (teacher) {
     try {
       const p = CC.savePack({ name: $("pkName").value, level: $("pkLevel").value, objective: $("pkObj").value, keywords: draft.keywords });
       packId = p.packId; openEditor(false); renderPacks(); render();
-      $("packMsg").textContent = `Saved “${p.name}” (${p.keywords.length} keywords) and chose it.`;
+      $("packMsg").textContent = `Saved “${p.name}” (${plural(p.keywords.length, "word")}) and chose it.`;
       $("newPack").focus();
     } catch (e) { $("edErr").textContent = e.message; }
   };
 
   // Live API overlay samples: the form as it stands (Start game's createGameSession body), the pack list,
-  // the chosen pack and the create-pack editor. Plain data, cheap to build.
+  // the chosen pack and the create-pack editor. Plain data, cheap to build. Timer fields keep the
+  // minutes/paced shape the catalog's sample builder reads.
+  const minutesOf = (key, field) => String((timerSec(key) ?? defaults[field] ?? 300) / 60);
   CCOverlay.setContext(() => {
     const pack = CC.getPack(packId);
     return {
-      setup: { packId, creatorDisplayName: teacher.name, mappingMinutes: $("mapMin").value, mappingPaced: $("mapPaced").checked,
-        adjudicationMinutes: $("revMin").value, adjudicationPaced: $("revPaced").checked, seed, boardSize: boardSize(), minChainLength: $("minChain").value },
+      setup: { packId, creatorDisplayName: teacher.name, mappingMinutes: minutesOf("map", "roundMappingSec"), mappingPaced: timerSec("map") == null,
+        adjudicationMinutes: minutesOf("rev", "roundAdjudicationSec"), adjudicationPaced: timerSec("rev") == null, seed, boardSize: boardSize(), minChainLength: $("minChain").value },
       packs: CC.listPacks().map((p) => ({ packId: p.packId, name: p.name, group: p.group, description: p.description, keywordCount: p.keywords.length, maxBoardSize: sizeOf(p) })),
       pack: pack ? { packId: pack.packId, name: pack.name, group: pack.group, description: pack.description, keywords: pack.keywords, maxBoardSize: sizeOf(pack) } : null,
       newPack: $("editor").hidden ? null : { name: $("pkName").value, level: $("pkLevel").value, objective: $("pkObj").value, keywords: draft.keywords },
@@ -354,7 +335,7 @@ if (teacher) {
   });
 
   $("start").onclick = () => {
-    const { settings } = readForm(); if (!settings) return render();
+    const { settings, error } = readForm(); if (!settings) { $("startErr").textContent = error; return; }
     try { CC.createSession(settings); CC.rememberSetup(settings); location.assign("teacher.html"); }
     catch (e) { $("startErr").textContent = e.message; }
   };
