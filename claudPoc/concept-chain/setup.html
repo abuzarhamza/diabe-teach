@@ -35,6 +35,25 @@ legend{font-weight:700;padding:0 4px}
 dl.sum{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;margin:0;font-size:14px}
 dl.sum dt{color:var(--muted)} dl.sum dd{margin:0;font-weight:700}
 #start{font-size:17px;padding:10px 18px}
+.packitem{display:flex;flex-direction:column;gap:4px}
+.packitem .pack{flex:1}
+.packitem .del{align-self:flex-end}
+.editor{display:flex;flex-direction:column;gap:10px}
+.editor .field{display:flex;flex-direction:column;gap:4px}
+.editor .field>label,.editor .lbl{font-weight:700;font-size:14px}
+.editor .row{gap:8px;flex-wrap:wrap;align-items:center}
+.editor .row select{flex:1;min-width:180px;width:auto}
+.kwchips{display:flex;flex-wrap:wrap;gap:4px;max-height:220px;overflow:auto;padding:6px;background:var(--sunk);border-radius:8px;min-height:44px;align-content:flex-start}
+.kwchips .chip{display:inline-flex;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:1px 2px 1px 9px;font-size:13px;max-width:100%}
+.kwchips .chip span{overflow-wrap:anywhere}
+.kwchips .chip button{border:0;background:transparent;padding:2px 7px;border-radius:999px;line-height:1;font-size:13px;cursor:pointer}
+.kwchips .chip button:hover{background:var(--sunk)}
+.count{font-size:14px;font-weight:700}
+.warn{color:var(--warn);font-size:14px;margin:0}
+.ok{color:var(--good);font-size:14px;margin:0}
+.mins select{width:auto}
+#file:focus-visible+label{outline:2px solid var(--accent);outline-offset:2px}
+label.btn{cursor:pointer}
 [hidden]{display:none !important} /* .panel/.col set display:flex, which would override the hidden attribute */
 </style>
 </head>
@@ -50,6 +69,35 @@ dl.sum dt{color:var(--muted)} dl.sum dd{margin:0;font-weight:700}
       <section class="panel" aria-labelledby="packH">
         <div class="row between"><h2 id="packH">Choose a pack</h2><span class="eyebrow" id="packCount"></span></div>
         <div class="packs" id="packs" role="radiogroup" aria-labelledby="packH"></div>
+        <div class="row between"><button class="btn" id="newPack" type="button" aria-expanded="false" aria-controls="editor">+ Create a new pack</button>
+          <p class="note" id="packMsg" role="status" aria-live="polite"></p></div>
+      </section>
+      <section class="panel" id="editor" aria-labelledby="edH" hidden>
+        <div class="row between"><h2 id="edH">Create a new pack</h2><span class="eyebrow">Saved in this browser</span></div>
+        <div class="editor">
+          <div class="field">
+            <span class="lbl" id="fromLbl">Start from an existing pack</span>
+            <div class="row"><select id="from" aria-labelledby="fromLbl"></select><button class="btn sm" id="fromAdd" type="button">Copy its keywords</button></div>
+          </div>
+          <div class="field">
+            <label for="paste">Paste keywords</label>
+            <textarea id="paste" placeholder="One per line, or separated by commas"></textarea>
+            <div class="row"><button class="btn sm" id="pasteAdd" type="button">Add pasted keywords</button>
+              <input type="file" id="file" accept=".txt,.csv,text/plain,text/csv" class="visually-hidden"><label class="btn sm" for="file">Upload .txt or .csv…</label></div>
+          </div>
+          <div class="field">
+            <div class="row between"><span class="count" id="edCount">0 keywords</span><button class="btn sm" id="clearKw" type="button">Clear all</button></div>
+            <div class="kwchips" id="edChips" aria-label="Keywords in the new pack"></div>
+            <p class="note" id="edAdded" role="status" aria-live="polite"></p>
+            <p class="warn" id="edWarn"></p>
+          </div>
+          <div class="field"><label for="pkName">Pack name</label><input type="text" id="pkName" maxlength="80" autocomplete="off"></div>
+          <div class="field"><label for="pkLevel">Learner level</label><input type="text" id="pkLevel" list="levels" maxlength="60" placeholder="e.g. Year 2 medicine">
+            <datalist id="levels"><option value="Pre-clinical"><option value="Year 1 undergraduate"><option value="Year 2 undergraduate"><option value="Clinical years"><option value="Postgraduate"><option value="Interprofessional"></datalist></div>
+          <div class="field"><label for="pkObj">Learning objective</label><textarea id="pkObj" maxlength="300" placeholder="e.g. Explain how insulin resistance leads to type 2 diabetes complications"></textarea></div>
+          <p class="err" id="edErr" role="alert"></p>
+          <div class="row"><button class="btn primary" id="savePack" type="button">Save pack</button><button class="btn" id="cancelPack" type="button">Cancel</button></div>
+        </div>
       </section>
       <section class="panel" aria-labelledby="kwH">
         <div class="row between"><h2 id="kwH">Keywords in <span id="kwPack"></span></h2><span class="eyebrow" id="kwCount"></span></div>
@@ -73,6 +121,16 @@ dl.sum dt{color:var(--muted)} dl.sum dd{margin:0;font-weight:700}
           <label class="check"><input type="checkbox" id="revPaced"> Teacher-paced (no timer)</label>
           <p class="err" id="revErr" role="alert"></p>
         </fieldset>
+        <fieldset>
+          <legend>Board size</legend>
+          <div class="mins"><select id="size" aria-describedby="sizeNote"></select><label for="size">keywords per side</label></div>
+          <p class="note" id="sizeNote"></p>
+        </fieldset>
+        <fieldset>
+          <legend>Shortest chain allowed</legend>
+          <div class="mins"><input type="number" id="minChain" min="2" step="1" inputmode="numeric" aria-describedby="minErr"><label for="minChain">keywords</label></div>
+          <p class="err" id="minErr" role="alert"></p>
+        </fieldset>
         <p class="note">Pre-test, trial round, round summary, post-test and survey stay teacher-paced.</p>
       </section>
 
@@ -92,31 +150,72 @@ const $ = (id) => document.getElementById(id);
 const teacher = CC.teacher();
 const defaults = CC.DEFAULT_TIMER_CONFIG;
 let packId = CC.DEFAULT_PACK_ID;
+let wantSize = 7; // the teacher's chosen board size; capped by what the chosen pack can fill
+const draft = { keywords: [], duplicates: 0, empty: 0 };
+const sizeOf = (pack) => Math.min(10, Math.floor(Math.sqrt(pack.keywords.length)));
+const boardSize = () => { const p = CC.getPack(packId); return p ? Math.max(3, Math.min(wantSize, sizeOf(p))) : wantSize; };
 
-// Reads the form; returns { settings } when valid, else { errors }. Settings mirror CreateSessionRequest.
+// Reads the form; returns { settings } when valid, else { errors }. Settings mirror CreateSessionRequest (+ boardSize, minChainLength).
 function readForm() {
   const errors = {}, timerConfig = {};
   for (const [key, field] of [["map", "roundMappingSec"], ["rev", "roundAdjudicationSec"]]) {
     try { timerConfig[field] = CC.timerFromMinutes($(`${key}Min`).value, $(`${key}Paced`).checked); }
     catch (e) { errors[key] = e.message; }
   }
+  const size = boardSize(), minChain = Number($("minChain").value);
+  if ($("minChain").value.trim() === "" || !Number.isInteger(minChain) || minChain < 2 || minChain > size * size)
+    errors.min = `Enter a whole number from 2 to ${size * size} (a ${size}×${size} board).`;
   if (!CC.getPack(packId)) errors.pack = "Choose a pack.";
   if (Object.keys(errors).length) return { errors };
-  const settings = { packId, mode: "classroom", adjudicationMode: "peer-instructor", creatorDisplayName: teacher.name, timerConfig };
+  const settings = { packId, mode: "classroom", adjudicationMode: "peer-instructor", creatorDisplayName: teacher.name, timerConfig, boardSize: size, minChainLength: minChain };
   try { CC.normalizeSettings(settings); } catch (e) { return { errors: { start: e.message } }; }
   return { settings };
 }
 
 function renderPacks() {
   const packs = CC.listPacks();
-  $("packCount").textContent = `${packs.length} packs`;
+  const own = packs.filter((p) => !p.builtIn).length;
+  $("packCount").textContent = `${packs.length} packs${own ? ` · ${own} yours` : ""}`;
   let html = "", group = null;
   for (const p of packs) {
     if (p.group !== group) { group = p.group; html += `<span class="eyebrow group">${CC.esc(group)}</span>`; }
-    html += `<label class="pack"><input type="radio" name="pack" value="${CC.esc(p.packId)}" ${p.packId === packId ? "checked" : ""}>
+    const label = `<label class="pack"><input type="radio" name="pack" value="${CC.esc(p.packId)}" ${p.packId === packId ? "checked" : ""}>
       <span><span class="nm">${CC.esc(p.name)}</span><span class="ds">${p.keywords.length} keywords · ${CC.esc(p.description)}</span></span></label>`;
+    html += p.builtIn ? label : `<div class="packitem">${label}<button class="btn sm bad del" type="button" data-del="${CC.esc(p.packId)}" aria-label="Delete pack ${CC.esc(p.name)}">Delete</button></div>`;
   }
   $("packs").innerHTML = html;
+  $("from").innerHTML = packs.map((p) => `<option value="${CC.esc(p.packId)}">${CC.esc(p.name)} (${p.keywords.length})</option>`).join("");
+  $("from").value = packId;
+}
+
+function renderEditor(added) {
+  const n = draft.keywords.length, size = boardSize(), need = size * size;
+  $("edCount").textContent = `${n} keyword${n === 1 ? "" : "s"}`;
+  $("edChips").innerHTML = n ? draft.keywords.map((k, i) => `<span class="chip"><span>${CC.esc(k)}</span><button type="button" data-rm="${i}" aria-label="Remove ${CC.esc(k)}">×</button></span>`).join("")
+    : `<p class="empty">No keywords yet. Paste, upload or copy from a pack.</p>`;
+  const removed = [draft.duplicates && `${draft.duplicates} duplicate${draft.duplicates === 1 ? "" : "s"}`, draft.empty && `${draft.empty} empty entr${draft.empty === 1 ? "y" : "ies"}`].filter(Boolean);
+  if (added != null) $("edAdded").textContent = `Added ${added}.${removed.length ? ` Removed so far: ${removed.join(" and ")}.` : ""}`;
+  else if (!n) $("edAdded").textContent = "";
+  const most = Math.min(10, Math.floor(Math.sqrt(n)));
+  $("edWarn").className = n >= need ? "ok" : "warn";
+  $("edWarn").textContent = n >= need ? `Enough for the chosen ${size}×${size} board (needs ${need}).`
+    : n < CC.MIN_PACK_KEYWORDS ? `A ${size}×${size} board needs ${need} keywords; you have ${n}. A pack needs at least ${CC.MIN_PACK_KEYWORDS} (a 3×3 board) to save.`
+    : `A ${size}×${size} board needs ${need} keywords; you have ${n} (${need - n} short). This pack can fill up to a ${most}×${most} board.`;
+}
+
+function addKeywords(input) {
+  const add = CC.cleanKeywords(input);
+  const merged = CC.cleanKeywords([...draft.keywords, ...add.keywords]);
+  const added = merged.keywords.length - draft.keywords.length;
+  draft.keywords = merged.keywords; draft.duplicates += add.duplicates + merged.duplicates; draft.empty += add.empty;
+  $("edErr").textContent = "";
+  renderEditor(added);
+}
+
+function openEditor(open) {
+  $("editor").hidden = !open; $("newPack").setAttribute("aria-expanded", String(open));
+  if (open) { renderEditor(); $("paste").focus(); }
+  else { Object.assign(draft, { keywords: [], duplicates: 0, empty: 0 }); for (const id of ["paste", "pkName", "pkLevel", "pkObj"]) $(id).value = ""; $("edErr").textContent = ""; $("edAdded").textContent = ""; }
 }
 
 function render() {
@@ -125,33 +224,98 @@ function render() {
   $("kwCount").textContent = pack ? `${pack.keywords.length} keywords` : "";
   $("keywords").innerHTML = pack ? pack.keywords.map((k) => `<span>${CC.esc(k)}</span>`).join("") : `<p class="empty">Choose a pack to see its keywords.</p>`;
 
+  const size = boardSize(), most = pack ? sizeOf(pack) : 10;
+  $("size").innerHTML = Array.from({ length: Math.max(0, most - 2) }, (_, i) => i + 3).map((n) => `<option value="${n}" ${n === size ? "selected" : ""}>${n}×${n} (${n * n} keywords)</option>`).join("");
+  $("sizeNote").textContent = pack ? `${pack.name} has ${pack.keywords.length} keywords: up to ${most}×${most}.` : "";
+  $("minChain").max = size * size;
+
   for (const key of ["map", "rev"]) $(`${key}Min`).disabled = $(`${key}Paced`).checked;
   const { settings, errors = {} } = readForm();
   for (const key of ["map", "rev"]) { $(`${key}Err`).textContent = errors[key] ?? ""; $(`${key}Min`).setAttribute("aria-invalid", String(!!errors[key])); }
-  $("startErr").textContent = errors.start ?? errors.pack ?? (settings ? "" : "Fix the times above to start.");
+  $("minErr").textContent = errors.min ?? ""; $("minChain").setAttribute("aria-invalid", String(!!errors.min));
+  $("startErr").textContent = errors.start ?? errors.pack ?? (settings ? "" : "Fix the settings above to start.");
 
-  const size = pack ? CC.normalizeSettings({ packId }).boardSize : null;
   const time = (key) => errors[key] ? "—" : CC.timerLabel(CC.timerFromMinutes($(`${key}Min`).value, $(`${key}Paced`).checked));
   $("summary").innerHTML = `<dt>Teacher</dt><dd>${CC.esc(teacher.name)}</dd>
     <dt>Pack</dt><dd>${CC.esc(pack?.name ?? "—")}</dd>
-    <dt>Board</dt><dd>${size ? `${size}×${size}` : "—"}</dd>
+    ${pack?.objective ? `<dt>Objective</dt><dd>${CC.esc(pack.objective)}</dd>` : ""}
+    <dt>Board</dt><dd>${pack ? `${size}×${size}` : "—"}</dd>
+    <dt>Shortest chain</dt><dd>${errors.min ? "—" : `${$("minChain").value} keywords`}</dd>
     <dt>Chain-building</dt><dd>${time("map")}</dd>
     <dt>Peer review</dt><dd>${time("rev")}</dd>
     <dt>Game</dt><dd>Classroom · peer votes + your final ruling</dd>`;
   $("start").disabled = !settings;
+  if (settings) CC.rememberSetup(settings);
+  if (!$("editor").hidden) renderEditor();
+}
+
+// Pre-fills from the last visit (CC.lastSetup), else the demo defaults.
+function prefill() {
+  const last = CC.lastSetup() ?? {}, tc = { ...defaults, ...(last.timerConfig ?? {}) };
+  if (last.packId && CC.getPack(last.packId)) packId = last.packId;
+  if (Number.isInteger(last.boardSize)) wantSize = last.boardSize;
+  for (const [key, field] of [["map", "roundMappingSec"], ["rev", "roundAdjudicationSec"]]) {
+    $(`${key}Paced`).checked = tc[field] == null;
+    $(`${key}Min`).value = (tc[field] ?? defaults[field] ?? 300) / 60;
+  }
+  $("minChain").value = Number.isInteger(last.minChainLength) ? last.minChainLength : 2;
 }
 
 if (teacher) {
   $("who").textContent = teacher.name;
-  $("mapMin").value = defaults.roundMappingSec / 60; $("mapPaced").checked = defaults.roundMappingSec == null;
-  $("revMin").value = defaults.roundAdjudicationSec / 60; $("revPaced").checked = defaults.roundAdjudicationSec == null;
+  prefill();
   renderPacks();
   $("packs").addEventListener("change", (e) => { if (e.target.name === "pack") { packId = e.target.value; render(); } });
-  for (const id of ["mapMin", "mapPaced", "revMin", "revPaced"]) $(id).addEventListener("input", render);
+  $("packs").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-del]"); if (!b) return;
+    if (b.dataset.armed !== "1") { b.dataset.armed = "1"; b.textContent = "Confirm delete"; setTimeout(() => { if (b.isConnected) { b.dataset.armed = ""; b.textContent = "Delete"; } }, 6000); return; }
+    const p = CC.getPack(b.dataset.del);
+    try { CC.deletePack(b.dataset.del); } catch (err) { $("packMsg").textContent = err.message; return; }
+    if (packId === b.dataset.del) packId = CC.DEFAULT_PACK_ID;
+    renderPacks(); render();
+    $("packMsg").textContent = `Deleted “${p?.name ?? "pack"}”.`;
+    document.querySelector('#packs input[name="pack"]:checked')?.focus();
+  });
+  for (const id of ["mapMin", "mapPaced", "revMin", "revPaced", "minChain"]) $(id).addEventListener("input", render);
+  $("size").addEventListener("change", () => { wantSize = Number($("size").value); render(); });
   $("signOut").addEventListener("click", () => CC.signOut());
+
+  $("newPack").onclick = () => openEditor($("editor").hidden);
+  $("cancelPack").onclick = () => { openEditor(false); $("newPack").focus(); };
+  $("fromAdd").onclick = () => {
+    const p = CC.getPack($("from").value); if (!p) return;
+    addKeywords(p.keywords);
+    if (!$("pkName").value.trim()) $("pkName").value = `${p.name} (my copy)`;
+    if (!$("pkLevel").value.trim() && p.level) $("pkLevel").value = p.level;
+    if (!$("pkObj").value.trim() && p.objective) $("pkObj").value = p.objective;
+  };
+  $("pasteAdd").onclick = () => { addKeywords($("paste").value); $("paste").value = ""; };
+  $("paste").addEventListener("keydown", (e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) $("pasteAdd").click(); });
+  $("file").addEventListener("change", async () => {
+    const f = $("file").files[0]; $("file").value = ""; if (!f) return;
+    if (!/\.(txt|csv)$/i.test(f.name)) { $("edErr").textContent = `“${f.name}” isn't a .txt or .csv file.`; return; }
+    if (f.size > 1024 * 1024) { $("edErr").textContent = `“${f.name}” is over 1 MB. Use a shorter list.`; return; }
+    try { addKeywords(await f.text()); $("edAdded").textContent = `From ${f.name}: ${$("edAdded").textContent}`; }
+    catch { $("edErr").textContent = `Couldn't read “${f.name}”.`; }
+  });
+  $("edChips").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-rm]"); if (!b) return;
+    const i = Number(b.dataset.rm); draft.keywords.splice(i, 1); renderEditor();
+    ($("edChips").querySelectorAll("[data-rm]")[Math.min(i, draft.keywords.length - 1)] ?? $("paste")).focus();
+  });
+  $("clearKw").onclick = () => { Object.assign(draft, { keywords: [], duplicates: 0, empty: 0 }); renderEditor(); };
+  $("savePack").onclick = () => {
+    try {
+      const p = CC.savePack({ name: $("pkName").value, level: $("pkLevel").value, objective: $("pkObj").value, keywords: draft.keywords });
+      packId = p.packId; openEditor(false); renderPacks(); render();
+      $("packMsg").textContent = `Saved “${p.name}” (${p.keywords.length} keywords) and chose it.`;
+      $("newPack").focus();
+    } catch (e) { $("edErr").textContent = e.message; }
+  };
+
   $("start").onclick = () => {
     const { settings } = readForm(); if (!settings) return render();
-    try { CC.createSession(settings); location.assign("teacher.html"); }
+    try { CC.createSession(settings); CC.rememberSetup(settings); location.assign("teacher.html"); }
     catch (e) { $("startErr").textContent = e.message; }
   };
   render();

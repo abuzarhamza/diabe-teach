@@ -56,13 +56,70 @@ const CC = (() => {
 
   function apiError(code, message) { const e = new Error(message); e.code = code; return e; }
 
-  function listPacks() { return BUILTIN_PACKS.slice(); }
-  function getPack(packId) { return BUILTIN_PACKS.find((p) => p.packId === packId) ?? null; }
+  // Teacher-created packs, saved in this browser: { packId, name, group, level, objective, description, keywords, boardSize,
+  // builtIn: false, createdAt }. They are plain keyword lists (a real registerCurriculumPack also needs card ids, domains, a rubric).
+  const PACKS_KEY = "cc-demo-packs-v1", OWN_GROUP = "Your packs";
+  const MIN_PACK_KEYWORDS = MIN_BOARD_SIZE * MIN_BOARD_SIZE, MAX_KEYWORD_LENGTH = 60;
   const maxBoardSize = (pack) => Math.min(MAX_BOARD_SIZE, Math.floor(Math.sqrt(pack.keywords.length)));
+  function ownPacks() {
+    try { const a = JSON.parse(localStorage.getItem(PACKS_KEY)); return Array.isArray(a) ? a.filter((p) => p && p.packId && Array.isArray(p.keywords)) : []; }
+    catch { return []; }
+  }
+  function listPacks() { return [...ownPacks(), ...BUILTIN_PACKS]; }
+  function getPack(packId) { return listPacks().find((p) => p.packId === packId) ?? null; }
+
+  // Splits pasted or uploaded text (.txt: one per line; .csv: comma, semicolon or tab separated, optional "quotes")
+  // into keywords. Trims, drops empty entries and case-insensitive duplicates (keeping the first spelling), and counts both.
+  // Also accepts an array of strings (e.g. an existing list plus new text).
+  function cleanKeywords(input) {
+    const raw = Array.isArray(input) ? input.map((x) => String(x ?? "")) : String(input ?? "").replace(/\s+$/, "").split(/\r?\n|[,;\t]/);
+    const seen = new Set(), keywords = []; let empty = 0, duplicates = 0;
+    for (const r of raw) {
+      const k = r.trim().replace(/^"(.*)"$/, "$1").replace(/""/g, '"').replace(/\s+/g, " ").trim();
+      if (!k) { empty++; continue; }
+      const key = k.toLowerCase();
+      if (seen.has(key)) { duplicates++; continue; }
+      seen.add(key); keywords.push(k);
+    }
+    return { keywords, empty, duplicates };
+  }
+  // Saves a new teacher-created pack. Needs a unique name and at least 9 distinct keywords (a 3×3 board).
+  function savePack({ name, level = "", objective = "", keywords } = {}) {
+    const bad = (msg) => { throw apiError("INVALID_REQUEST_BODY", msg); };
+    const nm = String(name ?? "").trim().replace(/\s+/g, " ");
+    if (!nm) bad("Give the pack a name.");
+    if (nm.length > 80) bad("Keep the pack name to 80 characters or fewer.");
+    if (listPacks().some((p) => p.name.toLowerCase() === nm.toLowerCase())) bad(`There is already a pack called "${nm}". Choose another name.`);
+    const { keywords: kws } = cleanKeywords(Array.isArray(keywords) ? keywords : String(keywords ?? ""));
+    if (kws.length < MIN_PACK_KEYWORDS) bad(`A pack needs at least ${MIN_PACK_KEYWORDS} different keywords (a 3×3 board); this one has ${kws.length}.`);
+    const long = kws.find((k) => k.length > MAX_KEYWORD_LENGTH);
+    if (long) bad(`Keep each keyword to ${MAX_KEYWORD_LENGTH} characters or fewer ("${long.slice(0, 30)}…").`);
+    const lv = String(level ?? "").trim(), obj = String(objective ?? "").trim();
+    const pack = { packId: uid("pack"), name: nm, group: OWN_GROUP, level: lv, objective: obj,
+      description: [lv, obj].filter(Boolean).join(" · ") || "Your pack", keywords: kws,
+      boardSize: Math.min(DEFAULT_BOARD_SIZE, Math.floor(Math.sqrt(kws.length))), builtIn: false, createdAt: new Date().toISOString() };
+    localStorage.setItem(PACKS_KEY, JSON.stringify([pack, ...ownPacks()]));
+    return pack;
+  }
+  // Deletes a teacher-created pack. Built-in packs can't be deleted. A running session keeps its own copy of the pack.
+  function deletePack(packId) {
+    if (BUILTIN_PACKS.some((p) => p.packId === packId)) throw apiError("INVALID_REQUEST_BODY", "Built-in packs can't be deleted.");
+    const own = ownPacks(); if (!own.some((p) => p.packId === packId)) throw apiError("PACK_NOT_FOUND", `No Curriculum Pack "${packId}".`);
+    localStorage.setItem(PACKS_KEY, JSON.stringify(own.filter((p) => p.packId !== packId)));
+  }
+
+  // Game setup's last choices ({ packId, timerConfig, boardSize, minChainLength }), pre-filled on the next visit.
+  const SETUP_KEY = "cc-demo-setup-v1";
+  function lastSetup() { try { const v = JSON.parse(localStorage.getItem(SETUP_KEY)); return v && typeof v === "object" ? v : null; } catch { return null; } }
+  function rememberSetup(settings) {
+    const { packId, timerConfig, boardSize, minChainLength } = settings ?? {};
+    localStorage.setItem(SETUP_KEY, JSON.stringify({ packId, timerConfig, boardSize, minChainLength }));
+  }
 
   // Deals a size x size board from a pack's keywords. Same pack + size + seed always gives the same board.
-  function dealBoard({ packId = DEFAULT_PACK_ID, boardSize = DEFAULT_BOARD_SIZE, seed } = {}) {
-    const pack = getPack(packId); if (!pack) throw apiError("PACK_NOT_FOUND", `No Curriculum Pack "${packId}".`);
+  // `pack` (a pack object) can be given instead of packId, e.g. the copy a session keeps.
+  function dealBoard({ packId = DEFAULT_PACK_ID, pack: given, boardSize = DEFAULT_BOARD_SIZE, seed } = {}) {
+    const pack = given ?? getPack(packId); if (!pack) throw apiError("PACK_NOT_FOUND", `No Curriculum Pack "${packId}".`);
     if (boardSize > maxBoardSize(pack)) throw apiError("INVALID_REQUEST_BODY", `${pack.name} has ${pack.keywords.length} keywords: too few for a ${boardSize}×${boardSize} board (needs ${boardSize * boardSize}).`);
     const r = rng(String(seed)); const w = pack.keywords.slice();
     for (let i = w.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [w[i], w[j]] = [w[j], w[i]]; }
@@ -100,6 +157,8 @@ const CC = (() => {
   }
   // A stored session's settings (sessions saved before settings existed get the defaults).
   const settingsOf = (s) => s.settings ?? normalizeSettings();
+  // The pack a session plays: the copy taken at creation (so deleting a saved pack doesn't break a running game).
+  const packOf = (s) => s.pack ?? getPack(settingsOf(s).packId);
 
   function fresh(input) {
     const settings = normalizeSettings(input);
@@ -109,6 +168,8 @@ const CC = (() => {
         currentPhase: "pretest", activeRoundNumber: null, phaseStartedAt: new Date().toISOString(), phaseEndsAt: null, activeBoard: null, participantCount: 0 },
       settings, participants: [], chains: [],
     };
+    const p = getPack(settings.packId);
+    s.pack = { packId: p.packId, name: p.name, level: p.level ?? "", objective: p.objective ?? "", keywords: p.keywords.slice(), builtIn: !!p.builtIn };
     s.session.phaseEndsAt = phaseEnd(settings, "pretest");
     return s;
   }
@@ -161,7 +222,7 @@ const CC = (() => {
     ss.activeRoundNumber = m ? Number(m[1]) : null;
     const set = settingsOf(s);
     // Round 1 uses the creation seed (the board Game setup previewed); Round 2, or a session made without a seed, gets a fresh one.
-    if (phase.endsWith(":chain-mapping")) ss.activeBoard = dealBoard({ packId: set.packId, boardSize: set.boardSize,
+    if (phase.endsWith(":chain-mapping")) ss.activeBoard = dealBoard({ packId: set.packId, pack: s.pack, boardSize: set.boardSize,
       seed: ss.activeRoundNumber === 1 && set.seed ? set.seed : `${ss.sessionId}-r${ss.activeRoundNumber}-${now()}` });
     if (!m) ss.activeBoard = null;
     ss.phaseStartedAt = new Date().toISOString();
@@ -312,7 +373,7 @@ const CC = (() => {
   const chainText = (c) => c.labels.map((l) => `<b>${esc(l)}</b>`).join(` <span class="arrow">→</span> `);
 
   return { PHASES, PHASE_LABEL, DEFAULT_PACK_ID, DEFAULT_TIMER_CONFIG, TIMER_FIELDS, TIMER_MIN_SEC, TIMER_MAX_SEC, MIN_BOARD_SIZE,
-    listPacks, getPack, dealBoard, newSeed, normalizeSettings, settingsOf, createSession, timerFromMinutes, timerLabel, TIMER_MAX_MIN,
+    MIN_PACK_KEYWORDS, listPacks, getPack, cleanKeywords, savePack, deletePack, lastSetup, rememberSetup, packOf, dealBoard, newSeed, normalizeSettings, settingsOf, createSession, timerFromMinutes, timerLabel, TIMER_MAX_MIN,
     teacher, signIn, signOut, requireTeacher,
     get, subscribe, reset, advance, extend, join, submitChain, vote, rule, standings, seedSampleLearners,
     topologyError, submissionsOpen, adjacent, clock, renderBoard, statusBadge, chainText, esc };

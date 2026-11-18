@@ -9,7 +9,8 @@ import { parse as parseYaml } from "yaml";
 
 interface GridCoord { readonly row: number; readonly col: number }
 interface Board { readonly seed: string; readonly rows: number; readonly cols: number; readonly cells: readonly (readonly { readonly keywordId: string; readonly label: string }[])[] }
-interface Pack { readonly packId: string; readonly name: string; readonly description: string; readonly keywords: readonly string[]; readonly boardSize: number }
+interface Pack { readonly packId: string; readonly name: string; readonly description: string; readonly keywords: readonly string[]; readonly boardSize: number; readonly builtIn: boolean; readonly level?: string; readonly objective?: string }
+interface SavedSetup { readonly packId: string; readonly timerConfig: Record<string, number | null>; readonly boardSize: number; readonly minChainLength: number }
 interface Settings {
   readonly packId: string;
   readonly timerConfig: Record<string, number | null>;
@@ -27,13 +28,21 @@ interface DemoMock {
   readonly PHASES: readonly string[];
   readonly DEFAULT_PACK_ID: string;
   readonly TIMER_FIELDS: readonly string[];
+  readonly MIN_PACK_KEYWORDS: number;
   listPacks: () => Pack[];
+  cleanKeywords: (input: string | readonly string[]) => { keywords: string[]; duplicates: number; empty: number };
+  savePack: (pack: { name: string; level?: string; objective?: string; keywords: string | readonly string[] }) => Pack;
+  deletePack: (packId: string) => void;
+  lastSetup: () => SavedSetup | null;
+  rememberSetup: (settings: Settings) => void;
+  packOf: (s: DemoState) => { packId: string; name: string; level: string; objective: string; keywords: string[] } | null;
   getPack: (id: string) => Pack | null;
   dealBoard: (args: { packId?: string; boardSize?: number; seed: string }) => Board;
   createSession: (settings?: Record<string, unknown>) => DemoState;
   reset: () => DemoState;
   get: () => DemoState;
   settingsOf: (s: DemoState) => Settings;
+  normalizeSettings: (settings?: Record<string, unknown>) => Settings;
   advance: () => void;
   join: (roomCode: string, name: string) => { participantId: string };
   submitChain: (participantId: string, path: GridCoord[], story: string, rationales: unknown[]) => unknown;
@@ -47,8 +56,8 @@ interface DemoMock {
 const root = resolve(import.meta.dirname, "..");
 const source = readFileSync(resolve(root, "claudPoc/concept-chain/shared.js"), "utf8");
 
-function loadMock(): DemoMock {
-  const store = new Map<string, string>();
+// Pass the same store to simulate a page reload in the same browser.
+function loadMock(store = new Map<string, string>()): DemoMock {
   const localStorage = {
     getItem: (k: string) => store.get(k) ?? null,
     setItem: (k: string, v: string) => void store.set(k, String(v)),
@@ -248,5 +257,153 @@ describe("shared demo mock: demo teacher sign-in", () => {
     expect(() => cc.signIn(" ", "a@b.org")).toThrow("Enter your name.");
     expect(() => cc.signIn("Ms Rahman", "rahman@school")).toThrow(/valid email/);
     expect(cc.teacher()).toBeNull();
+  });
+});
+
+const words = (n: number, prefix = "Term"): string[] => Array.from({ length: n }, (_, i) => `${prefix} ${i + 1}`);
+
+describe("shared demo mock: keyword lists", () => {
+  it("splits pasted lines, commas, semicolons and tabs, drops empty entries and case-insensitive duplicates", () => {
+    expect(cc.cleanKeywords("Insulin\n\n  Glucose , insulin;HbA1c\tglucose\r\n,,\n  Beta   cells  ")).toEqual({
+      keywords: [
+        "Insulin",
+        "Glucose",
+        "HbA1c",
+        "Beta cells",
+      ],
+      duplicates: 2,
+      empty: 4,
+    });
+  });
+
+  it("reads a quoted .csv row and an existing list", () => {
+    expect(cc.cleanKeywords("\"Insulin\",\"Glucose\",Metformin\n").keywords).toEqual(["Insulin", "Glucose", "Metformin"]);
+    expect(cc.cleanKeywords(["A", " a ", "", "B"])).toEqual({
+      keywords: ["A", "B"],
+      duplicates: 1,
+      empty: 1,
+    });
+  });
+});
+
+describe("shared demo mock: teacher-created packs", () => {
+  it("saves a pack with name, learner level and objective, lists it first and keeps it across reloads", () => {
+    const store = new Map<string, string>();
+    const before = loadMock(store);
+    const pack = before.savePack({
+      name: " My  insulin pack ",
+      level: "Year 2",
+      objective: "Link insulin to complications",
+      keywords: [
+        "x",
+        "X",
+        ...words(15),
+      ],
+    });
+    expect(pack).toMatchObject({
+      name: "My insulin pack",
+      level: "Year 2",
+      objective: "Link insulin to complications",
+      description: "Year 2 · Link insulin to complications",
+      builtIn: false,
+      boardSize: 4,
+    });
+    expect(pack.keywords).toHaveLength(16);
+    const after = loadMock(store);
+    expect(after.listPacks()).toHaveLength(16);
+    expect(after.listPacks()[0]).toEqual(pack);
+    expect(after.getPack(pack.packId)).toEqual(pack);
+  });
+
+  it("rejects a missing or taken name and fewer than 9 distinct keywords", () => {
+    expect(() => cc.savePack({
+      name: " ",
+      keywords: words(9),
+    })).toThrow("Give the pack a name.");
+    expect(() => cc.savePack({
+      name: "diabetes MELLITUS",
+      keywords: words(9),
+    })).toThrow(/already a pack called/);
+    expect(() => cc.savePack({
+      name: "Tiny",
+      keywords: [
+        ...words(8),
+        "term 1",
+      ],
+    })).toThrow(
+      expect.objectContaining({
+        code: "INVALID_REQUEST_BODY",
+        message: expect.stringMatching(/at least 9 different keywords.*has 8/),
+      }),
+    );
+    expect(cc.listPacks()).toHaveLength(15);
+  });
+
+  it("deletes a teacher-created pack but not a built-in one", () => {
+    const store = new Map<string, string>();
+    const a = loadMock(store);
+    const pack = a.savePack({
+      name: "Mine",
+      keywords: words(9),
+    });
+    expect(() => a.deletePack("diabe-teach")).toThrow("Built-in packs can't be deleted.");
+    a.deletePack(pack.packId);
+    expect(loadMock(store).getPack(pack.packId)).toBeNull();
+    expect(() => a.deletePack(pack.packId)).toThrow(expect.objectContaining({ code: "PACK_NOT_FOUND" }));
+    expect(a.listPacks()).toHaveLength(15);
+  });
+
+  it("plays a saved pack at a custom board size and keeps playing it after the pack is deleted", () => {
+    const pack = cc.savePack({
+      name: "Mine",
+      objective: "Practise",
+      keywords: words(20),
+    });
+    expect(() => cc.createSession({ packId: pack.packId, boardSize: 5 })).toThrow(/from 3 to 4 for Mine \(20 keywords\)/);
+    const s = cc.createSession({ packId: pack.packId, boardSize: 4, seed: "abc" });
+    expect(cc.packOf(s)).toMatchObject({ packId: pack.packId, name: "Mine", objective: "Practise" });
+    cc.deletePack(pack.packId);
+    const board = advanceTo(cc, "round-1:chain-mapping").session.activeBoard;
+    expect(board).toMatchObject({ rows: 4, cols: 4, seed: "abc" });
+    expect(board?.cells.flat().every(c => pack.keywords.includes(c.label))).toBe(true);
+    expect(advanceTo(cc, "round-2:chain-mapping").session.activeBoard).toMatchObject({ rows: 4, cols: 4 });
+  });
+});
+
+describe("shared demo mock: custom board size and shortest chain", () => {
+  it("deals the chosen board size and rejects chains under the chosen shortest chain", () => {
+    cc.createSession({ boardSize: 5, minChainLength: 3 });
+    const p = cc.join(cc.get().session.roomCode, "Ana");
+    const board = advanceTo(cc, "round-1:chain-mapping").session.activeBoard;
+    expect(board).toMatchObject({ rows: 5, cols: 5 });
+    expect(() => cc.submitChain(p.participantId, row(2), "story", [])).toThrow(
+      expect.objectContaining({ code: "CHAIN_TOPOLOGY_INVALID", message: "A chain needs at least 3 keywords." }),
+    );
+    expect(() => cc.submitChain(p.participantId, row(3), "story", [])).not.toThrow();
+  });
+
+  it("rejects a shortest chain longer than the board", () => {
+    expect(() => cc.createSession({ boardSize: 3, minChainLength: 10 })).toThrow("Shortest chain must be a whole number from 2 to 9.");
+  });
+});
+
+describe("shared demo mock: remembered Game setup", () => {
+  it("remembers the last pack and settings across reloads", () => {
+    const store = new Map<string, string>();
+    const a = loadMock(store);
+    expect(a.lastSetup()).toBeNull();
+    const settings = a.normalizeSettings({
+      packId: "thyroid",
+      timerConfig: { roundMappingSec: 120, roundAdjudicationSec: null },
+      boardSize: 5,
+      minChainLength: 4,
+    });
+    a.rememberSetup(settings);
+    expect(loadMock(store).lastSetup()).toEqual({
+      packId: "thyroid",
+      timerConfig: settings.timerConfig,
+      boardSize: 5,
+      minChainLength: 4,
+    });
   });
 });
