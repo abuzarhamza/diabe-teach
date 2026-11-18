@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Concept Chain · Game setup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Atkinson+Hyperlegible:wght@400;700&family=IBM+Plex+Mono:wght@500&display=swap">
+<link rel="stylesheet" href="shared.css">
+<script src="shared.js"></script>
+<script>CC.requireTeacher();</script>
+<style>
+.who{display:flex;flex-direction:column;align-items:flex-end;gap:2px;font-size:14px}
+.who a{color:var(--muted);font-size:13px}
+.packs{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px}
+.group{grid-column:1/-1;margin-top:6px}
+.pack{display:flex;gap:8px;align-items:flex-start;border:1px solid var(--line);border-radius:8px;padding:8px 10px;background:var(--surface);cursor:pointer}
+.pack:hover{border-color:var(--accent)}
+.pack:has(input:checked){border-color:var(--accent);box-shadow:0 0 0 1px var(--accent);background:color-mix(in srgb,var(--accent) 8%,var(--surface))}
+.pack input{margin-top:3px;accent-color:var(--accent)}
+.pack .nm{font-weight:700;display:block}
+.pack .ds{font-size:13px;color:var(--muted);display:block}
+.chips{display:flex;flex-wrap:wrap;gap:4px}
+.chips span{background:var(--sunk);border-radius:999px;padding:2px 9px;font-size:13px}
+fieldset{border:1px solid var(--line);border-radius:8px;padding:10px;margin:0;display:flex;flex-direction:column;gap:6px}
+legend{font-weight:700;padding:0 4px}
+.mins{display:flex;align-items:center;gap:8px}
+.mins input[type=number]{width:96px}
+.mins input[type=number][aria-invalid=true]{border-color:var(--bad)}
+.check{display:flex;gap:6px;align-items:center;font-size:14px}
+.check input{accent-color:var(--accent)}
+.err{color:var(--bad);font-size:13px;font-weight:700;min-height:0;margin:0}
+.err:empty{display:none}
+dl.sum{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;margin:0;font-size:14px}
+dl.sum dt{color:var(--muted)} dl.sum dd{margin:0;font-weight:700}
+#start{font-size:17px;padding:10px 18px}
+[hidden]{display:none !important} /* .panel/.col set display:flex, which would override the hidden attribute */
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="brand"><h1>Concept <span>Chain</span></h1><p>Game setup · choose a pack and how long each phase lasts</p></div>
+    <div class="who"><span>Signed in as <b id="who"></b></span><a href="login.html" id="signOut">Sign out</a></div>
+  </header>
+
+  <div class="main">
+    <div class="col">
+      <section class="panel" aria-labelledby="packH">
+        <div class="row between"><h2 id="packH">Choose a pack</h2><span class="eyebrow" id="packCount"></span></div>
+        <div class="packs" id="packs" role="radiogroup" aria-labelledby="packH"></div>
+      </section>
+      <section class="panel" aria-labelledby="kwH">
+        <div class="row between"><h2 id="kwH">Keywords in <span id="kwPack"></span></h2><span class="eyebrow" id="kwCount"></span></div>
+        <div class="chips" id="keywords"></div>
+      </section>
+    </div>
+
+    <aside class="col">
+      <section class="panel" aria-labelledby="timeH">
+        <h2 id="timeH">Time allotment</h2>
+        <p class="note">Per Gameplay Round; both rounds use the same times. A teacher-paced phase has no timer: you move the class on with Next phase.</p>
+        <fieldset>
+          <legend>Chain-building</legend>
+          <div class="mins"><input type="number" id="mapMin" min="1" max="1440" step="1" inputmode="numeric" aria-describedby="mapErr"><label for="mapMin">minutes</label></div>
+          <label class="check"><input type="checkbox" id="mapPaced"> Teacher-paced (no timer)</label>
+          <p class="err" id="mapErr" role="alert"></p>
+        </fieldset>
+        <fieldset>
+          <legend>Peer review</legend>
+          <div class="mins"><input type="number" id="revMin" min="1" max="1440" step="1" inputmode="numeric" aria-describedby="revErr"><label for="revMin">minutes</label></div>
+          <label class="check"><input type="checkbox" id="revPaced"> Teacher-paced (no timer)</label>
+          <p class="err" id="revErr" role="alert"></p>
+        </fieldset>
+        <p class="note">Pre-test, trial round, round summary, post-test and survey stay teacher-paced.</p>
+      </section>
+
+      <section class="panel" aria-labelledby="sumH">
+        <h2 id="sumH">Summary</h2>
+        <dl class="sum" id="summary"></dl>
+        <button class="btn primary" id="start" type="button">Start game →</button>
+        <p class="err" id="startErr" role="status" aria-live="polite"></p>
+        <p class="note">Starts a new Game Session with a new room code and opens the teacher screen.</p>
+      </section>
+    </aside>
+  </div>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const teacher = CC.teacher();
+const defaults = CC.DEFAULT_TIMER_CONFIG;
+let packId = CC.DEFAULT_PACK_ID;
+
+// Reads the form; returns { settings } when valid, else { errors }. Settings mirror CreateSessionRequest.
+function readForm() {
+  const errors = {}, timerConfig = {};
+  for (const [key, field] of [["map", "roundMappingSec"], ["rev", "roundAdjudicationSec"]]) {
+    try { timerConfig[field] = CC.timerFromMinutes($(`${key}Min`).value, $(`${key}Paced`).checked); }
+    catch (e) { errors[key] = e.message; }
+  }
+  if (!CC.getPack(packId)) errors.pack = "Choose a pack.";
+  if (Object.keys(errors).length) return { errors };
+  const settings = { packId, mode: "classroom", adjudicationMode: "peer-instructor", creatorDisplayName: teacher.name, timerConfig };
+  try { CC.normalizeSettings(settings); } catch (e) { return { errors: { start: e.message } }; }
+  return { settings };
+}
+
+function renderPacks() {
+  const packs = CC.listPacks();
+  $("packCount").textContent = `${packs.length} packs`;
+  let html = "", group = null;
+  for (const p of packs) {
+    if (p.group !== group) { group = p.group; html += `<span class="eyebrow group">${CC.esc(group)}</span>`; }
+    html += `<label class="pack"><input type="radio" name="pack" value="${CC.esc(p.packId)}" ${p.packId === packId ? "checked" : ""}>
+      <span><span class="nm">${CC.esc(p.name)}</span><span class="ds">${p.keywords.length} keywords · ${CC.esc(p.description)}</span></span></label>`;
+  }
+  $("packs").innerHTML = html;
+}
+
+function render() {
+  const pack = CC.getPack(packId);
+  $("kwPack").textContent = pack?.name ?? "—";
+  $("kwCount").textContent = pack ? `${pack.keywords.length} keywords` : "";
+  $("keywords").innerHTML = pack ? pack.keywords.map((k) => `<span>${CC.esc(k)}</span>`).join("") : `<p class="empty">Choose a pack to see its keywords.</p>`;
+
+  for (const key of ["map", "rev"]) $(`${key}Min`).disabled = $(`${key}Paced`).checked;
+  const { settings, errors = {} } = readForm();
+  for (const key of ["map", "rev"]) { $(`${key}Err`).textContent = errors[key] ?? ""; $(`${key}Min`).setAttribute("aria-invalid", String(!!errors[key])); }
+  $("startErr").textContent = errors.start ?? errors.pack ?? (settings ? "" : "Fix the times above to start.");
+
+  const size = pack ? CC.normalizeSettings({ packId }).boardSize : null;
+  const time = (key) => errors[key] ? "—" : CC.timerLabel(CC.timerFromMinutes($(`${key}Min`).value, $(`${key}Paced`).checked));
+  $("summary").innerHTML = `<dt>Teacher</dt><dd>${CC.esc(teacher.name)}</dd>
+    <dt>Pack</dt><dd>${CC.esc(pack?.name ?? "—")}</dd>
+    <dt>Board</dt><dd>${size ? `${size}×${size}` : "—"}</dd>
+    <dt>Chain-building</dt><dd>${time("map")}</dd>
+    <dt>Peer review</dt><dd>${time("rev")}</dd>
+    <dt>Game</dt><dd>Classroom · peer votes + your final ruling</dd>`;
+  $("start").disabled = !settings;
+}
+
+if (teacher) {
+  $("who").textContent = teacher.name;
+  $("mapMin").value = defaults.roundMappingSec / 60; $("mapPaced").checked = defaults.roundMappingSec == null;
+  $("revMin").value = defaults.roundAdjudicationSec / 60; $("revPaced").checked = defaults.roundAdjudicationSec == null;
+  renderPacks();
+  $("packs").addEventListener("change", (e) => { if (e.target.name === "pack") { packId = e.target.value; render(); } });
+  for (const id of ["mapMin", "mapPaced", "revMin", "revPaced"]) $(id).addEventListener("input", render);
+  $("signOut").addEventListener("click", () => CC.signOut());
+  $("start").onclick = () => {
+    const { settings } = readForm(); if (!settings) return render();
+    try { CC.createSession(settings); location.assign("teacher.html"); }
+    catch (e) { $("startErr").textContent = e.message; }
+  };
+  render();
+}
+</script>
+</body>
+</html>

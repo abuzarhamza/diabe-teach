@@ -35,7 +35,8 @@ header.top{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-
 .btn.bad{color:var(--bad);border-color:var(--bad)}
 .btn[disabled]{opacity:.45;cursor:not-allowed}
 .btn.sm{padding:5px 10px;font-size:13px}
-input[type=text],select,textarea{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:8px 10px;min-width:0;width:100%}
+a.btn{display:inline-block;text-decoration:none;color:inherit}
+input[type=text],input[type=email],input[type=number],select,textarea{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:8px 10px;min-width:0;width:100%}
 textarea{resize:vertical;min-height:64px}
 
 .bar{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px;display:flex;flex-wrap:wrap;gap:12px 20px;align-items:center;justify-content:space-between}

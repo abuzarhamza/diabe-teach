@@ -6,8 +6,27 @@ const CC = (() => {
   const KEY = "cc-demo-session-v1";
   const GRACE_MS = 5000; // fixed grace period after phaseEndsAt (see submitConceptChain 409)
 
-  // Diabe-teach keywords (49 = 7x7 board).
-  const WORDS = ["Retinopathy","Pancreas","Ulcer","Sulfonylureas","Metformin","Beta cells","Diet","Autoimmune","Glycemic index","Hypoglycemia","Weight loss","Adiponectin","Glucose","Hyperglycemia","Islet cells","Transplant","HHS","Amylin","Thiazolidinediones","Podiatrist","Polyphagia","ACE inhibitors","Screening","Microalbuminuria","Smoking","Genetic","Fasting","GTT","Glucagon","Neuropathy","Dyslipidaemia","Insulin","Weight","Polyuria","Glucometer","Polydipsia","Gastroparesis","C-Peptide","Venous","Ketoacidosis","Glucosuria","Hypertension","MODY","Lipohypertrophy","Children","Pregnancy","LADA","Glipizide","HbA1c"];
+  // Built-in Curriculum Packs: the topics of the earlier single-page prototype (claudPoc/ConceptChain (API overlay).html, SETS).
+  // In the mock a pack is { packId, name, description, keywords, boardSize }. "diabe-teach" (Diabetes mellitus) is the
+  // backend's seeded pack and the default; its keyword order is the one the demo always dealt from.
+  const BUILTIN_PACKS = [
+    { packId: "ipe", name: "Interprofessional teamwork", group: "Interprofessional learning", keywords: ["Interprofessional education","Collaborative practice","Shared goals","Roles and responsibilities","Scope of practice","Mutual respect","Trust","Values and ethics","Patient-centred care","Shared decision-making","Communication","SBAR","Closed-loop communication","Handover","ISBAR","Huddle","Briefing","Debriefing","Situation monitoring","Mutual support","Speaking up","CUS words","Two-challenge rule","Psychological safety","Hierarchy","Conflict resolution","Leadership","Followership","Team roles","Delegation","Workload","Medication error","Adverse event","Near miss","Incident reporting","Patient safety","Root cause analysis","Human factors","Situational awareness","Checklist","WHO surgical checklist","Care plan","Case conference","Discharge planning","Continuity of care","Family involvement","Simulation","Reflection","Professional identity"] },
+    { packId: "ipediabetes", name: "Diabetes: the care team", group: "Interprofessional learning", keywords: ["Patient","Family","Physician","Endocrinologist","Diabetes nurse educator","Dietitian","Pharmacist","Podiatrist","Ophthalmologist","Psychologist","Social worker","Physiotherapist","Community health worker","Self-management","Education","Carbohydrate counting","Meal plan","Physical activity","Insulin technique","Injection sites","Glucometer","Hypoglycemia","Sick-day rules","HbA1c","Medication reconciliation","Adherence","Polypharmacy","Drug interactions","Foot examination","Monofilament","Foot ulcer","Footwear","Amputation","Retinal screening","Retinopathy","Depression","Diabetes distress","Smoking cessation","Weight management","Blood pressure","Lipids","Kidney function","Referral","Care plan","Shared goals","Follow-up","Telehealth","Cultural beliefs","Ramadan fasting"] },
+    { packId: "diabe-teach", name: "Diabetes mellitus", group: "Clinical medicine", keywords: ["Retinopathy","Pancreas","Ulcer","Sulfonylureas","Metformin","Beta cells","Diet","Autoimmune","Glycemic index","Hypoglycemia","Weight loss","Adiponectin","Glucose","Hyperglycemia","Islet cells","Transplant","HHS","Amylin","Thiazolidinediones","Podiatrist","Polyphagia","ACE inhibitors","Screening","Microalbuminuria","Smoking","Genetic","Fasting","GTT","Glucagon","Neuropathy","Dyslipidaemia","Insulin","Weight","Polyuria","Glucometer","Polydipsia","Gastroparesis","C-Peptide","Venous","Ketoacidosis","Glucosuria","Hypertension","MODY","Lipohypertrophy","Children","Pregnancy","LADA","Glipizide","HbA1c"] },
+    { packId: "thyroid", name: "Thyroid disorders", group: "Clinical medicine", keywords: ["Thyroxine (T4)","Triiodothyronine (T3)","TSH","TRH","Hypothalamus","Pituitary","Iodine","Thyroid peroxidase","Thyroglobulin","Graves disease","TSH receptor antibodies","Exophthalmos","Pretibial myxedema","Hashimoto thyroiditis","Anti-TPO","Hypothyroidism","Hyperthyroidism","Goitre","Toxic multinodular goitre","Thyroid storm","Myxedema coma","Weight gain","Weight loss","Heat intolerance","Cold intolerance","Tremor","Atrial fibrillation","Bradycardia","Constipation","Menorrhagia","Carbimazole","Propylthiouracil","Agranulocytosis","Radioactive iodine","Thyroidectomy","Levothyroxine","Beta-blockers","Subacute thyroiditis","Postpartum thyroiditis","Amiodarone","Lithium","Congenital hypothyroidism","Cretinism","Papillary carcinoma","Psammoma bodies","Fine-needle aspiration","Ultrasound","Hypocalcemia","Recurrent laryngeal nerve"] },
+    { packId: "heartfailure", name: "Heart failure", group: "Clinical medicine", keywords: ["Cardiac output","Preload","Afterload","Contractility","Ejection fraction","HFrEF","HFpEF","Left ventricle","Right ventricle","Myocardial infarction","Hypertension","Valvular disease","Cardiomyopathy","Dyspnea","Orthopnea","Paroxysmal nocturnal dyspnea","Pulmonary edema","Crackles","Raised JVP","Peripheral edema","Hepatomegaly","S3 gallop","Fatigue","Cor pulmonale","BNP","Echocardiography","Chest X-ray","Cardiomegaly","Kerley B lines","RAAS","Aldosterone","Sodium retention","Sympathetic activation","Remodeling","ACE inhibitors","ARNI","Beta-blockers","Spironolactone","SGLT2 inhibitors","Loop diuretics","Furosemide","Digoxin","Hypokalemia","Atrial fibrillation","Arrhythmia","ICD","Fluid restriction","NYHA class","Renal impairment"] },
+    { packId: "kidney", name: "Kidney disease (AKI & CKD)", group: "Clinical medicine", keywords: ["Nephron","Glomerulus","GFR","Creatinine","Urea","eGFR","Proteinuria","Albuminuria","Diabetic nephropathy","Hypertension","Glomerulonephritis","Polycystic kidney","Acute kidney injury","Prerenal","Acute tubular necrosis","Postrenal","Obstruction","NSAIDs","Contrast","Hyperkalemia","Metabolic acidosis","Bicarbonate","Fluid overload","Uremia","Pericarditis","Encephalopathy","Anemia","Erythropoietin","Renal osteodystrophy","Phosphate","Calcium","Vitamin D","PTH","Secondary hyperparathyroidism","ACE inhibitors","SGLT2 inhibitors","Dialysis","Hemodialysis","Peritoneal dialysis","Transplant","Immunosuppression","Ultrasound","Small kidneys","Urinalysis","Casts","Oliguria","Nephrotic syndrome","Edema","Hyperlipidemia"] },
+    { packId: "anemia", name: "Anemia", group: "Clinical medicine", keywords: ["Hemoglobin","Red blood cell","Erythropoietin","Kidney","Bone marrow","Iron deficiency","Ferritin","Transferrin","TIBC","Microcytic","Hypochromic","MCV","Blood loss","Menorrhagia","Hookworm","Koilonychia","Pica","Vitamin B12","Folate","Megaloblastic","Macrocytic","Hypersegmented neutrophils","Pernicious anemia","Intrinsic factor","Subacute combined degeneration","Methotrexate","Anemia of chronic disease","Hepcidin","Hemolysis","Reticulocytes","Unconjugated bilirubin","Haptoglobin","LDH","Spherocytosis","G6PD deficiency","Heinz bodies","Sickle cell","HbS","Thalassemia","HbA2","Target cells","Aplastic anemia","Pancytopenia","Fatigue","Pallor","Tachycardia","Transfusion","Oral iron","Blood film"] },
+    { packId: "airways", name: "Asthma and COPD", group: "Clinical medicine", keywords: ["Asthma","COPD","Airway obstruction","Reversibility","Spirometry","FEV1","FVC","FEV1/FVC ratio","Peak flow","Bronchodilator","Wheeze","Dyspnea","Chronic cough","Sputum","Smoking","Emphysema","Chronic bronchitis","Alpha-1 antitrypsin","Bullae","Hyperinflation","Barrel chest","Pursed-lip breathing","Type 2 inflammation","Eosinophils","IgE","Atopy","Allergens","Mast cells","Leukotrienes","Hyperresponsiveness","Salbutamol","Ipratropium","Tiotropium","Inhaled corticosteroids","LABA","Montelukast","Omalizumab","Inhaler technique","Spacer","Exacerbation","Oral prednisolone","Hypoxemia","Hypercapnia","Respiratory acidosis","Oxygen therapy","Cor pulmonale","Pulmonary rehabilitation","Vaccination","Smoking cessation"] },
+    { packId: "sle", name: "Systemic lupus erythematosus", group: "Clinical medicine", keywords: ["Autoimmune","ANA","Anti-dsDNA","Anti-Smith","Antiphospholipid","Lupus anticoagulant","Complement","Low C3","Malar rash","Discoid rash","Photosensitivity","Oral ulcers","Arthritis","Serositis","Pericarditis","Pleuritis","Lupus nephritis","Proteinuria","Renal biopsy","Wire-loop lesions","Immune complex","Type III hypersensitivity","Hemolytic anemia","Thrombocytopenia","Leukopenia","Libman-Sacks","Endocarditis","Neuropsychiatric","Seizures","Women","Childbearing age","Pregnancy loss","Neonatal lupus","Heart block","Anti-Ro","Hydroxychloroquine","Corticosteroids","Mycophenolate","Cyclophosphamide","Belimumab","Drug-induced lupus","Hydralazine","Procainamide","Anti-histone","Fatigue","Fever","Raynaud phenomenon","Thrombosis","Retinal vasculitis"] },
+    { packId: "amyloidosis", name: "Amyloidosis", group: "Clinical medicine", keywords: ["Amyloid","Beta-pleated sheet","Congo red","Apple-green birefringence","AL amyloid","AA amyloid","Light chains","Plasma cell","Multiple myeloma","Serum amyloid A","Rheumatoid arthritis","Chronic inflammation","Transthyretin","ATTR","Hereditary","Wild-type","Beta-2 microglobulin","Dialysis","Alzheimer disease","Amyloid beta","Nephrotic syndrome","Proteinuria","Cardiomyopathy","Restrictive","Low-voltage ECG","Macroglossia","Hepatomegaly","Carpal tunnel","Periorbital purpura","Fat pad biopsy","Rectal biopsy","Electron microscopy","Fibrils","Tafamidis","Bortezomib","Colchicine","Familial Mediterranean fever","Islet amyloid","Type 2 diabetes","Calcitonin","Medullary thyroid carcinoma","Free light chains","Electrophoresis","Echocardiography","Cardiac MRI","Neuropathy","Orthostatic hypotension","Kidney","Prognosis"] },
+    { packId: "tb", name: "Tuberculosis", group: "Clinical medicine", keywords: ["M. tuberculosis","Acid-fast bacilli","Ziehl-Neelsen","Mycolic acid","Airborne","Droplet nuclei","Macrophage","Granuloma","Caseous necrosis","Langhans giant cells","Ghon focus","Ghon complex","Latent TB","Reactivation","Lung apex","Cavitation","Hemoptysis","Night sweats","Weight loss","Fever","Chronic cough","HIV","Immunosuppression","Miliary TB","TB meningitis","Pott disease","Spine","Lymphadenitis","Pleural effusion","Mantoux test","IGRA","BCG vaccine","Sputum","GeneXpert","Rifampicin resistance","Chest X-ray","Isoniazid","Peripheral neuropathy","Pyridoxine","Rifampicin","Orange urine","Pyrazinamide","Ethambutol","Optic neuritis","Hepatotoxicity","DOTS","MDR-TB","Contact tracing","Notification"] },
+    { packId: "biochem", name: "Carbohydrate metabolism", group: "Basic sciences", keywords: ["Glucose","Hexokinase","Glucokinase","Glucose-6-phosphate","Glycolysis","Pyruvate","Lactate","Anaerobic","NADH","ATP","Pyruvate kinase","PFK-1","Fructose-2,6-bisphosphate","Insulin","Glucagon","cAMP","Protein kinase A","Glycogen","Glycogen synthase","Glycogen phosphorylase","Liver","Muscle","Gluconeogenesis","Pyruvate carboxylase","Oxaloacetate","PEPCK","Fructose-1,6-bisphosphatase","Cori cycle","Pentose phosphate pathway","NADPH","G6PD deficiency","Hemolysis","Red blood cell","Pyruvate dehydrogenase","Thiamine","Acetyl-CoA","TCA cycle","Electron transport chain","Oxygen","Mitochondria","Von Gierke disease","Hypoglycemia","Fasting","Ketone bodies","Fatty acids","Galactosemia","Fructose intolerance","Aldolase B","Lactose"] },
+    { packId: "pathology", name: "Cell injury and inflammation", group: "Basic sciences", keywords: ["Cell injury","Hypoxia","Ischemia","ATP depletion","Reversible injury","Cell swelling","Fatty change","Necrosis","Apoptosis","Caspases","Coagulative necrosis","Liquefactive necrosis","Caseous necrosis","Fat necrosis","Fibrinoid necrosis","Gangrene","Free radicals","Reperfusion injury","Acute inflammation","Vasodilation","Increased permeability","Exudate","Edema","Neutrophils","Margination","Rolling","Selectins","Integrins","Diapedesis","Chemotaxis","Phagocytosis","Histamine","Prostaglandins","Leukotrienes","Bradykinin","Complement","Cytokines","TNF","IL-1","Fever","Chronic inflammation","Macrophages","Lymphocytes","Granuloma","Fibrosis","Repair","Regeneration","Scar","Angiogenesis"] },
+    { packId: "pharma", name: "Autonomic pharmacology", group: "Pharmacology", keywords: ["Acetylcholine","Noradrenaline","Muscarinic receptor","Nicotinic receptor","Alpha-1","Alpha-2","Beta-1","Beta-2","Atropine","Pilocarpine","Neostigmine","Acetylcholinesterase","Organophosphates","Pralidoxime","Myasthenia gravis","Glaucoma","Miosis","Mydriasis","Bradycardia","Tachycardia","Bronchodilation","Salbutamol","Asthma","Propranolol","Atenolol","Hypertension","Prazosin","Clonidine","Adrenaline","Anaphylaxis","Dopamine","Dobutamine","Shock","Phenylephrine","Vasoconstriction","Tamsulosin","Prostatic hyperplasia","Succinylcholine","Neuromuscular block","Rocuronium","Sympathetic","Parasympathetic","Heart rate","Secretions","Urinary retention","Dry mouth","Ipratropium","COPD","Reflex tachycardia"] },
+    { packId: "antimicrobials", name: "Antimicrobials", group: "Pharmacology", keywords: ["Penicillin","Beta-lactam ring","Cell wall","Peptidoglycan","Beta-lactamase","Amoxicillin","Clavulanic acid","Cephalosporins","Carbapenems","Vancomycin","MRSA","Red man syndrome","Aminoglycosides","Gentamicin","30S ribosome","Nephrotoxicity","Ototoxicity","Tetracyclines","Teeth discoloration","Macrolides","Azithromycin","50S ribosome","QT prolongation","Clindamycin","C. difficile","Fluoroquinolones","Ciprofloxacin","DNA gyrase","Tendon rupture","Sulfonamides","Trimethoprim","Folate synthesis","Metronidazole","Anaerobes","Disulfiram-like reaction","Linezolid","VRE","Bactericidal","Bacteriostatic","MIC","Resistance","Efflux pumps","Culture and sensitivity","Empirical therapy","Stewardship","Allergy","Anaphylaxis","Spectrum","Probenecid"] },
+  ].map((p) => Object.freeze({ ...p, description: `${p.group} · built-in pack`, boardSize: Math.min(7, Math.floor(Math.sqrt(p.keywords.length))), builtIn: true }));
+  const DEFAULT_PACK_ID = "diabe-teach";
 
   const PHASES = ["pretest","trial-orientation","round-1:chain-mapping","round-1:peer-adjudication","round-1:round-summary","round-2:chain-mapping","round-2:peer-adjudication","round-2:round-summary","posttest","feedback-survey","completed"];
   const PHASE_LABEL = {
@@ -16,32 +35,114 @@ const CC = (() => {
     "round-2:chain-mapping":"R2 · Chain mapping","round-2:peer-adjudication":"R2 · Peer review","round-2:round-summary":"R2 · Summary",
     "posttest":"Post-test","feedback-survey":"Survey","completed":"Completed",
   };
-  // Seconds per phase; null = instructor-driven (phaseEndsAt null).
-  const TIMERS = { "round-1:chain-mapping":300, "round-1:peer-adjudication":240, "round-2:chain-mapping":300, "round-2:peer-adjudication":240 };
+  // SessionTimerConfig (docs/api/openapi.yaml): whole seconds 1-86400 per phase; null = teacher-paced (phaseEndsAt null).
+  // The demo's defaults (5 min chain mapping, 4 min peer review, everything else teacher-paced) are not the API's.
+  const TIMER_FIELDS = ["pretestSec","trialOrientationSec","roundMappingSec","roundAdjudicationSec","posttestSec","feedbackSurveySec"];
+  const DEFAULT_TIMER_CONFIG = Object.freeze({ pretestSec: null, trialOrientationSec: null, roundMappingSec: 300, roundAdjudicationSec: 240, posttestSec: null, feedbackSurveySec: null });
+  const TIMER_MIN_SEC = 1, TIMER_MAX_SEC = 86400;
+  const timerField = (phase) => ({ "pretest":"pretestSec", "trial-orientation":"trialOrientationSec", "posttest":"posttestSec", "feedback-survey":"feedbackSurveySec" })[phase]
+    ?? (phase.endsWith(":chain-mapping") ? "roundMappingSec" : phase.endsWith(":peer-adjudication") ? "roundAdjudicationSec" : null);
+  // Prototype-only settings (not in CreateSessionRequest): board size and shortest chain.
+  const DEFAULT_BOARD_SIZE = 7, MIN_BOARD_SIZE = 3, MAX_BOARD_SIZE = 10, DEFAULT_MIN_CHAIN = 2;
 
   const listeners = [];
   const now = () => Date.now();
   const uid = (p) => `${p}_${Math.random().toString(36).slice(2, 8)}`;
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+  const newSeed = () => Math.random().toString(36).slice(2, 10);
 
   function hash(s) { let h = 2166136261; for (const c of s) { h ^= c.charCodeAt(0); h = Math.imul(h, 16777619); } return h >>> 0; }
   function rng(seed) { let a = hash(seed); return () => { a |= 0; a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
 
-  function shuffleBoard(seed) {
-    const r = rng(seed); const w = WORDS.slice();
+  function apiError(code, message) { const e = new Error(message); e.code = code; return e; }
+
+  function listPacks() { return BUILTIN_PACKS.slice(); }
+  function getPack(packId) { return BUILTIN_PACKS.find((p) => p.packId === packId) ?? null; }
+  const maxBoardSize = (pack) => Math.min(MAX_BOARD_SIZE, Math.floor(Math.sqrt(pack.keywords.length)));
+
+  // Deals a size x size board from a pack's keywords. Same pack + size + seed always gives the same board.
+  function dealBoard({ packId = DEFAULT_PACK_ID, boardSize = DEFAULT_BOARD_SIZE, seed } = {}) {
+    const pack = getPack(packId); if (!pack) throw apiError("PACK_NOT_FOUND", `No Curriculum Pack "${packId}".`);
+    if (boardSize > maxBoardSize(pack)) throw apiError("INVALID_REQUEST_BODY", `${pack.name} has ${pack.keywords.length} keywords: too few for a ${boardSize}×${boardSize} board (needs ${boardSize * boardSize}).`);
+    const r = rng(String(seed)); const w = pack.keywords.slice();
     for (let i = w.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [w[i], w[j]] = [w[j], w[i]]; }
-    const rows = 7, cols = 7, cells = [];
+    const rows = boardSize, cols = boardSize, cells = [];
     for (let row = 0; row < rows; row++) cells.push(w.slice(row * cols, row * cols + cols).map((label) => ({ keywordId: label.toLowerCase().replace(/[^a-z0-9]+/g, "-"), label })));
-    return { seed, rows, cols, cells };
+    return { seed: String(seed), rows, cols, cells };
   }
 
-  function fresh() {
+  // Checks and fills in settings shaped like CreateSessionRequest (+ prototype-only boardSize, minChainLength).
+  // Throws INVALID_REQUEST_BODY / PACK_NOT_FOUND with a message a teacher can read.
+  function normalizeSettings(input = {}) {
+    const bad = (msg) => { throw apiError("INVALID_REQUEST_BODY", msg); };
+    const packId = input.packId ?? DEFAULT_PACK_ID, pack = getPack(packId);
+    if (!pack) throw apiError("PACK_NOT_FOUND", `No Curriculum Pack "${packId}".`);
+    const tc = input.timerConfig ?? {};
+    if (typeof tc !== "object" || Array.isArray(tc)) bad("timerConfig must be an object.");
+    for (const k of Object.keys(tc)) if (!TIMER_FIELDS.includes(k)) bad(`timerConfig.${k} is not a known timer.`);
+    const timerConfig = {};
+    for (const k of TIMER_FIELDS) {
+      const v = k in tc ? tc[k] : DEFAULT_TIMER_CONFIG[k];
+      if (v !== null && !(Number.isInteger(v) && v >= TIMER_MIN_SEC && v <= TIMER_MAX_SEC))
+        bad(`timerConfig.${k} must be a whole number of seconds from ${TIMER_MIN_SEC} to ${TIMER_MAX_SEC} (24 hours), or null for teacher-paced.`);
+      timerConfig[k] = v;
+    }
+    const boardSize = input.boardSize ?? Math.min(DEFAULT_BOARD_SIZE, maxBoardSize(pack));
+    if (!Number.isInteger(boardSize) || boardSize < MIN_BOARD_SIZE || boardSize > maxBoardSize(pack))
+      bad(`Board size must be a whole number from ${MIN_BOARD_SIZE} to ${maxBoardSize(pack)} for ${pack.name} (${pack.keywords.length} keywords).`);
+    const minChainLength = input.minChainLength ?? DEFAULT_MIN_CHAIN;
+    if (!Number.isInteger(minChainLength) || minChainLength < 2 || minChainLength > boardSize * boardSize)
+      bad(`Shortest chain must be a whole number from 2 to ${boardSize * boardSize}.`);
+    if (input.seed != null && (typeof input.seed !== "string" || !input.seed.trim())) bad("seed must be a non-empty string.");
+    if (input.creatorDisplayName != null && typeof input.creatorDisplayName !== "string") bad("creatorDisplayName must be a string.");
+    return { packId, mode: input.mode ?? "classroom", adjudicationMode: input.adjudicationMode ?? "peer-instructor", timerConfig,
+      seed: input.seed ?? null, creatorDisplayName: input.creatorDisplayName?.trim() || null, boardSize, minChainLength };
+  }
+  // A stored session's settings (sessions saved before settings existed get the defaults).
+  const settingsOf = (s) => s.settings ?? normalizeSettings();
+
+  function fresh(input) {
+    const settings = normalizeSettings(input);
     const roomCode = Array.from({ length: 6 }, () => "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"[Math.floor(Math.random() * 32)]).join("");
-    return {
-      session: { sessionId: uid("ses"), roomCode, packId: "diabe-teach", mode: "classroom", adjudicationMode: "peer-instructor",
+    const s = {
+      session: { sessionId: uid("ses"), roomCode, packId: settings.packId, mode: settings.mode, adjudicationMode: settings.adjudicationMode,
         currentPhase: "pretest", activeRoundNumber: null, phaseStartedAt: new Date().toISOString(), phaseEndsAt: null, activeBoard: null, participantCount: 0 },
-      participants: [], chains: [],
+      settings, participants: [], chains: [],
     };
+    s.session.phaseEndsAt = phaseEnd(settings, "pretest");
+    return s;
+  }
+  function phaseEnd(settings, phase) {
+    const f = timerField(phase), sec = f ? settings.timerConfig[f] : null;
+    return sec ? new Date(now() + sec * 1000).toISOString() : null;
+  }
+
+  // Phase length from Game setup: whole minutes 1-1440 (1440 min = TIMER_MAX_SEC), or teacher-paced (null).
+  const TIMER_MAX_MIN = TIMER_MAX_SEC / 60;
+  function timerFromMinutes(minutes, teacherPaced = false) {
+    if (teacherPaced) return null;
+    const m = typeof minutes === "string" ? (minutes.trim() === "" ? NaN : Number(minutes)) : minutes;
+    if (!Number.isInteger(m) || m < 1 || m > TIMER_MAX_MIN) throw apiError("INVALID_REQUEST_BODY", `Enter whole minutes from 1 to ${TIMER_MAX_MIN} (24 hours), or make it teacher-paced.`);
+    return m * 60;
+  }
+
+  const timerLabel = (sec) => sec == null ? "Teacher-paced" : sec < 60 ? `${sec} s` : sec % 60 ? `${Math.floor(sec / 60)} min ${sec % 60} s` : `${sec / 60} min`;
+
+  // Demo teacher sign-in: name + email remembered in this browser. No password, nothing secret (not a real account).
+  const TEACHER_KEY = "cc-demo-teacher-v1";
+  function teacher() { try { const t = JSON.parse(localStorage.getItem(TEACHER_KEY)); return t && t.name && t.email ? t : null; } catch { return null; } }
+  function signIn(name, email) {
+    const n = String(name ?? "").trim(), e = String(email ?? "").trim();
+    if (!n) throw apiError("INVALID_REQUEST_BODY", "Enter your name.");
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) throw apiError("INVALID_REQUEST_BODY", "Enter a valid email address, like name@school.org.");
+    const t = { name: n.slice(0, 60), email: e, signedInAt: new Date().toISOString() };
+    localStorage.setItem(TEACHER_KEY, JSON.stringify(t)); return t;
+  }
+  function signOut() { localStorage.removeItem(TEACHER_KEY); }
+  // Guard for teacher pages: returns the signed-in teacher, or hides the page and sends the browser to Teacher login.
+  function requireTeacher(loginUrl = "login.html") {
+    const t = teacher(); if (t) return t;
+    document.documentElement.style.visibility = "hidden"; location.replace(loginUrl); return null;
   }
 
   function load() { try { return JSON.parse(localStorage.getItem(KEY)) || null; } catch { return null; } }
@@ -50,18 +151,21 @@ const CC = (() => {
   function update(mut) { const s = get(); const out = mut(s); save(s); return out; }
   function subscribe(fn) { listeners.push(fn); window.addEventListener("storage", (e) => { if (e.key === KEY) fn(get()); }); }
   function reset() { const s = fresh(); save(s); return s; }
-
-  function apiError(code, message) { const e = new Error(message); e.code = code; return e; }
+  // Creates a new demo Game Session from CreateSessionRequest-shaped settings, replacing the stored one (like reset()).
+  function createSession(settings) { const s = fresh(settings); save(s); return s; }
 
   function enterPhase(s, phase) {
     const ss = s.session;
     ss.currentPhase = phase;
     const m = /^round-(\d)/.exec(phase);
     ss.activeRoundNumber = m ? Number(m[1]) : null;
-    if (phase.endsWith(":chain-mapping")) ss.activeBoard = shuffleBoard(`${ss.sessionId}-r${ss.activeRoundNumber}-${now()}`);
+    const set = settingsOf(s);
+    // Round 1 uses the creation seed (the board Game setup previewed); Round 2, or a session made without a seed, gets a fresh one.
+    if (phase.endsWith(":chain-mapping")) ss.activeBoard = dealBoard({ packId: set.packId, boardSize: set.boardSize,
+      seed: ss.activeRoundNumber === 1 && set.seed ? set.seed : `${ss.sessionId}-r${ss.activeRoundNumber}-${now()}` });
     if (!m) ss.activeBoard = null;
     ss.phaseStartedAt = new Date().toISOString();
-    ss.phaseEndsAt = TIMERS[phase] ? new Date(now() + TIMERS[phase] * 1000).toISOString() : null;
+    ss.phaseEndsAt = phaseEnd(set, phase);
   }
   function advance() { return update((s) => { const i = PHASES.indexOf(s.session.currentPhase); if (i >= PHASES.length - 1) throw apiError("INVALID_PHASE_TRANSITION", "Session already completed."); enterPhase(s, PHASES[i + 1]); }); }
   function extend(sec) { return update((s) => { const ss = s.session; const base = ss.phaseEndsAt ? Math.max(now(), Date.parse(ss.phaseEndsAt)) : now(); ss.phaseEndsAt = new Date(base + sec * 1000).toISOString(); }); }
@@ -75,8 +179,8 @@ const CC = (() => {
   }
 
   const adjacent = (a, b) => Math.max(Math.abs(a.row - b.row), Math.abs(a.col - b.col)) === 1; // chebyshev-8
-  function topologyError(path) {
-    if (path.length < 2) return "A chain needs at least two keywords.";
+  function topologyError(path, minLength = DEFAULT_MIN_CHAIN) {
+    if (path.length < minLength) return minLength === 2 ? "A chain needs at least two keywords." : `A chain needs at least ${minLength} keywords.`;
     const seen = new Set();
     for (let i = 0; i < path.length; i++) {
       const k = `${path[i].row},${path[i].col}`; if (seen.has(k)) return "A keyword can only appear once in a chain."; seen.add(k);
@@ -93,7 +197,7 @@ const CC = (() => {
   function submitChain(participantId, path, narrativeExplanation, stepRationales) {
     return update((s) => {
       if (!submissionsOpen(s)) throw apiError("PHASE_CLOSED_FOR_SUBMISSIONS", "Chain mapping is closed for this round.");
-      const err = topologyError(path); if (err) throw apiError("CHAIN_TOPOLOGY_INVALID", err);
+      const err = topologyError(path, settingsOf(s).minChainLength); if (err) throw apiError("CHAIN_TOPOLOGY_INVALID", err);
       if (!narrativeExplanation.trim()) throw apiError("INVALID_REQUEST_BODY", "Add a narrative explanation.");
       const b = s.session.activeBoard;
       const chain = { chainId: uid("chn"), sessionId: s.session.sessionId, roundNumber: s.session.activeRoundNumber, participantId,
@@ -207,6 +311,9 @@ const CC = (() => {
   }
   const chainText = (c) => c.labels.map((l) => `<b>${esc(l)}</b>`).join(` <span class="arrow">→</span> `);
 
-  return { PHASES, PHASE_LABEL, get, subscribe, reset, advance, extend, join, submitChain, vote, rule, standings, seedSampleLearners,
+  return { PHASES, PHASE_LABEL, DEFAULT_PACK_ID, DEFAULT_TIMER_CONFIG, TIMER_FIELDS, TIMER_MIN_SEC, TIMER_MAX_SEC, MIN_BOARD_SIZE,
+    listPacks, getPack, dealBoard, newSeed, normalizeSettings, settingsOf, createSession, timerFromMinutes, timerLabel, TIMER_MAX_MIN,
+    teacher, signIn, signOut, requireTeacher,
+    get, subscribe, reset, advance, extend, join, submitChain, vote, rule, standings, seedSampleLearners,
     topologyError, submissionsOpen, adjacent, clock, renderBoard, statusBadge, chainText, esc };
 })();

@@ -104,7 +104,7 @@
 
     steps: {
       A: {
-        title: "Create session",
+        title: "Start game",
         actor: "teacher",
         ops: ["createGameSession"],
         screens: ["teacher"],
@@ -187,7 +187,7 @@
           "No Capability Token is needed: this call issues the instructor token. Keep `instructorToken` for every teacher call (D, G, and the reads in C and H).",
           "Share `roomCode` with learners; they join with it (step B).",
           "`timerConfig` durations are whole seconds 1-86400; `null` makes that phase teacher-paced (no deadline). Omitted fields use the defaults (20 min mapping, 10 min peer review).",
-          "\"Reset session\" and \"Start a new session\" both create a brand-new Game Session with a new room code; nothing ends the old one.",
+          "\"Start game\" on Game setup creates a brand-new Game Session with a new room code; \"Reset session\" and \"Start a new session\" on the teacher screen go back to Game setup. Nothing ends the old session.",
         ],
         deviations: [
           "Every session starts in `pretest`, including solo mode (the spec summary says solo auto-starts Round 1; it only auto-joins the creator).",
