@@ -29,7 +29,7 @@
   <header class="top">
     <div class="brand">
       <h1>Concept <span>Chain</span></h1>
-      <p>Teacher view · <span id="packName">Diabetes mellitus pack</span> · Classroom game, peer + teacher review</p>
+      <p>Teacher view · <span id="packName">Diabetes mellitus</span> · class votes + your final say</p>
       <p id="objective" hidden></p>
       <p id="timings"></p>
       <p class="who">Signed in as <b id="who"></b> · <a href="login.html" id="signOut">Sign out</a></p>
@@ -118,10 +118,11 @@ function render(s = CC.get()) { keepFocus(() => {
   const set = CC.settingsOf(s);
   const pack = CC.packOf(s);
   const packName = pack?.name ?? set.packId;
-  $("packName").textContent = /\bpack$/i.test(packName) ? packName : `${packName} pack`; // "My pack" stays "My pack", not "My pack pack"
+  $("packName").textContent = packName; // same name as on Game setup
   $("objective").hidden = !(pack?.objective || pack?.level);
   $("objective").innerHTML = [pack?.level && `Learner level: <b>${CC.esc(pack.level)}</b>`, pack?.objective && `Objective: <b>${CC.esc(pack.objective)}</b>`].filter(Boolean).join(" · ");
-  $("timings").textContent = `Each round: chain-building ${CC.timerLabel(set.timerConfig.roundMappingSec).toLowerCase()} · peer review ${CC.timerLabel(set.timerConfig.roundAdjudicationSec).toLowerCase()} · ${set.boardSize}×${set.boardSize} board · shortest chain ${set.minChainLength} keywords`;
+  const time = (sec) => sec == null ? "no timer" : CC.timerLabel(sec); // same wording as Game setup's summary
+  $("timings").textContent = `Building chains: ${time(set.timerConfig.roundMappingSec)} · Reviewing: ${time(set.timerConfig.roundAdjudicationSec)} · ${set.boardSize} × ${set.boardSize} board · chains of ${set.minChainLength}+ words · 2 rounds, each with a new board`;
   $("pCount").textContent = s.participants.length;
   $("steps").innerHTML = CC.PHASES.map((p, i) => `<li class="${i < idx ? "done" : i === idx ? "now" : ""}" ${i === idx ? 'aria-current="step"' : ""}>${CC.PHASE_LABEL[p]}</li>`).join("");
   const done = idx === CC.PHASES.length - 1;

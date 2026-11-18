@@ -7,6 +7,7 @@
     "dev": "netlify dev",
     "dev:debug": "DEBUG=* netlify dev",
     "dev:local": "node --import tsx scripts/start-dev-with-mongodb.ts",
+    "serve:poc": "node claudPoc/concept-chain/server.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:bdd": "node --import tsx node_modules/@cucumber/cucumber/bin/cucumber.js --config tests/cucumber.mjs",
