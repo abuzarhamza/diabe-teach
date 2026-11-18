@@ -46,7 +46,7 @@
     <div class="row">
       <div class="timer" data-api="C.timer" data-api-io="read"><span class="clock" id="clock">—:—</span><span class="note" id="clockNote"></span></div>
       <button class="btn sm" id="extend" data-api="gap.extend" data-api-io="write" title="Add one minute to this phase">+1 min</button>
-      <button class="btn sm bad" id="resetTop" data-api="A" data-api-io="write" title="Discard this session and go to Game setup to start a new game with a new room code">Reset session</button>
+      <button class="btn sm bad" id="resetTop" data-api="nav.setup" data-api-io="write" title="Discard this session and go to Game setup to start a new game with a new room code">Reset session</button>
       <button class="btn primary" id="advance" data-api="D" data-api-io="write">Next phase →</button>
     </div>
   </section>
@@ -87,7 +87,7 @@
         <p class="note">This prototype stores the session in your browser. Open the learner screen in more tabs to play along.</p>
         <div class="row">
           <button class="btn sm" id="seed">Add sample learners & chains</button>
-          <button class="btn sm bad" id="reset" data-api="A" data-api-io="write">Start a new session</button>
+          <button class="btn sm bad" id="reset" data-api="nav.setup" data-api-io="write">Start a new session</button>
         </div>
       </div>
     </aside>
@@ -126,7 +126,7 @@ function render(s = CC.get()) { keepFocus(() => {
   $("steps").innerHTML = CC.PHASES.map((p, i) => `<li class="${i < idx ? "done" : i === idx ? "now" : ""}" ${i === idx ? 'aria-current="step"' : ""}>${CC.PHASE_LABEL[p]}</li>`).join("");
   const done = idx === CC.PHASES.length - 1;
   $("advance").textContent = done ? "Start a new session ↺" : CC.nextPhaseLabel(ss.currentPhase);
-  $("advance").dataset.api = done ? "A" : "D"; // from Completed it creates a new Game Session
+  $("advance").dataset.api = done ? "nav.setup" : "D"; // from Completed it opens Game setup (where step A happens)
   $("extend").hidden = !ss.phaseEndsAt;
 
   const roundChains = s.chains.filter((c) => c.roundNumber === round);

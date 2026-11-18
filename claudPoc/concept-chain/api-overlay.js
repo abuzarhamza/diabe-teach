@@ -5,13 +5,15 @@
 //   data-api="D"            step letter from CC_API_CATALOG.steps
 //   data-api="G.reject"     finer key: CC_API_CATALOG.targets["G.reject"] if present, else step "G"
 //   data-api="gap.extend"   UI element with no API: CC_API_CATALOG.gaps.extend
+//   data-api="nav.setup"    control that only navigates: CC_API_CATALOG.nav.setup (points at the step on that page)
 //   data-api-io="write"     sends a request (dashed outline); "read" shows API data (solid outline)
 //   data-api-toggle         optional extra place for the toggle (e.g. a view with no header.top);
 //                           a toggle goes into every header.top and every [data-api-toggle], all kept in sync
 //
 // On/off is kept in tab-scoped sessionStorage (STORE_KEY), so it survives join → lobby → game redirects.
 //
-// When on, a flow legend (steps A → H from CC_API_CATALOG.steps, then CC_API_CATALOG.noScreen) sits
+// When on, a flow legend (the pages from CC_API_CATALOG.screens, steps P, A → H from CC_API_CATALOG.steps,
+// then CC_API_CATALOG.noScreen) sits
 // fixed at the bottom right. Steps with no visible element on this page are dimmed and say which
 // screen they're on; clicking a step flashes its elements. Collapsed/open is kept in LEGEND_KEY.
 //
@@ -21,8 +23,8 @@
 // buttons for the path, sample request and sample response body; Esc or × closes it and focus goes
 // back to the tag. Cards are kept inside the viewport.
 //
-// Live samples: an operation's sample(CC.get(), ctx) fills path, request and response from the demo
-// session. ctx = page data from CCOverlay.setContext(fn) + { variant, key, chainId }, where chainId is
+// Live samples: an operation's sample(CC.peek(), ctx) fills path, request and response from the demo
+// session (null when none is stored: the overlay never creates one). ctx = page data from CCOverlay.setContext(fn) + { variant, key, chainId }, where chainId is
 // the nearest [data-api-chain] around the element. Cards refresh on page re-renders, typing in page
 // fields and demo-session changes in other tabs (storage events).
 //
@@ -56,6 +58,10 @@ const CCOverlay = (() => {
     const c = cat(); if (!c || !key) return null;
     const target = c.targets?.[key] ?? {};
     const withMissing = (info) => ({ ...info, missing: info.ops.some((op) => c.operations?.[op]?.status === "missing") });
+    if (key.startsWith("nav.")) {
+      const nav = c.nav?.[key.slice(4)]; if (!nav) return null;
+      return { kind: "nav", letter: null, navStep: nav.step ?? null, title: nav.title, actor: null, ops: [], note: nav.note, variant: null, missing: false };
+    }
     if (key.startsWith("gap.")) {
       const gap = c.gaps?.[target.gap ?? key.slice(4)]; if (!gap) return null;
       return withMissing({ kind: "gap", letter: null, title: gap.title, actor: null, ops: target.ops ?? gap.ops ?? [], note: target.note ?? gap.note, variant: target.variant ?? null });
@@ -73,6 +79,7 @@ const CCOverlay = (() => {
   function tagLabel(info) {
     const actor = info.actor ? cat().actors?.[info.actor] : null;
     const ops = info.ops.length ? ` (${info.ops.join(", ")})` : "";
+    if (info.kind === "nav") return `Navigation: ${info.title}${info.navStep ? ` (step ${info.navStep} happens there)` : ""}, no API call. Show API card`;
     const head = info.letter ? `Step ${info.letter}: ${info.title}` : `No API: ${info.title}`;
     return `${head}${ops}${actor ? `, ${actor.label}` : ""}${info.missing ? ", missing API" : ""}. Show API card`;
   }
@@ -100,8 +107,8 @@ const CCOverlay = (() => {
       const x = r.left + scrollX, y = r.top + scrollY;
       const io = el.dataset.apiIo === "read" ? "read" : "write";
       const actor = info.actor ? cat().actors?.[info.actor] : null;
-      const text = info.letter ? `${info.letter}${actor ? ` ${actor.badge}` : ""}${info.missing ? " · missing API" : ""}` : "no API";
-      const bad = info.kind === "gap" || info.missing ? " gap" : "";
+      const text = info.kind === "nav" ? `→ ${info.navStep ?? "page"}` : info.letter ? `${info.letter}${actor ? ` ${actor.badge}` : ""}${info.missing ? " · missing API" : ""}` : "no API";
+      const bad = info.kind === "nav" ? " nav" : info.kind === "gap" || info.missing ? " gap" : "";
       const lit = flash && info.letter === flash.letter ? " flash" : "";
       const boxCls = `cc-api-box ${io}${bad}${lit}`, tagCls = `cc-api-tag ${io}${bad}`;
       if (m.box.className !== boxCls) m.box.className = boxCls;
@@ -141,7 +148,9 @@ const CCOverlay = (() => {
     let live = null;
     // shared.js declares `const CC` (a global binding, not a window property), so look it up by name.
     const demo = typeof CC !== "undefined" ? CC : null;
-    if (typeof op.sample === "function" && demo) { try { live = op.sample(demo.get(), { ...ctx, variant }); } catch { live = null; } }
+    // peek() reads the stored session without creating one (get() would make a default session on login/setup).
+    const state = () => (typeof demo.peek === "function" ? demo.peek() : demo.get());
+    if (typeof op.sample === "function" && demo) { try { live = op.sample(state(), { ...ctx, variant }); } catch { live = null; } }
     const req = live?.request ?? op.request, res = live?.response ?? op.response, path = live?.path ?? op.path;
     const liveTag = (part) => (live?.[part] !== undefined ? ` <span class="cc-api-live">example from demo session</span>` : "");
     const copy = (value, what) => (pinned ? copyBtn(typeof value === "string" ? value : JSON.stringify(value, null, 2), what) : "");
@@ -171,7 +180,9 @@ const CCOverlay = (() => {
     const ctx = sampleCtx(el);
     copyData = [];
     const actor = info.actor ? cat().actors?.[info.actor] : null;
-    const head = info.kind === "gap"
+    const head = info.kind === "nav"
+      ? `<span class="cc-api-step nav">→ ${esc(info.navStep ?? "page")}</span> ${esc(info.title)}`
+      : info.kind === "gap"
       ? `<span class="cc-api-step gap">no API</span> ${esc(info.title)}`
       : `<span class="cc-api-step">${esc(info.letter)}</span> ${esc(info.title)}${actor ? ` <span class="cc-api-actor">${actor.badge} ${esc(actor.label)}</span>` : ""}`;
     const close = pinned ? `<button type="button" class="cc-api-close" aria-label="Close API card">×</button>` : "";
@@ -293,8 +304,23 @@ const CCOverlay = (() => {
 
 
   // ---- flow legend ----
-  const SCREEN_LABELS = { teacher: "teacher screen", lobby: "lobby", learner: "learner screen" };
-  const where = (screens) => `on ${(screens ?? []).map((s) => SCREEN_LABELS[s] ?? s).join(" / ")}`;
+  const screenLabel = (id) => cat().screens?.find((s) => s.id === id)?.label ?? id;
+  const where = (screens) => `on ${(screens ?? []).map(screenLabel).join(" / ")}`;
+  // This page's entry in CC_API_CATALOG.screens, by file name.
+  const thisScreen = () => { const file = location.pathname.split("/").pop() || "index.html"; return cat().screens?.find((s) => s.file === file)?.id ?? null; };
+
+  // The pages in flow order, per actor: "Teacher login → Game setup → Teacher screen", this page in bold.
+  function screensHtml() {
+    const c = cat(), here = thisScreen(), list = c.screens ?? [];
+    const rows = ["teacher", "learner"].map((actor) => {
+      const items = list.filter((s) => s.actor === actor);
+      if (!items.length) return "";
+      const a = c.actors?.[actor];
+      return `<li>${a ? `<span class="cc-api-actor" title="${esc(a.label)}">${a.badge}</span> ` : ""}${items.map((s) => s.id === here
+        ? `<b aria-current="page">${esc(s.label)}</b>` : esc(s.label)).join(" → ")}</li>`;
+    }).join("");
+    return rows ? `<h4>Screens</h4><ul class="cc-api-leg-screens">${rows}</ul>` : "";
+  }
   const STATUS_CLS = { implemented: "good", partial: "warn", "specced-only": "warn", missing: "bad" };
 
   function statusBadges(ops, variant) {
@@ -323,8 +349,11 @@ const CCOverlay = (() => {
         <code class="cc-api-leg-where">${entry.ops.map(esc).join(", ")}</code></span>
         <span class="cc-api-leg-status">${statusBadges(entry.ops)}</span></li>`;
     }).join("");
-    return `<div class="cc-api-leg-head"><button type="button" class="cc-api-leg-toggle" aria-controls="cc-api-leg-body">API flow A → ${esc(Object.keys(c.steps ?? {}).slice(-1)[0] ?? "")}</button></div>
+    const letters = Object.keys(c.steps ?? {});
+    const range = letters.length ? `${letters[0] === "A" ? "" : `${letters[0]}, `}A → ${letters.at(-1)}` : ""; // "P, A → H": the pack step comes first
+    return `<div class="cc-api-leg-head"><button type="button" class="cc-api-leg-toggle" aria-controls="cc-api-leg-body">API flow ${esc(range)}</button></div>
       <div class="cc-api-leg-body" id="cc-api-leg-body">
+        ${screensHtml()}
         <ol class="cc-api-leg-steps">${steps}</ol>
         ${none ? `<h4>No screen yet</h4><ul class="cc-api-leg-none">${none}</ul>` : ""}
         <p class="cc-api-leg-live visually-hidden" aria-live="polite"></p>

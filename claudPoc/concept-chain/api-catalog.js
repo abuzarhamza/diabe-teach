@@ -7,6 +7,7 @@
 // When a backend gap closes, update `status` and `deviations` here.
 //
 // Shape (see .scratch/concept-chain-screens-api-overlay/spec.md):
+//   screens[]        = { id, label, file, actor }  (the prototype's pages in flow order; steps' `screens` name these ids)
 //   steps[letter]    = { title, actor: "teacher"|"learner"|"both", ops: opId[], screens: string[] }
 //   operations[opId] = { method, path, pathParams, auth, request, response: { status, body },
 //                        errors: [{ status, code }], status, deviations, notes?, sample?(session, ctx),
@@ -14,10 +15,12 @@
 //   (a step or target may name a `variant`; its fields replace the operation's, and its notes are appended)
 //   gaps[key]        = { title, note, ops?: opId[] }   (UI elements with no API; ops may name "missing" operations)
 //   targets[key]     = { step?, gap?, ops?, note?, variant? }  (optional finer keys used as data-api="G.reject")
+//   nav[key]         = { title, step, note }  (data-api="nav.<key>": a control that only navigates; it points at the
+//                                               step that happens on the page it opens, and makes no API call)
 //   noScreen[]       = { title, actor, ops: opId[] }  (operations no screen uses yet; legend only)
 // An element whose operations include a `missing` one is drawn in the bad (red) color.
 //
-// Pages mark elements with data-api="<letter>" | "<letter>.<detail>" | "gap.<key>"
+// Pages mark elements with data-api="<letter>" | "<letter>.<detail>" | "gap.<key>" | "nav.<key>"
 // and data-api-io="write" (sends a request, dashed) | "read" (shows API data, solid).
 /* eslint-disable */
 (function (root) {
@@ -48,6 +51,37 @@
     verdict: null,
     peerVotes: [{ voterParticipantId: "<otherParticipantId>", decision: "approve", comment: null, votedAt: "2026-11-17T09:22:00.000Z" }],
     submittedAt: "2026-11-17T09:12:00.000Z",
+  };
+
+  // Curriculum Pack shapes (CurriculumPackSummary, PublicCurriculumPack, CurriculumPackInput), trimmed to 3 cards.
+  const sampleBoardConfig = { rows: 7, cols: 7, minChainLength: 4, adjacencyRule: "chebyshev-8" };
+  const samplePackSummary = {
+    id: "diabe-teach", title: "Diabe-teach: Undergraduate Diabetes Mellitus Clinical Reasoning", version: "1.0.0", subjectDomain: "Diabetes mellitus",
+    boardConfig: sampleBoardConfig, cardCount: 49, domainCount: 7, hasAssessmentInstrument: true, hasPerceptionSurvey: true,
+  };
+  const sampleCards = [
+    { id: "insulin", verbatimLabel: "Insulin", displayLabel: "Insulin", aliases: [], domainId: "anatomy-pathophysiology", summary: "Hormone from pancreatic beta cells that lowers blood glucose." },
+    { id: "metformin", verbatimLabel: "Metformin", displayLabel: "Metformin", aliases: ["Biguanide"], domainId: "therapeutics-multidisciplinary", summary: "First-line oral biguanide for type 2 diabetes." },
+    { id: "hba1c", verbatimLabel: "HbA1c", displayLabel: "HbA1c", aliases: ["Glycated hemoglobin", "Hemoglobin A1c", "A1c"], domainId: "diagnostics-monitoring", summary: "Glycated hemoglobin: mean blood glucose over 8-12 weeks." },
+  ];
+  const sampleRubric = {
+    evaluatorPersona: "Endocrinology tutor", subjectDomain: "Diabetes mellitus",
+    chainContinuityCriteria: ["Each link names a mechanism, cause or consequence"], calibrationExamples: [],
+  };
+  const samplePublicPack = {
+    id: "diabe-teach", title: samplePackSummary.title, version: "1.0.0",
+    description: "49-keyword associative concept-chaining board game for undergraduate diabetes mellitus.",
+    boardConfig: sampleBoardConfig,
+    domains: [{ id: "anatomy-pathophysiology", label: "Anatomy & Pathophysiology", description: "Pancreatic islets, hormones and glucose homeostasis." }],
+    cards: sampleCards, adjudicationRubric: sampleRubric, assessmentInstrument: null, perceptionSurvey: null,
+  };
+  const samplePackInput = {
+    id: "my-endocrine-review", title: "Endocrine review", version: "1.0.0", description: "Year 2 undergraduate · Explain how insulin resistance leads to complications",
+    boardConfig: sampleBoardConfig,
+    domains: [{ id: "<domainId>", label: "<Semantic Domain (not collected)>", description: "<not collected>" }],
+    cards: sampleCards.map((c) => ({ ...c, domainId: "<domainId>", summary: "<not collected>" })),
+    adjudicationRubric: { evaluatorPersona: "<not collected>", subjectDomain: "Endocrine review", chainContinuityCriteria: ["<not collected>"], calibrationExamples: [] },
+    assessmentInstrument: null, perceptionSurvey: null,
   };
 
   const rulingNotes = [
@@ -102,12 +136,28 @@
       missing: "Missing",
     },
 
+    // The prototype's pages in flow order (the legend lists them and marks the current one).
+    screens: [
+      { id: "login", label: "Teacher login", file: "login.html", actor: "teacher" },
+      { id: "setup", label: "Game setup", file: "setup.html", actor: "teacher" },
+      { id: "teacher", label: "Teacher screen", file: "teacher.html", actor: "teacher" },
+      { id: "learner", label: "Learner screen", file: "participant.html", actor: "learner" },
+      { id: "lobby", label: "Lobby", file: "lobby.html", actor: "learner" },
+    ],
+
     steps: {
+      // P comes before A: the teacher picks or makes a Curriculum Pack on Game setup, then starts the game.
+      P: {
+        title: "Choose a Curriculum Pack",
+        actor: "teacher",
+        ops: ["listCurriculumPacks", "getCurriculumPackById", "validateCurriculumPack", "registerCurriculumPack"],
+        screens: ["setup"],
+      },
       A: {
         title: "Start game",
         actor: "teacher",
         ops: ["createGameSession"],
-        screens: ["teacher"],
+        screens: ["setup", "teacher"],
       },
       B: {
         title: "Join session",
@@ -156,6 +206,100 @@
     },
 
     operations: {
+      listCurriculumPacks: {
+        method: "GET",
+        path: "/api/v1/packs",
+        pathParams: {},
+        auth: ["apiKey"],
+        request: null,
+        response: { status: 200, body: { packs: [samplePackSummary] } },
+        errors: [],
+        status: "implemented",
+        notes: [
+          "No Capability Token is needed, so Game setup can list packs before any Game Session exists.",
+          "A CurriculumPackSummary has no `description` and no keywords: the keyword count is `cardCount`, and the description and keywords need getCurriculumPackById.",
+          "There is no grouping field (the prototype's \"Clinical medicine\", \"Your packs\" headings) and no \"made by me\" flag.",
+        ],
+        deviations: [
+          "Only `diabe-teach` ships with the backend; the prototype's other 14 built-in topics exist only in the browser.",
+          "Archived packs are left out (archiving is not in the spec).",
+          "x-api-key is checked when the server has API_KEY set (401 UNAUTHORIZED_TOKEN), but the spec declares no security or 401 here.",
+        ],
+      },
+
+      getCurriculumPackById: {
+        method: "GET",
+        path: "/api/v1/packs/{packId}",
+        pathParams: { packId: "Curriculum Pack id (from listCurriculumPacks)" },
+        auth: ["apiKey"],
+        request: null,
+        response: { status: 200, body: { pack: samplePublicPack } },
+        errors: [
+          { status: 401, code: "UNAUTHORIZED_TOKEN" },
+          { status: 404, code: "PACK_NOT_FOUND" },
+        ],
+        status: "implemented",
+        notes: [
+          "No Capability Token is needed. With the instructor token (Authorization: Bearer) the assessment questions also carry `correctIndex` and `explanation`; an invalid token gets 401.",
+          "The keyword list is `pack.cards[].displayLabel`; the board size and shortest chain are `pack.boardConfig`.",
+          "The live sample shows only the first 3 Keyword Cards of the pack.",
+        ],
+        deviations: [
+          "A pack id that isn't a slug (letters, digits, dashes) gets 404 PACK_NOT_FOUND rather than 400.",
+        ],
+      },
+
+      validateCurriculumPack: {
+        method: "POST",
+        path: "/api/v1/packs/validate",
+        pathParams: {},
+        auth: ["apiKey", "instructor"],
+        request: samplePackInput,
+        response: {
+          status: 200,
+          body: { valid: false, issues: [{ jsonPointer: "/adjudicationRubric/chainContinuityCriteria", rule: "minItems", message: "At least one chain continuity criterion is required." }] },
+        },
+        errors: [],
+        status: "partial",
+        notes: [
+          "Checks a draft CurriculumPackInput without saving it. Call it before registerCurriculumPack to show the teacher what is missing.",
+          "A real pack needs more than the prototype collects: Keyword Cards with ids, aliases, a Semantic Domain and a summary each; the Semantic Domains; an adjudication rubric (evaluator persona, subject domain, chain continuity criteria, calibration examples); and a semver `version`. Game setup only has keywords, a name, a learner level and an objective.",
+          "Learner level and learning objective have no field: the closest is the pack `description`.",
+        ],
+        deviations: [
+          "Needs the instructor Capability Token (403 FORBIDDEN_ROLE without one), which only createGameSession issues; the spec declares no security and no 403 here.",
+          "Returns `{ valid, errors, warnings }` with `{ path, code, message }` items, not the spec's `{ valid, issues }` with `{ jsonPointer, rule, message }`.",
+        ],
+      },
+
+      registerCurriculumPack: {
+        method: "POST",
+        path: "/api/v1/packs",
+        pathParams: {},
+        auth: ["apiKey", "instructor"],
+        request: samplePackInput,
+        response: { status: 201, body: { pack: { ...samplePackSummary, id: "my-endocrine-review", title: "Endocrine review", subjectDomain: "Endocrinology", cardCount: 49 } } },
+        errors: [
+          { status: 409, code: "PACK_ALREADY_EXISTS" },
+          { status: 422, code: "PACK_VALIDATION_FAILED" },
+        ],
+        status: "partial",
+        notes: [
+          "Validates and saves the pack (same checks as validateCurriculumPack); it can then be used as `packId` in createGameSession.",
+          "A real pack needs Keyword Card ids, Semantic Domains and an adjudication rubric that the prototype doesn't collect, so a pack made on Game setup can't be registered as it is.",
+          "409 PACK_ALREADY_EXISTS: the same `id` and `version` is already registered (a new `version` of the same id is accepted).",
+        ],
+        deviations: [
+          "Needs the instructor Capability Token (403 FORBIDDEN_ROLE without one), and only createGameSession issues one: a teacher has to start a Game Session before they can register the pack they want to play. The spec declares no security, 401 or 403 here.",
+          "Returns 201 `{ packId, version, warnings }`, not `{ pack: CurriculumPackSummary }`.",
+          "409 and 422 bodies are `{ error: { code, ... } }` (422 carries `errors` and `warnings`, no `message`), not ApiErrorResponse.",
+          "Malformed JSON is not mapped to 400 INVALID_REQUEST_BODY.",
+          "netlify.toml force-redirects `/api/v1/packs` (any method) to the list function and `/api/v1/packs/register` (not in the spec) to register, so a POST to the spec path may never reach it. Not checked at runtime.",
+          "Packs live in MongoDB when MONGODB_URI is set; the in-memory store loses them between function instances.",
+          "Deleting a pack is not in the spec; the backend has an undocumented POST /api/v1/packs/{packId}/archive (instructor token).",
+        ],
+      },
+
       createGameSession: {
         method: "POST",
         path: "/api/v1/sessions",
@@ -165,7 +309,9 @@
           packId: "diabe-teach",
           mode: "classroom",
           adjudicationMode: "peer-instructor",
-          timerConfig: { roundMappingSec: 300, roundAdjudicationSec: 240 },
+          creatorDisplayName: "Ms Rahman",
+          timerConfig: { pretestSec: null, trialOrientationSec: null, roundMappingSec: 300, roundAdjudicationSec: 240, posttestSec: null, feedbackSurveySec: null },
+          seed: "k3v9q2",
         },
         response: {
           status: 201,
@@ -186,12 +332,16 @@
         notes: [
           "No Capability Token is needed: this call issues the instructor token. Keep `instructorToken` for every teacher call (D, G, and the reads in C and H).",
           "Share `roomCode` with learners; they join with it (step B).",
-          "`timerConfig` durations are whole seconds 1-86400; `null` makes that phase teacher-paced (no deadline). Omitted fields use the defaults (20 min mapping, 10 min peer review).",
-          "\"Start game\" on Game setup creates a brand-new Game Session with a new room code; \"Reset session\" and \"Start a new session\" on the teacher screen go back to Game setup. Nothing ends the old session.",
+          "`timerConfig` durations are whole seconds 1-86400; `null` makes that phase teacher-paced (no deadline). Omitted fields use the API defaults (15 min pretest, trial, post-test and survey; 20 min mapping; 10 min peer review), so Game setup sends all six: its chain-building and peer-review minutes × 60 (or `null` when teacher-paced), and `null` for the phases the prototype keeps teacher-paced.",
+          "`seed` is the board preview's seed, so Round 1 would be dealt exactly as previewed (see the deviation: the backend ignores it today).",
+          "\"Start game\" on Game setup creates a brand-new Game Session with a new room code; \"Reset session\" and \"Start a new session\" on the teacher screen only go back to Game setup. Nothing ends the old session.",
+          "Board size and shortest chain have no field here: they come from the pack's `boardConfig` (see the Game setup gaps).",
         ],
         deviations: [
           "Every session starts in `pretest`, including solo mode (the spec summary says solo auto-starts Round 1; it only auto-joins the creator).",
-          "`state` has no `activeBoard` key and no board is dealt; `seed` is ignored.",
+          "`state` has no `activeBoard` key and no board is dealt; `seed` is ignored, so the previewed board can't be reproduced server-side.",
+          "`creatorDisplayName` is only used in solo mode (as the auto-joined learner's name); in classroom mode it is dropped and the teacher's name is stored nowhere.",
+          "Only `diabe-teach` ships with the backend: the prototype's other built-in topics and teacher-made packs get 404 PACK_NOT_FOUND unless they were registered first (step P).",
           "`mode` and `adjudicationMode` are not validated; only `timerConfig` is (400 INVALID_REQUEST_BODY).",
           "Malformed JSON is not mapped to 400 INVALID_REQUEST_BODY.",
         ],
@@ -549,6 +699,30 @@
     },
 
     gaps: {
+      signIn: {
+        title: "Teacher sign-in",
+        note: "No teacher sign-in endpoint: the API has no teacher accounts, passwords or sign-in. A teacher's only credential is the instructor Capability Token that createGameSession returns, which is tied to one Game Session. The demo keeps the name and email in this browser only (no password), and the email is sent nowhere; the name could go in createGameSession's `creatorDisplayName`.",
+      },
+      packMeta: {
+        title: "Learner level and learning objective",
+        note: "No API field for either, on a Curriculum Pack or a Game Session. The closest is the pack's `description` (the demo stores \"level · objective\" there).",
+      },
+      boardSize: {
+        title: "Board size",
+        note: "Not enforced by the API: createGameSession has no board size field. A pack's size is its `boardConfig.rows` / `cols` (3-12 in the spec), fixed when the pack is registered (`diabe-teach` is 7×7), and the backend deals no board at all today.",
+      },
+      minChain: {
+        title: "Shortest chain allowed",
+        note: "Not enforced by the API: createGameSession has no field for it, and submitConceptChain uses a fixed 4 cells (422 CHAIN_TOPOLOGY_INVALID below that), not the pack's `boardConfig.minChainLength`. Only the demo enforces the number set here.",
+      },
+      boardPreview: {
+        title: "Board preview",
+        note: "Dealt in the browser from the pack, board size and preview seed. No API deals or returns a board yet: `state.activeBoard` is in the spec but never returned, and createGameSession ignores `seed`.",
+      },
+      deletePack: {
+        title: "Delete a pack",
+        note: "Not in the spec. The backend has an undocumented POST /api/v1/packs/{packId}/archive (instructor token; 403 for built-in system packs), which hides a pack from listCurriculumPacks rather than deleting it. The demo deletes from this browser only.",
+      },
       extend: {
         title: "Extend the phase (+1 min)",
         note: "No API can extend a phase: `phaseEndsAt` is fixed from the session's timerConfig when the phase starts, and a timerConfig can only be set at createGameSession. The demo changes its local timer only.",
@@ -563,8 +737,35 @@
       { title: "Session analytics", actor: "both", ops: ["getSessionAnalytics"] },
     ],
 
+    // Controls that only navigate (data-api="nav.<key>"): they make no API call themselves.
+    nav: {
+      setup: {
+        title: "Opens Game setup",
+        step: "A",
+        note: "Navigation only, no API call. The new game is created by step A (createGameSession) when the teacher presses \"Start game\" on Game setup. Nothing ends the old Game Session.",
+      },
+    },
+
     // Finer keys for data-api="<letter>.<detail>". Keys not listed here fall back to the step letter.
     targets: {
+      "P.list": {
+        ops: ["listCurriculumPacks"],
+        note: "The pack list is listCurriculumPacks: name = `title`, keyword count = `cardCount`. The description needs getCurriculumPackById, and grouping and \"your packs\" have no API field.",
+      },
+      "P.keywords": {
+        ops: ["getCurriculumPackById"],
+        note: "The chosen pack's keywords are `pack.cards[].displayLabel` from getCurriculumPackById.",
+      },
+      "P.create": {
+        ops: ["validateCurriculumPack", "registerCurriculumPack"],
+        note: "Saving a new pack would call validateCurriculumPack, then registerCurriculumPack. A real pack needs Keyword Card ids, Semantic Domains and an adjudication rubric that this form doesn't collect, and both calls need an instructor token that only createGameSession issues. The demo saves the keyword list in this browser.",
+      },
+      "A.timerConfig": {
+        note: "Chain-building and peer-review minutes become createGameSession's `timerConfig.roundMappingSec` / `roundAdjudicationSec` (minutes × 60, 1-86400 s); teacher-paced sends `null` (no deadline). Both Gameplay Rounds use them.",
+      },
+      "A.seed": {
+        note: "Shuffle picks a new board preview seed, sent as createGameSession's `seed` so Round 1 matches the preview. Partial: the backend ignores `seed` and deals no board, so a previewed board can't be reproduced server-side yet.",
+      },
       "A.roomCode": {
         note: "Shows `roomCode` from the createGameSession response (also in every `state`).",
       },
@@ -628,7 +829,8 @@
   // operations[op].sample(state, ctx) builds request/response JSON from the demo session, in API shapes.
   // Pure and deterministic: no DOM, no clock, no randomness. A pinned card re-renders on every redraw and
   // its copy buttons copy exactly what this returns.
-  //   state = CC.get():  { session: PublicSessionState (+ activeBoard), participants: [], chains: SubmittedChain-like[] }
+  //   state = the stored demo session (CC.peek()), or null when none exists yet (login, a first visit to Game setup):
+  //           { session: PublicSessionState (+ activeBoard), settings?: CreateSessionRequest-like, participants: [], chains: [] }
   //   ctx (built by api-overlay.js, plain data only):
   //     variant        the step/target variant (e.g. "peer-challenge", "instructor-reject")
   //     chainId        the Concept Chain under the cursor (from the nearest [data-api-chain]), or null
@@ -636,11 +838,70 @@
   //     draft          learner's chain being built: { path: GridCoord[], links: string[], story: string }
   //     voteNotes      { [chainId]: comment draft }  (learner)
   //     rulings        { [chainId]: { feedback, score } }  (teacher's ruling drafts)
+  //     setup          Game setup's form: { packId, creatorDisplayName, mappingMinutes, mappingPaced,
+  //                    adjudicationMinutes, adjudicationPaced, seed, boardSize, minChainLength }
+  //     packs          Game setup's pack list: [{ packId, name, group, description, keywordCount, maxBoardSize }]
+  //     pack           the chosen pack: { packId, name, description, keywords: string[] }
+  //     newPack        the create-pack editor while open: { name, level, objective, keywords: string[] }
   // Returns { path?, request?, response? }; anything left out falls back to the fixed example.
   // Values the demo can't know (tokens, ids and times the server assigns) stay as <placeholders>.
   const PHASES = ["pretest", "trial-orientation", "round-1:chain-mapping", "round-1:peer-adjudication", "round-1:round-summary",
     "round-2:chain-mapping", "round-2:peer-adjudication", "round-2:round-summary", "posttest", "feedback-survey", "completed"];
-  const TIMER_SEC = { "chain-mapping": 300, "peer-adjudication": 240 }; // the createGameSession sample's timerConfig
+  // The prototype's timerConfig defaults (CC.DEFAULT_TIMER_CONFIG): used for sessions stored without settings.
+  const DEMO_TIMER = { pretestSec: null, trialOrientationSec: null, roundMappingSec: 300, roundAdjudicationSec: 240, posttestSec: null, feedbackSurveySec: null };
+  const PHASE_TIMER = { pretest: "pretestSec", "trial-orientation": "trialOrientationSec", "chain-mapping": "roundMappingSec",
+    "peer-adjudication": "roundAdjudicationSec", posttest: "posttestSec", "feedback-survey": "feedbackSurveySec" };
+  const timerOf = (state) => ({ ...DEMO_TIMER, ...(state?.settings?.timerConfig ?? {}) });
+  const MAX_MIN = 1440; // 86400 s
+
+  // Game setup minutes → timerConfig seconds: teacher-paced → null; not a whole 1-1440 → a placeholder.
+  function minutesToSec(minutes, paced) {
+    if (paced) return null;
+    const n = Number(minutes);
+    return String(minutes ?? "").trim() !== "" && Number.isInteger(n) && n >= 1 && n <= MAX_MIN ? n * 60 : "<whole minutes 1-1440 × 60>";
+  }
+
+  // The createGameSession body Game setup's "Start game" would send.
+  function setupRequest(f) {
+    const request = {
+      packId: f.packId ?? "<packId>", mode: "classroom", adjudicationMode: "peer-instructor",
+      creatorDisplayName: f.creatorDisplayName ?? "<teacher name>",
+      timerConfig: { ...DEMO_TIMER, roundMappingSec: minutesToSec(f.mappingMinutes, f.mappingPaced), roundAdjudicationSec: minutesToSec(f.adjudicationMinutes, f.adjudicationPaced) },
+    };
+    if (f.seed) request.seed = String(f.seed);
+    return request;
+  }
+
+  // The createGameSession body that created a stored session (its settings), or null for old sessions.
+  function sessionRequest(state) {
+    const set = state?.settings; if (!set) return null;
+    const request = { packId: set.packId, mode: set.mode, adjudicationMode: set.adjudicationMode };
+    if (set.creatorDisplayName) request.creatorDisplayName = set.creatorDisplayName;
+    request.timerConfig = timerOf(state);
+    if (set.seed) request.seed = set.seed;
+    return request;
+  }
+
+  // Curriculum Pack shapes from the demo's plain keyword packs. Values the demo doesn't have stay <placeholders>.
+  const slug = (text) => String(text ?? "").toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  const boardConfigOf = (size, minChain) => ({ rows: size ?? 7, cols: size ?? 7, minChainLength: minChain ?? 4, adjacencyRule: "chebyshev-8" });
+  const cardsOf = (keywords) => (keywords ?? []).slice(0, 3).map((k) => ({ id: slug(k) || "<cardId>", verbatimLabel: k, displayLabel: k, aliases: [], domainId: "<domainId>", summary: "<summary>" }));
+  function packSummary(p) {
+    return { id: p.packId, title: p.name, version: "1.0.0", subjectDomain: p.group ?? "<subjectDomain>", boardConfig: boardConfigOf(p.maxBoardSize, 4),
+      cardCount: p.keywordCount ?? p.keywords?.length ?? 0, domainCount: "<domainCount>", hasAssessmentInstrument: false, hasPerceptionSurvey: false };
+  }
+  function newPackInput(np, setup) {
+    const size = Number(setup?.boardSize) || 7, minChain = Number(setup?.minChainLength) || 4;
+    return {
+      id: slug(np.name) || "<pack-id>", title: String(np.name ?? "").trim() || "<pack name>", version: "1.0.0",
+      description: [np.level, np.objective].map((x) => String(x ?? "").trim()).filter(Boolean).join(" · ") || "<description>",
+      boardConfig: boardConfigOf(size, minChain),
+      domains: [{ id: "<domainId>", label: "<Semantic Domain (not collected)>", description: "<not collected>" }],
+      cards: cardsOf(np.keywords).map((c) => ({ ...c, summary: "<not collected>" })),
+      adjudicationRubric: { evaluatorPersona: "<not collected>", subjectDomain: String(np.name ?? "").trim() || "<subjectDomain>", chainContinuityCriteria: ["<not collected>"], calibrationExamples: [] },
+      assessmentInstrument: null, perceptionSurvey: null,
+    };
+  }
 
   const fillPath = (template, params) => template.replace(/\{(\w+)\}/g, (whole, name) => (params[name] ?? null) === null ? whole : String(params[name]));
 
@@ -690,7 +951,7 @@
   function nextState(state) {
     const cur = publicState(state), i = PHASES.indexOf(cur.currentPhase);
     if (i < 0 || i >= PHASES.length - 1) return cur; // completed: 200 with the state unchanged (see deviations)
-    const phase = PHASES[i + 1], m = /^round-(\d)/.exec(phase), sec = TIMER_SEC[phase.split(":")[1]];
+    const phase = PHASES[i + 1], m = /^round-(\d)/.exec(phase), sec = timerOf(state)[PHASE_TIMER[phase.split(":").pop()]];
     return { ...cur, currentPhase: phase, activeRoundNumber: m ? Number(m[1]) : null, phaseStartedAt: "<server time>",
       phaseEndsAt: sec ? `<phaseStartedAt + ${sec} s>` : null };
   }
@@ -698,14 +959,53 @@
   const ops = catalog.operations;
   const sid = (state) => ({ sessionId: state.session.sessionId });
 
-  ops.createGameSession.sample = (state) => {
-    const st = publicState(state), fresh = st.currentPhase === "pretest";
+  // Game setup (ctx.setup): the request "Start game" would send, built from the form. Teacher screen: the
+  // request that created the stored session (its settings) and that session as the response.
+  ops.createGameSession.sample = (state, ctx = {}) => {
+    if (ctx.setup) {
+      const request = setupRequest(ctx.setup), pretest = request.timerConfig.pretestSec;
+      return { request, response: { status: 201, body: {
+        sessionId: "<sessionId>", roomCode: "<roomCode>", instructorToken: "<instructorToken>", participantId: null, participantToken: null,
+        state: { sessionId: "<sessionId>", roomCode: "<roomCode>", packId: request.packId, mode: request.mode, adjudicationMode: request.adjudicationMode,
+          currentPhase: "pretest", activeRoundNumber: null, phaseStartedAt: "<createdAt>", phaseEndsAt: pretest ? `<createdAt + ${pretest} s>` : null, participantCount: 0 },
+      } } };
+    }
+    const st = publicState(state), fresh = st.currentPhase === "pretest", pretest = timerOf(state).pretestSec;
+    const out = { response: { status: 201, body: {
+      sessionId: st.sessionId, roomCode: st.roomCode, instructorToken: "<instructorToken>", participantId: null, participantToken: null,
+      state: { ...st, currentPhase: "pretest", activeRoundNumber: null, phaseStartedAt: fresh ? st.phaseStartedAt : "<createdAt>",
+        phaseEndsAt: fresh ? st.phaseEndsAt : pretest ? `<createdAt + ${pretest} s>` : null, participantCount: 0 },
+    } } };
+    const request = sessionRequest(state);
+    if (request) out.request = request;
+    return out;
+  };
+
+  ops.listCurriculumPacks.sample = (state, ctx = {}) => (ctx.packs?.length
+    ? { response: { status: 200, body: { packs: ctx.packs.map(packSummary) } } } : {});
+
+  ops.getCurriculumPackById.sample = (state, ctx = {}) => {
+    const p = ctx.pack; if (!p) return {};
     return {
-      response: { status: 201, body: {
-        sessionId: st.sessionId, roomCode: st.roomCode, instructorToken: "<instructorToken>", participantId: null, participantToken: null,
-        state: { ...st, currentPhase: "pretest", activeRoundNumber: null, phaseStartedAt: fresh ? st.phaseStartedAt : "<createdAt>", phaseEndsAt: fresh ? st.phaseEndsAt : null, participantCount: 0 },
-      } },
+      path: fillPath(ops.getCurriculumPackById.path, { packId: p.packId }),
+      response: { status: 200, body: { pack: {
+        id: p.packId, title: p.name, version: "1.0.0", description: p.description || "<description>", boardConfig: boardConfigOf(p.maxBoardSize, 4),
+        domains: [{ id: "<domainId>", label: "<Semantic Domain>", description: "<description>" }],
+        cards: cardsOf(p.keywords), adjudicationRubric: { ...sampleRubric, evaluatorPersona: "<evaluatorPersona>", subjectDomain: p.group ?? p.name },
+        assessmentInstrument: null, perceptionSurvey: null,
+      } } },
     };
+  };
+
+  ops.validateCurriculumPack.sample = (state, ctx = {}) => (ctx.newPack ? { request: newPackInput(ctx.newPack, ctx.setup) } : {});
+
+  ops.registerCurriculumPack.sample = (state, ctx = {}) => {
+    if (!ctx.newPack) return {};
+    const request = newPackInput(ctx.newPack, ctx.setup);
+    return { request, response: { status: 201, body: { pack: {
+      id: request.id, title: request.title, version: request.version, subjectDomain: request.adjudicationRubric.subjectDomain, boardConfig: request.boardConfig,
+      cardCount: (ctx.newPack.keywords ?? []).length, domainCount: request.domains.length, hasAssessmentInstrument: false, hasPerceptionSurvey: false,
+    } } } };
   };
 
   ops.joinGameSession.sample = (state, ctx = {}) => {

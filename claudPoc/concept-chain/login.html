@@ -16,16 +16,18 @@
 .demo b{color:var(--warn)}
 .foot{font-size:13px;color:var(--muted)}
 .foot a{color:var(--accent)}
+.login-tools{display:flex;justify-content:flex-end;gap:8px}
 [hidden]{display:none !important} /* .panel/.col set display:flex, which would override the hidden attribute */
 </style>
 </head>
 <body>
 <div class="wrap">
   <section class="panel login">
+    <div class="login-tools" data-api-toggle></div>
     <div class="brand"><h1>Concept <span>Chain</span></h1><p>Teacher login</p></div>
     <p class="demo"><b>Demo sign-in.</b> There is no password and no account: your name and email are only remembered in this browser so the prototype knows who is running the class.</p>
 
-    <div class="col" id="signedIn" hidden>
+    <div class="col" id="signedIn" data-api="gap.signIn" data-api-io="read" hidden>
       <p>Signed in as <b id="who"></b> <span class="note" id="whoEmail"></span></p>
       <div class="row">
         <a class="btn primary" href="setup.html" id="continue">Continue to Game setup →</a>
@@ -33,7 +35,7 @@
       </div>
     </div>
 
-    <form id="loginForm" class="col" novalidate hidden>
+    <form id="loginForm" class="col" data-api="gap.signIn" data-api-io="write" novalidate hidden>
       <div class="field"><label for="name">Your name</label><input type="text" id="name" maxlength="60" autocomplete="name" required placeholder="Shown to your class, e.g. Ms Rahman"></div>
       <div class="field"><label for="email">Email</label><input type="email" id="email" maxlength="120" autocomplete="email" required placeholder="name@school.org"></div>
       <button class="btn primary" type="submit">Sign in</button>
@@ -44,6 +46,8 @@
 </div>
 
 <script src="shared.js"></script>
+<script src="api-catalog.js"></script>
+<script src="api-overlay.js"></script>
 <script>
 const $ = (id) => document.getElementById(id);
 function render() {

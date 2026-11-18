@@ -62,18 +62,18 @@ label.btn{cursor:pointer}
 <div class="wrap">
   <header class="top">
     <div class="brand"><h1>Concept <span>Chain</span></h1><p>Game setup · choose a pack and how long each phase lasts</p></div>
-    <div class="who"><span>Signed in as <b id="who"></b></span><a href="login.html" id="signOut">Sign out</a></div>
+    <div class="who" data-api="gap.signIn" data-api-io="read"><span>Signed in as <b id="who"></b></span><a href="login.html" id="signOut">Sign out</a></div>
   </header>
 
   <div class="main">
     <div class="col">
       <section class="panel" aria-labelledby="packH">
         <div class="row between"><h2 id="packH">Choose a pack</h2><span class="eyebrow" id="packCount"></span></div>
-        <div class="packs" id="packs" role="radiogroup" aria-labelledby="packH"></div>
+        <div class="packs" id="packs" role="radiogroup" aria-labelledby="packH" data-api="P.list" data-api-io="read"></div>
         <div class="row between"><button class="btn" id="newPack" type="button" aria-expanded="false" aria-controls="editor">+ Create a new pack</button>
           <p class="note" id="packMsg" role="status" aria-live="polite"></p></div>
       </section>
-      <section class="panel" id="editor" aria-labelledby="edH" hidden>
+      <section class="panel" id="editor" aria-labelledby="edH" data-api="P.create" data-api-io="write" hidden>
         <div class="row between"><h2 id="edH">Create a new pack</h2><span class="eyebrow">Saved in this browser</span></div>
         <div class="editor">
           <div class="field">
@@ -93,19 +93,19 @@ label.btn{cursor:pointer}
             <p class="warn" id="edWarn"></p>
           </div>
           <div class="field"><label for="pkName">Pack name</label><input type="text" id="pkName" maxlength="80" autocomplete="off"></div>
-          <div class="field"><label for="pkLevel">Learner level</label><input type="text" id="pkLevel" list="levels" maxlength="60" placeholder="e.g. Year 2 medicine">
+          <div class="field" data-api="gap.packMeta" data-api-io="write"><label for="pkLevel">Learner level</label><input type="text" id="pkLevel" list="levels" maxlength="60" placeholder="e.g. Year 2 medicine">
             <datalist id="levels"><option value="Pre-clinical"><option value="Year 1 undergraduate"><option value="Year 2 undergraduate"><option value="Clinical years"><option value="Postgraduate"><option value="Interprofessional"></datalist></div>
-          <div class="field"><label for="pkObj">Learning objective</label><textarea id="pkObj" maxlength="300" placeholder="e.g. Explain how insulin resistance leads to type 2 diabetes complications"></textarea></div>
+          <div class="field" data-api="gap.packMeta" data-api-io="write"><label for="pkObj">Learning objective</label><textarea id="pkObj" maxlength="300" placeholder="e.g. Explain how insulin resistance leads to type 2 diabetes complications"></textarea></div>
           <p class="err" id="edErr" role="alert"></p>
-          <div class="row"><button class="btn primary" id="savePack" type="button">Save pack</button><button class="btn" id="cancelPack" type="button">Cancel</button></div>
+          <div class="row"><button class="btn primary" id="savePack" type="button" data-api="P.create" data-api-io="write">Save pack</button><button class="btn" id="cancelPack" type="button">Cancel</button></div>
         </div>
       </section>
       <section class="panel" aria-labelledby="pvH">
-        <div class="row between"><h2 id="pvH">Board preview</h2><button class="btn sm" id="shuffle" type="button" aria-describedby="pvNote">Shuffle ↻</button></div>
+        <div class="row between"><h2 id="pvH">Board preview</h2><button class="btn sm" id="shuffle" type="button" aria-describedby="pvNote" data-api="A.seed" data-api-io="write">Shuffle ↻</button></div>
         <p class="note" id="pvNote" role="status" aria-live="polite"></p>
-        <div class="board-shell board-readonly" id="preview" aria-label="Board preview"></div>
+        <div class="board-shell board-readonly" id="preview" aria-label="Board preview" data-api="gap.boardPreview" data-api-io="read"></div>
       </section>
-      <section class="panel" aria-labelledby="kwH">
+      <section class="panel" aria-labelledby="kwH" data-api="P.keywords" data-api-io="read">
         <div class="row between"><h2 id="kwH">Keywords in <span id="kwPack"></span></h2><span class="eyebrow" id="kwCount"></span></div>
         <div class="chips" id="keywords"></div>
       </section>
@@ -115,24 +115,24 @@ label.btn{cursor:pointer}
       <section class="panel" aria-labelledby="timeH">
         <h2 id="timeH">Time allotment</h2>
         <p class="note">Per Gameplay Round; both rounds use the same times. A teacher-paced phase has no timer: you move the class on with Next phase.</p>
-        <fieldset>
+        <fieldset data-api="A.timerConfig" data-api-io="write">
           <legend>Chain-building</legend>
           <div class="mins"><input type="number" id="mapMin" min="1" max="1440" step="1" inputmode="numeric" aria-describedby="mapErr"><label for="mapMin">minutes</label></div>
           <label class="check"><input type="checkbox" id="mapPaced"> Teacher-paced (no timer)</label>
           <p class="err" id="mapErr" role="alert"></p>
         </fieldset>
-        <fieldset>
+        <fieldset data-api="A.timerConfig" data-api-io="write">
           <legend>Peer review</legend>
           <div class="mins"><input type="number" id="revMin" min="1" max="1440" step="1" inputmode="numeric" aria-describedby="revErr"><label for="revMin">minutes</label></div>
           <label class="check"><input type="checkbox" id="revPaced"> Teacher-paced (no timer)</label>
           <p class="err" id="revErr" role="alert"></p>
         </fieldset>
-        <fieldset>
+        <fieldset data-api="gap.boardSize" data-api-io="write">
           <legend>Board size</legend>
           <div class="mins"><select id="size" aria-describedby="sizeNote"></select><label for="size">keywords per side</label></div>
           <p class="note" id="sizeNote"></p>
         </fieldset>
-        <fieldset>
+        <fieldset data-api="gap.minChain" data-api-io="write">
           <legend>Shortest chain allowed</legend>
           <div class="mins"><input type="number" id="minChain" min="2" step="1" inputmode="numeric" aria-describedby="minErr"><label for="minChain">keywords</label></div>
           <p class="err" id="minErr" role="alert"></p>
@@ -148,7 +148,7 @@ label.btn{cursor:pointer}
       <section class="panel" aria-labelledby="sumH">
         <h2 id="sumH">Summary</h2>
         <dl class="sum" id="summary"></dl>
-        <button class="btn primary" id="start" type="button">Start game →</button>
+        <button class="btn primary" id="start" type="button" data-api="A" data-api-io="write">Start game →</button>
         <p class="err" id="startErr" role="status" aria-live="polite"></p>
         <p class="note">Starts a new Game Session with a new room code and opens the teacher screen.</p>
       </section>
@@ -156,6 +156,8 @@ label.btn{cursor:pointer}
   </div>
 </div>
 
+<script src="api-catalog.js"></script>
+<script src="api-overlay.js"></script>
 <script>
 const $ = (id) => document.getElementById(id);
 const teacher = CC.teacher();
@@ -194,7 +196,7 @@ function renderPacks() {
     if (p.group !== group) { group = p.group; html += `<span class="eyebrow group">${CC.esc(group)}</span>`; }
     const label = `<label class="pack"><input type="radio" name="pack" value="${CC.esc(p.packId)}" ${p.packId === packId ? "checked" : ""}>
       <span><span class="nm">${CC.esc(p.name)}</span><span class="ds">${p.keywords.length} keywords · ${CC.esc(p.description)}</span></span></label>`;
-    html += p.builtIn ? label : `<div class="packitem">${label}<button class="btn sm bad del" type="button" data-del="${CC.esc(p.packId)}" aria-label="Delete pack ${CC.esc(p.name)}">Delete</button></div>`;
+    html += p.builtIn ? label : `<div class="packitem">${label}<button class="btn sm bad del" type="button" data-del="${CC.esc(p.packId)}" data-api="gap.deletePack" data-api-io="write" aria-label="Delete pack ${CC.esc(p.name)}">Delete</button></div>`;
   }
   $("packs").innerHTML = html;
   $("from").innerHTML = packs.map((p) => `<option value="${CC.esc(p.packId)}">${CC.esc(p.name)} (${p.keywords.length})</option>`).join("");
@@ -337,6 +339,19 @@ if (teacher) {
       $("newPack").focus();
     } catch (e) { $("edErr").textContent = e.message; }
   };
+
+  // Live API overlay samples: the form as it stands (Start game's createGameSession body), the pack list,
+  // the chosen pack and the create-pack editor. Plain data, cheap to build.
+  CCOverlay.setContext(() => {
+    const pack = CC.getPack(packId);
+    return {
+      setup: { packId, creatorDisplayName: teacher.name, mappingMinutes: $("mapMin").value, mappingPaced: $("mapPaced").checked,
+        adjudicationMinutes: $("revMin").value, adjudicationPaced: $("revPaced").checked, seed, boardSize: boardSize(), minChainLength: $("minChain").value },
+      packs: CC.listPacks().map((p) => ({ packId: p.packId, name: p.name, group: p.group, description: p.description, keywordCount: p.keywords.length, maxBoardSize: sizeOf(p) })),
+      pack: pack ? { packId: pack.packId, name: pack.name, group: pack.group, description: pack.description, keywords: pack.keywords, maxBoardSize: sizeOf(pack) } : null,
+      newPack: $("editor").hidden ? null : { name: $("pkName").value, level: $("pkLevel").value, objective: $("pkObj").value, keywords: draft.keywords },
+    };
+  });
 
   $("start").onclick = () => {
     const { settings } = readForm(); if (!settings) return render();

@@ -20,6 +20,8 @@ interface CatalogTarget {
 }
 
 interface ApiCatalog {
+  readonly screens: ReadonlyArray<{ readonly id: string; readonly file: string }>;
+  readonly nav?: Record<string, { readonly step?: string }>;
   readonly steps: Record<string, { readonly ops: readonly string[]; readonly screens: readonly string[]; readonly variant?: string }>;
   readonly operations: Record<string, CatalogOperation>;
   readonly gaps: Record<string, { readonly ops?: readonly string[] }>;
@@ -72,6 +74,13 @@ const specced = Object.entries(catalog.operations).filter(([, op]) => op.status 
 /** The step or gap, operations and variant a page's data-api key points at (mirrors api-overlay.js). */
 function resolveKey(key: string): { readonly ops: readonly string[]; readonly variant?: string } | undefined {
   const target = catalog.targets[key] ?? {};
+  if (key.startsWith("nav.")) {
+    // Navigation only: no operations of its own; it must point at an existing step.
+    const nav = catalog.nav?.[key.slice(4)];
+    return nav && nav.step && catalog.steps[nav.step]
+      ? { ops: [] }
+      : undefined;
+  }
   if (key.startsWith("gap.")) {
     const gap = catalog.gaps[target.gap ?? key.slice(4)];
     return gap
@@ -147,11 +156,43 @@ describe("claudPoc Concept Chain API catalog matches docs/api/openapi.yaml", () 
   });
 
   it("every step names the screens it happens on", () => {
+    const screens = catalog.screens.map(screen => screen.id);
     for (const [letter, step] of Object.entries(catalog.steps)) {
       expect(step.screens.length, `step ${letter}`).toBeGreaterThan(0);
       for (const screen of step.screens) {
-        expect(["teacher", "lobby", "learner"], `step ${letter} screen ${screen}`).toContain(screen);
+        expect(screens, `step ${letter} screen ${screen}`).toContain(screen);
       }
+    }
+  });
+
+  it("lists every prototype page in the legend's screens, including Teacher login and Game setup", () => {
+    expect(catalog.screens.map(screen => screen.file)).toEqual(
+      expect.arrayContaining([
+        "login.html",
+        "setup.html",
+        "teacher.html",
+        "participant.html",
+        "lobby.html",
+      ]),
+    );
+    expect(catalog.steps.A?.screens).toContain("setup");
+  });
+
+  it.each([
+    ["listCurriculumPacks", "GET", "/api/v1/packs"],
+    ["getCurriculumPackById", "GET", "/api/v1/packs/{packId}"],
+    ["validateCurriculumPack", "POST", "/api/v1/packs/validate"],
+    ["registerCurriculumPack", "POST", "/api/v1/packs"],
+  ])("pack operation %s is in the catalog and matches the spec (%s %s)", (opId, method, path) => {
+    const op = catalog.operations[opId];
+    expect(op, `${opId} missing from the catalog`).toBeDefined();
+    expect(op?.method).toBe(method);
+    expect(op?.path).toBe(path);
+    expect(specOps.get(opId)?.method).toBe(method);
+    expect(specOps.get(opId)?.path).toBe(path);
+    const declared = specOps.get(opId)?.responseStatuses ?? [];
+    for (const error of op?.errors ?? []) {
+      expect(declared, `${opId} error ${error.status} ${error.code}`).toContain(String(error.status));
     }
   });
 
@@ -169,7 +210,13 @@ describe("claudPoc Concept Chain API catalog matches docs/api/openapi.yaml", () 
     }
   });
 
-  describe.each(["teacher.html", "participant.html", "lobby.html"])("%s", (file) => {
+  describe.each([
+    "login.html",
+    "setup.html",
+    "teacher.html",
+    "participant.html",
+    "lobby.html",
+  ])("%s", (file) => {
     const keys = screenApiKeys(file);
 
     it("marks at least one element", () => {

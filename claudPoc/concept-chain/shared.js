@@ -208,6 +208,8 @@ const CC = (() => {
 
   function load() { try { return JSON.parse(localStorage.getItem(KEY)) || null; } catch { return null; } }
   function get() { let s = load(); if (!s) { s = fresh(); localStorage.setItem(KEY, JSON.stringify(s)); } return s; }
+  // The stored session or null, without creating one (the API overlay reads it on login and Game setup).
+  const peek = () => load();
   function save(s) { s.session.participantCount = s.participants.length; localStorage.setItem(KEY, JSON.stringify(s)); listeners.forEach((fn) => fn(s)); }
   function update(mut) { const s = get(); const out = mut(s); save(s); return out; }
   function subscribe(fn) { listeners.push(fn); window.addEventListener("storage", (e) => { if (e.key === KEY) fn(get()); }); }
@@ -382,6 +384,6 @@ const CC = (() => {
   return { PHASES, PHASE_LABEL, DEFAULT_PACK_ID, DEFAULT_TIMER_CONFIG, TIMER_FIELDS, TIMER_MIN_SEC, TIMER_MAX_SEC, MIN_BOARD_SIZE,
     MIN_PACK_KEYWORDS, listPacks, getPack, cleanKeywords, savePack, deletePack, lastSetup, rememberSetup, packOf, dealBoard, newSeed, normalizeSettings, settingsOf, createSession, timerFromMinutes, timerLabel, TIMER_MAX_MIN,
     teacher, signIn, signOut, requireTeacher,
-    get, subscribe, reset, advance, extend, join, submitChain, vote, rule, standings, seedSampleLearners,
+    get, peek, subscribe, reset, advance, extend, join, submitChain, vote, rule, standings, seedSampleLearners,
     topologyError, submissionsOpen, adjacent, clock, nextPhaseLabel, renderBoard, statusBadge, chainText, esc };
 })();
