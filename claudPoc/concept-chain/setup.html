@@ -34,8 +34,17 @@
 .opt{font-weight:400;color:var(--muted)}
 details>summary{cursor:pointer;font-weight:700;font-size:14px;color:var(--accent)}
 details[open]>summary{margin-bottom:8px}
-#more{display:flex;flex-direction:column;gap:10px}
-#more .field+.field{margin-top:10px}
+#more{border:1px solid var(--line);border-radius:8px;background:var(--sunk)}
+#more:hover,#more[open]{border-color:var(--accent)}
+#more>summary{list-style:none;display:grid;grid-template-columns:1fr auto;gap:2px 10px;align-items:center;padding:10px 12px;color:inherit;margin:0}
+#more>summary::-webkit-details-marker{display:none}
+#more>summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:8px}
+#more .ttl{font-weight:700;font-size:14px}
+#more .val{grid-column:1;font-weight:400;font-size:13px;color:var(--muted)}
+#more .chg{grid-row:1/3;grid-column:2;border:1px solid var(--accent);color:var(--accent);border-radius:999px;padding:3px 12px;font-size:13px;font-weight:700}
+#more .chg::after{content:" ▾"}
+#more[open] .chg::after{content:" ▴"}
+#more .body{padding:0 12px 12px;display:flex;flex-direction:column;gap:10px}
 .sum{margin:0;font-size:15px;line-height:1.5}
 .sum b{font-size:16px}
 #preview{max-width:440px;margin:0}
@@ -119,9 +128,11 @@ label.btn{cursor:pointer}
         <div class="field" data-api="A.timerConfig" data-api-io="write"><label for="revSel">Reviewing chains</label><select id="revSel"></select></div>
         <p class="note">Same times for both rounds.</p>
         <details id="more">
-          <summary>More options</summary>
+          <summary><span class="ttl">Board &amp; chain length</span><span class="val" id="moreVal"></span><span class="chg" id="moreChg" aria-hidden="true">Change</span></summary>
+          <div class="body">
           <div class="field" data-api="gap.boardSize" data-api-io="write"><label for="size">Board</label><select id="size" aria-describedby="sizeNote"></select><p class="note" id="sizeNote"></p></div>
           <div class="field" data-api="gap.minChain" data-api-io="write"><label for="minChain">Chains need at least</label><select id="minChain"></select></div>
+          </div>
         </details>
       </section>
 
@@ -175,7 +186,7 @@ function readForm() {
   if (!CC.getPack(packId)) return { error: "Choose a topic first." };
   const timerConfig = Object.fromEntries(TIMERS.map(([key, field]) => [field, timerSec(key)]));
   const size = boardSize(), minChain = Number($("minChain").value);
-  if (minChain > size * size) return { error: `Chains of ${minChain} words don't fit a ${size} × ${size} board. Pick a shorter chain in More options.` };
+  if (minChain > size * size) return { error: `Chains of ${minChain} words don't fit a ${size} × ${size} board. Pick a shorter chain under Board & chain length.` };
   const settings = { packId, mode: "classroom", adjudicationMode: "peer-instructor", creatorDisplayName: teacher.name, timerConfig, seed, boardSize: size, minChainLength: minChain };
   try { CC.normalizeSettings(settings); } catch (e) { return { error: e.message }; }
   return { settings };
@@ -243,6 +254,7 @@ function render() {
   $("summary").innerHTML = pack
     ? `<b>${CC.esc(pack.name)}</b><br>Building chains: ${time("map")} · Reviewing: ${time("rev")}<br>${size} × ${size} board · chains of ${CC.esc($("minChain").value)}+ words · 2 rounds, each with a new board`
     : "Pick a topic in step 1.";
+  $("moreVal").textContent = `${size} × ${size} board · chains of ${$("minChain").value}+ words`;
   $("start").disabled = !settings;
   if (settings) CC.rememberSetup(settings);
   if (!$("editor").hidden) renderEditor();
@@ -282,6 +294,7 @@ if (teacher) {
     document.querySelector('#packs input[name="pack"]:checked')?.focus();
   });
   for (const id of ["mapSel", "revSel", "minChain"]) $(id).addEventListener("change", render);
+  $("more").addEventListener("toggle", () => { $("moreChg").textContent = $("more").open ? "Done" : "Change"; });
   $("size").addEventListener("change", () => { wantSize = Number($("size").value); render(); });
   $("signOut").addEventListener("click", () => CC.signOut());
   $("shuffle").onclick = () => { seed = CC.newSeed(); shuffles++; render(); };
