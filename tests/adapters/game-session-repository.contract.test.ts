@@ -1,5 +1,5 @@
 import type { GameSessionRepositoryPort } from "../../src/application/ports/game-session-repository.port.js";
-import type { McqAnswerChoice } from "../../src/domain/game-session/game-session.types.js";
+import type { LikertRating, McqAnswerChoice } from "../../src/domain/game-session/game-session.types.js";
 import mongoose from "mongoose";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { InMemoryGameSessionRepository } from "../../src/adapters/outbound/in-memory-game-session-repository.js";
@@ -161,6 +161,38 @@ function defineGameSessionRepositoryContract(
       expect(answersOf(bob.participantId, "pretest")).toBe(2);
       expect(answersOf(alice.participantId, "posttest")).toBe(0);
       expect(answersOf(bob.participantId, "posttest")).toBe(1);
+    });
+
+    it("round-trips every participant's perception survey response", async () => {
+      const session = newSession();
+      await harness.repo.create(session);
+      const surveyPhase = await harness.repo.findById(session.sessionId);
+      const alice = surveyPhase!.addParticipant("Alice");
+      const bob = surveyPhase!.addParticipant("Bob");
+      for (const phase of [
+        "trial-orientation",
+        "round-1:chain-mapping",
+        "round-1:peer-adjudication",
+        "round-1:round-summary",
+        "round-2:chain-mapping",
+        "round-2:peer-adjudication",
+        "round-2:round-summary",
+        "posttest",
+        "feedback-survey",
+      ] as const) {
+        surveyPhase!.transitionTo(phase, new Date("2026-03-01T10:00:00.000Z"));
+      }
+      surveyPhase!.submitSurvey(alice.participantId, new Map<string, LikertRating>().set("survey-q1", 5), "Loved it");
+      surveyPhase!.submitSurvey(bob.participantId, new Map<string, LikertRating>().set("survey-q1", 2));
+      await harness.repo.update(surveyPhase!);
+
+      const reloaded = await harness.repo.findById(session.sessionId);
+      const aliceResponse = reloaded!.getSurveyResponse(alice.participantId);
+      const bobResponse = reloaded!.getSurveyResponse(bob.participantId);
+      expect(aliceResponse?.responses.get("survey-q1")).toBe(5);
+      expect(aliceResponse?.comments).toBe("Loved it");
+      expect(bobResponse?.responses.get("survey-q1")).toBe(2);
+      expect(bobResponse?.comments).toBeUndefined();
     });
 
     it("reports a conflict when updating a session that was never stored", async () => {

@@ -505,7 +505,7 @@ paths:
           $ref: "#/components/responses/NotFoundError"
         "409":
           description: >-
-            SURVEY_ALREADY_SUBMITTED. A perception survey has already been recorded.
+            SURVEY_ALREADY_SUBMITTED. This participant has already submitted the perception survey.
 
             PHASE_CLOSED_FOR_SUBMISSIONS. The session is not in the feedback-survey phase.
 
@@ -631,6 +631,7 @@ components:
         - ASSESSMENT_INCOMPLETE
         - CONCURRENT_UPDATE_CONFLICT
         - CHAIN_ALREADY_SUBMITTED
+        - SURVEY_ALREADY_SUBMITTED
 
     ApiErrorResponse:
       type: object

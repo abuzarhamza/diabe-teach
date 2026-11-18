@@ -61,7 +61,10 @@ export interface GameSessionDocument {
   activeRoundNumber: 1 | 2 | null;
   chains: ConceptChainDocument[];
   assessments: AssessmentAttemptDocument[];
-  surveyResponse: SurveyResponseDocument | null;
+  /** Every participant's perception survey response. Absent on sessions stored before per-participant responses. */
+  surveyResponses?: SurveyResponseDocument[];
+  /** Legacy single survey response, read only when `surveyResponses` is absent. Always written as null. */
+  surveyResponse?: SurveyResponseDocument | null;
   createdAt: Date;
   /** Optimistic-concurrency version. Absent on sessions stored before versioning (read as 0). */
   version?: number;

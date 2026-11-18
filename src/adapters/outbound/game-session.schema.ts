@@ -139,6 +139,11 @@ export const gameSessionSchema = new Schema(
     activeRoundNumber: { type: Number, enum: [1, 2, null], default: null },
     chains: { type: [conceptChainSchema], default: [] },
     assessments: { type: [assessmentAttemptSchema], default: [] },
+    surveyResponses: {
+      type: [surveyResponseSchema],
+      default: [],
+    },
+    // Legacy single survey response, kept so old documents load; written as null.
     surveyResponse: { type: surveyResponseSchema, default: null },
     createdAt: { type: Date, required: true },
     // Optimistic-concurrency version. Sessions stored before it existed have

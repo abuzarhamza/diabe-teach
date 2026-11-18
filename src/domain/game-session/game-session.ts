@@ -44,9 +44,10 @@ export class GameSession {
   readonly #chains: ConceptChain[];
   /** Assessment Attempts keyed by participant, then by stage. */
   readonly #assessments: Map<string, Map<AssessmentStage, AssessmentAttempt>>;
+  /** Perception survey responses keyed by participant. */
+  readonly #surveyResponses: Map<string, SurveyResponse>;
   readonly #version: number;
 
-  #surveyResponse: SurveyResponse | null;
   #currentPhase: PhaseIdentifier;
   #phaseStartedAt: Date;
   #activeRoundNumber: 1 | 2 | null;
@@ -83,8 +84,11 @@ export class GameSession {
     for (const attempt of props._assessments ?? []) {
       this.#recordAssessment(attempt);
     }
-    // Support rehydration from persistence with existing survey response
-    this.#surveyResponse = props._surveyResponse ?? null;
+    // Support rehydration from persistence with existing survey responses
+    this.#surveyResponses = new Map();
+    for (const response of props._surveyResponses ?? []) {
+      this.#surveyResponses.set(response.participantId, response);
+    }
   }
 
   /**
@@ -303,8 +307,9 @@ export class GameSession {
     return this.#assessments.get(participantId)?.get(stage);
   }
 
-  public get surveyResponse(): SurveyResponse | null {
-    return this.#surveyResponse;
+  /** Every participant's perception survey response, for persistence. */
+  public get surveyResponses(): readonly SurveyResponse[] {
+    return Array.from(this.#surveyResponses.values());
   }
 
   public submitSurvey(
@@ -312,11 +317,8 @@ export class GameSession {
     responses: ReadonlyMap<string, LikertRating>,
     comments?: string,
   ): SurveyResponse {
-    if (this.#surveyResponse !== null) {
-      throw new SurveyAlreadySubmittedError(
-        this.#surveyResponse.participantId,
-        this.#sessionId.value,
-      );
+    if (this.#surveyResponses.has(participantId)) {
+      throw new SurveyAlreadySubmittedError(participantId, this.#sessionId.value);
     }
 
     const surveyResponse: SurveyResponse = {
@@ -326,18 +328,12 @@ export class GameSession {
       submittedAt: new Date(),
     };
 
-    this.#surveyResponse = surveyResponse;
+    this.#surveyResponses.set(participantId, surveyResponse);
     return surveyResponse;
   }
 
   public getSurveyResponse(participantId: string): SurveyResponse | undefined {
-    if (
-      this.#surveyResponse !== null
-      && this.#surveyResponse.participantId === participantId
-    ) {
-      return this.#surveyResponse;
-    }
-    return undefined;
+    return this.#surveyResponses.get(participantId);
   }
 
   /**

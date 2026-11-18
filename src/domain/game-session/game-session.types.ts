@@ -80,7 +80,7 @@ export interface GameSessionProps {
   /** Used for rehydration from persistence - bypasses phase validation */
   readonly _assessments?: readonly AssessmentAttempt[];
   /** Used for rehydration from persistence - bypasses phase validation */
-  readonly _surveyResponse?: SurveyResponse;
+  readonly _surveyResponses?: readonly SurveyResponse[];
 }
 
 /**

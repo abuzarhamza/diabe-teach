@@ -226,7 +226,7 @@ describe("POST /api/v1/sessions/{sessionId}/survey", () => {
 
       // Verify comments were stored in the session
       const updatedSession = await sessionRepo.findById(session.sessionId);
-      expect(updatedSession?.surveyResponse?.comments).toBe(comments);
+      expect(updatedSession?.getSurveyResponse(participant.participantId)?.comments).toBe(comments);
     });
 
     it("returns 201 for comments with exactly 1000 words (boundary)", async () => {
@@ -551,6 +551,63 @@ describe("POST /api/v1/sessions/{sessionId}/survey", () => {
       expect(response2.statusCode).toBe(409);
       const body = JSON.parse(response2.body);
       expect(body.code).toBe("SURVEY_ALREADY_SUBMITTED");
+    });
+  });
+
+  describe("per-participant responses", () => {
+    function setUpTwoParticipants() {
+      const session = makeFeedbackSurveySession();
+      const alice = session.addParticipant("Alice");
+      const bob = session.addParticipant("Bob");
+      const sessionRepo = new InMemoryGameSessionRepository([session]);
+      const tokenAdapter = new FakeCapabilityTokenAdapter();
+      const handler = createSubmitSurveyHandler({
+        sessionRepo,
+        packRepo: new InMemoryCurriculumPackRepository(),
+        tokenVerifier: tokenAdapter,
+      });
+      const submit = async (participantId: string, responses: Record<string, LikertRating>) => {
+        const token = await tokenAdapter.signToken({
+          role: "participant",
+          sessionId: session.sessionId.value,
+          participantId,
+        });
+        return handler(
+          makeEvent(session.sessionId.value, { responses }, { authorization: `Bearer ${token}` }),
+          {} as never,
+        );
+      };
+      const storedResponseOf = async (participantId: string) =>
+        (await sessionRepo.findById(session.sessionId))?.getSurveyResponse(participantId);
+      return { alice, bob, submit, storedResponseOf };
+    }
+
+    it("accepts a survey from each of two participants", async () => {
+      const { alice, bob, submit } = setUpTwoParticipants();
+
+      const aliceResponse = await submit(alice.participantId, makeAllResponses());
+      const bobResponse = await submit(bob.participantId, makePartialResponses());
+
+      expect(aliceResponse.statusCode).toBe(201);
+      expect(bobResponse.statusCode).toBe(201);
+      expect(JSON.parse(bobResponse.body).participantId).toBe(bob.participantId);
+      expect(JSON.parse(bobResponse.body).recordedItemCount).toBe(3);
+    });
+
+    it("rejects a participant's repeat without affecting the other participant's response", async () => {
+      const { alice, bob, submit, storedResponseOf } = setUpTwoParticipants();
+
+      await submit(alice.participantId, makeAllResponses());
+      await submit(bob.participantId, makePartialResponses());
+      const repeat = await submit(bob.participantId, makeAllResponses());
+      const aliceRepeat = await submit(alice.participantId, makePartialResponses());
+
+      expect(repeat.statusCode).toBe(409);
+      expect(JSON.parse(repeat.body).code).toBe("SURVEY_ALREADY_SUBMITTED");
+      expect(aliceRepeat.statusCode).toBe(409);
+      expect(JSON.parse(aliceRepeat.body).code).toBe("SURVEY_ALREADY_SUBMITTED");
+      expect((await storedResponseOf(alice.participantId))?.responses.size).toBe(9);
+      expect((await storedResponseOf(bob.participantId))?.responses.size).toBe(3);
     });
   });
 

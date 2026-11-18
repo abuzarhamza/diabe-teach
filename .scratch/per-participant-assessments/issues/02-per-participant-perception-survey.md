@@ -6,12 +6,12 @@ See spec: `.scratch/per-participant-assessments/spec.md`. Decided with the user 
 
 **Blocked by:** 01 (per-participant assessment attempts). Both edit `GameSession` rehydration and the Mongo mapping.
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] Handler test: two participants each submit the survey → both 201
-- [ ] Handler test: a repeat by one participant → `SURVEY_ALREADY_SUBMITTED`, and the other's response is unaffected
-- [ ] Repository contract suite (in-memory + Mongo): several participants' survey responses round-trip intact
-- [ ] Mongo-only test: a legacy document with a single `surveyResponse` object loads, and saving it writes the list form
-- [ ] OpenAPI `ApiErrorCode` includes `SURVEY_ALREADY_SUBMITTED`
-- [ ] The Cucumber multi-participant scenario from ticket 01 is extended so both participants submit the survey
-- [ ] Existing tests, BDD and lint baselines unchanged
+- [x] Handler test: two participants each submit the survey → both 201
+- [x] Handler test: a repeat by one participant → `SURVEY_ALREADY_SUBMITTED`, and the other's response is unaffected
+- [x] Repository contract suite (in-memory + Mongo): several participants' survey responses round-trip intact
+- [x] Mongo-only test: a legacy document with a single `surveyResponse` object loads, and saving it writes the list form
+- [x] OpenAPI `ApiErrorCode` includes `SURVEY_ALREADY_SUBMITTED`
+- [x] The Cucumber multi-participant scenario from ticket 01 is extended so both participants submit the survey
+- [x] Existing tests, BDD and lint baselines unchanged

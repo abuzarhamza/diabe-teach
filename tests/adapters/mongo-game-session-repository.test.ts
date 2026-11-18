@@ -1,3 +1,4 @@
+import type { LikertRating } from "../../src/domain/game-session/game-session.types.js";
 import mongoose from "mongoose";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { MongoGameSessionRepository } from "../../src/adapters/outbound/mongo-game-session-repository.js";
@@ -79,6 +80,83 @@ describe("mongoGameSessionRepository timer config persistence", () => {
       posttestSec: 900,
       feedbackSurveySec: 900,
     });
+  });
+
+  it("loads a legacy single survey response as that participant's response and saves it in the list form", async () => {
+    const submittedAt = new Date("2026-03-01T11:00:00.000Z");
+    const connection = await mongoose.createConnection(mongoUri, { dbName: mongoDbName }).asPromise();
+    const collection = connection.collection(MongoGameSessionRepository.collectionName);
+    try {
+      await collection.insertOne({
+        _id: "legacy-single-survey" as unknown as never,
+        roomCode: "LGSRVY",
+        packId: "diabe-teach",
+        mode: "classroom",
+        adjudicationMode: "peer-instructor",
+        timerConfig: {
+          pretestSec: 900,
+          trialOrientationSec: 900,
+          roundMappingSec: 1200,
+          roundAdjudicationSec: 600,
+          posttestSec: 900,
+          feedbackSurveySec: 900,
+        },
+        currentPhase: "feedback-survey",
+        phaseStartedAt: new Date("2026-03-01T10:00:00.000Z"),
+        participants: [
+          {
+            participantId: "p-alice",
+            displayName: "Alice",
+            joinedAt: new Date("2026-03-01T09:00:00.000Z"),
+          },
+          {
+            participantId: "p-bob",
+            displayName: "Bob",
+            joinedAt: new Date("2026-03-01T09:00:00.000Z"),
+          },
+        ],
+        activeRoundNumber: null,
+        chains: [],
+        assessments: [],
+        surveyResponse: {
+          participantId: "p-alice",
+          responses: { "survey-q1": 4 },
+          comments: "Stored before per-participant surveys",
+          submittedAt,
+        },
+        createdAt: new Date("2026-03-01T09:00:00.000Z"),
+      });
+
+      const loaded = await repo.findById(SessionId.from("legacy-single-survey"));
+      const aliceResponse = loaded?.getSurveyResponse("p-alice");
+      expect(aliceResponse?.responses.get("survey-q1")).toBe(4);
+      expect(aliceResponse?.comments).toBe("Stored before per-participant surveys");
+      expect(aliceResponse?.submittedAt).toEqual(submittedAt);
+
+      loaded!.submitSurvey("p-bob", new Map<string, LikertRating>().set("survey-q1", 2));
+      await repo.update(loaded!);
+
+      const stored = await collection.findOne({ _id: "legacy-single-survey" as unknown as never });
+      expect(stored?.surveyResponse).toBeNull();
+      expect(stored?.surveyResponses).toEqual([
+        {
+          participantId: "p-alice",
+          responses: { "survey-q1": 4 },
+          comments: "Stored before per-participant surveys",
+          submittedAt,
+        },
+        expect.objectContaining({
+          participantId: "p-bob",
+          responses: { "survey-q1": 2 },
+        }),
+      ]);
+      const reloaded = await repo.findById(SessionId.from("legacy-single-survey"));
+      expect(reloaded?.getSurveyResponse("p-alice")?.responses.get("survey-q1")).toBe(4);
+      expect(reloaded?.getSurveyResponse("p-bob")?.responses.get("survey-q1")).toBe(2);
+    }
+    finally {
+      await connection.close();
+    }
   });
 
   it("still loads a session stored before create-time timer validation (legacy zero duration)", async () => {

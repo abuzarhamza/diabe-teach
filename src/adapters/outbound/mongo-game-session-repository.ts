@@ -157,15 +157,20 @@ export class MongoGameSessionRepository implements GameSessionRepositoryPort {
       }),
     );
 
-    // Restore survey response for rehydration
-    const surveyResponse: SurveyResponse | undefined = doc.surveyResponse
-      ? {
-          participantId: doc.surveyResponse.participantId,
-          responses: new Map(Object.entries(doc.surveyResponse.responses)) as ReadonlyMap<string, LikertRating>,
-          ...(doc.surveyResponse.comments !== undefined && { comments: doc.surveyResponse.comments }),
-          submittedAt: doc.surveyResponse.submittedAt,
-        }
-      : undefined;
+    // Restore survey responses for rehydration. A document stored before
+    // per-participant responses holds a single `surveyResponse` and no list.
+    const legacySurveyResponseDocs = doc.surveyResponse
+      ? [doc.surveyResponse]
+      : [];
+    const surveyResponseDocs = doc.surveyResponses ?? legacySurveyResponseDocs;
+    const surveyResponses: SurveyResponse[] = surveyResponseDocs.map(
+      (responseDoc): SurveyResponse => ({
+        participantId: responseDoc.participantId,
+        responses: new Map(Object.entries(responseDoc.responses)) as ReadonlyMap<string, LikertRating>,
+        ...(responseDoc.comments !== undefined && { comments: responseDoc.comments }),
+        submittedAt: responseDoc.submittedAt,
+      }),
+    );
 
     return GameSession.rehydrate({
       sessionId: doc._id,
@@ -186,7 +191,7 @@ export class MongoGameSessionRepository implements GameSessionRepositoryPort {
       version: doc.version ?? 0,
       _chains: chains,
       _assessments: assessments,
-      _surveyResponse: surveyResponse,
+      _surveyResponses: surveyResponses,
     });
   }
 
@@ -210,17 +215,18 @@ export class MongoGameSessionRepository implements GameSessionRepositoryPort {
         MongoGameSessionRepository.#chainToDocument(c),
       ),
       assessments: MongoGameSessionRepository.#assessmentsToDocument(session.assessmentAttempts),
-      surveyResponse: MongoGameSessionRepository.#surveyResponseToDocument(session.surveyResponse),
+      surveyResponses: session.surveyResponses.map(response =>
+        MongoGameSessionRepository.#surveyResponseToDocument(response),
+      ),
+      // Clears the legacy single-response field so it cannot diverge from the list.
+      surveyResponse: null,
       createdAt: session.createdAt,
     };
   }
 
   static #surveyResponseToDocument(
-    surveyResponse: SurveyResponse | null,
-  ): SurveyResponseDocument | null {
-    if (!surveyResponse) {
-      return null;
-    }
+    surveyResponse: SurveyResponse,
+  ): SurveyResponseDocument {
     return {
       participantId: surveyResponse.participantId,
       responses: Object.fromEntries(surveyResponse.responses) as Record<string, LikertRating>,

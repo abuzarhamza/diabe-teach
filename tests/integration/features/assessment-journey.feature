@@ -61,7 +61,7 @@ Feature: Assessment Submission Journey
     And the response error code should be "PHASE_CLOSED_FOR_SUBMISSIONS"
 
   @classroom @per-participant
-  Scenario: Two participants each complete their own Pretest and Posttest
+  Scenario: Two participants each complete their own Pretest, Posttest and survey
     When the instructor creates a classroom session with pack "diabe-teach"
     And participant "Alice" joins using the room code
     And participant "Bob" joins using the room code
@@ -76,3 +76,12 @@ Feature: Assessment Submission Journey
     When participant "Bob" submits posttest answers
     Then the response status should be 201
     And the metacognitive report should include a pretest summary
+    When the instructor advances the phase
+    Then the session phase should be "feedback-survey"
+    When participant "Alice" submits a perception survey
+    Then the response status should be 201
+    When participant "Bob" submits a perception survey
+    Then the response status should be 201
+    When participant "Bob" submits a perception survey again
+    Then the response status should be 409
+    And the response error code should be "SURVEY_ALREADY_SUBMITTED"
