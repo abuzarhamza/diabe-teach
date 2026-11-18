@@ -105,11 +105,12 @@ table.lb{width:100%;border-collapse:collapse;font-size:14px;font-variant-numeric
 .cc-api-box{position:absolute;border:2px dashed var(--api-write);border-radius:8px}
 .cc-api-box.read{border:2px solid var(--api-read)}
 .cc-api-box.gap{border-color:var(--api-gap)}
-.cc-api-tag{position:absolute;transform:translate(-30%,-60%);font:700 12px/1 var(--font-mono);padding:3px 6px;border-radius:999px;background:var(--api-write);color:#fff;white-space:nowrap;box-shadow:0 1px 3px rgba(0,0,0,.3)}
+.cc-api-tag{position:absolute;transform:translate(-30%,-60%);display:inline-flex;align-items:center;min-height:24px;margin:0;border:0;cursor:pointer;pointer-events:auto;font:700 12px/1 var(--font-mono);padding:4px 8px;border-radius:999px;background:var(--api-write);color:#fff;white-space:nowrap;box-shadow:0 1px 3px rgba(0,0,0,.3)}
+.cc-api-tag:hover,.cc-api-tag[aria-expanded=true]{box-shadow:0 0 0 2px var(--api-card),0 0 0 4px currentColor}
 .cc-api-tag.read{background:var(--api-read)}
 .cc-api-tag.gap{background:var(--api-gap)}
 @media (prefers-color-scheme:dark){.cc-api-tag{color:#0D1719}}
-.cc-api-card{position:absolute;width:min(420px,calc(100vw - 16px));max-height:min(70vh,560px);overflow:auto;pointer-events:auto;background:var(--api-card);border:1px solid var(--line);border-radius:10px;padding:12px;box-shadow:0 8px 24px rgba(0,0,0,.25);font-size:13px;line-height:1.4}
+.cc-api-card{position:absolute;width:min(420px,calc(100vw - 16px));max-height:min(70vh,560px);overflow:auto;pointer-events:none;background:var(--api-card);border:1px solid var(--line);border-radius:10px;padding:12px;box-shadow:0 8px 24px rgba(0,0,0,.25);font-size:13px;line-height:1.4}
 .cc-api-card[hidden]{display:none}
 .cc-api-card h4{margin:10px 0 4px;font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
 .cc-api-card ul{margin:0;padding-left:18px}
@@ -150,7 +151,8 @@ table.lb{width:100%;border-collapse:collapse;font-size:14px;font-variant-numeric
 .cc-api-leg-where{font-size:12px;color:var(--muted);overflow-wrap:anywhere}
 .cc-api-leg-status{display:flex;flex-direction:column;align-items:flex-end;gap:2px}
 .cc-api-leg-status .cc-api-status{font-size:10px;padding:1px 6px}
-.cc-api-legend li.off .cc-api-leg-step{opacity:.55;cursor:default}
+.cc-api-legend li.off .cc-api-leg-step{cursor:default}
+.cc-api-legend li.off .cc-api-leg-title{color:var(--muted);font-weight:400} /* dimmed by color, not opacity, to keep text contrast */
 .cc-api-legend li.off .cc-api-leg-step:hover{background:none}
 .cc-api-legend li.off .cc-api-step{background:var(--muted)}
 /* Flash: a steady highlight always; it pulses only when motion is fine. */
@@ -158,3 +160,27 @@ table.lb{width:100%;border-collapse:collapse;font-size:14px;font-variant-numeric
 .cc-api-box.read.flash{box-shadow:0 0 0 4px color-mix(in srgb,var(--api-read) 35%,transparent);background:color-mix(in srgb,var(--api-read) 12%,transparent)}
 @keyframes cc-api-flash{50%{box-shadow:0 0 0 10px transparent}}
 @media (prefers-reduced-motion:no-preference){.cc-api-box.flash{animation:cc-api-flash .5s ease-in-out 3}}
+
+/* Pinning (ticket 06): hover cards take no pointer events so they never swallow clicks; a pinned card
+   is a dialog you can scroll, select from and copy from. */
+.cc-api-card.pinned{pointer-events:auto;border:2px solid var(--api-write)}
+.cc-api-card:focus{outline:none}
+.cc-api-card:focus-visible{outline:3px solid var(--pick);outline-offset:2px}
+.cc-api-title{justify-content:space-between}
+.cc-api-title-text{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.cc-api-close{flex:none;width:32px;height:32px;border:1px solid var(--line);border-radius:8px;background:var(--surface);font:700 18px/1 var(--font-body);cursor:pointer}
+.cc-api-close:hover{border-color:var(--api-write)}
+.cc-api-path,.cc-api-sub{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+.cc-api-sub h4{margin-right:auto}
+.cc-api-sub{margin:10px 0 4px}.cc-api-sub h4{margin:0}
+.cc-api-copy{flex:none;min-height:28px;padding:3px 10px;border:1px solid var(--api-write);border-radius:6px;background:var(--surface);color:var(--ink);font:700 12px/1 var(--font-body);cursor:pointer}
+.cc-api-copy:hover{background:var(--sunk)}
+.cc-api-copy.done{border-color:var(--good);color:var(--good)}
+/* Legend: never taller than about half the window, so the room code and the top of the side column
+   stay visible on short screens (it starts collapsed below 801px height). */
+.cc-api-legend{max-height:min(55vh,560px)}
+/* Legend flash also outlines the page elements themselves. */
+[data-api-flash]{outline:3px solid var(--api-write) !important;outline-offset:4px}
+@media (prefers-reduced-motion:no-preference){[data-api-flash]{animation:cc-api-el-flash .5s ease-in-out 3}}
+@keyframes cc-api-el-flash{50%{outline-color:transparent}}
+[data-api-io=read][data-api-flash]{outline-color:var(--api-read) !important}
