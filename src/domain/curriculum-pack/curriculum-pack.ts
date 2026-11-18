@@ -25,6 +25,12 @@ export class CurriculumPack {
   public readonly adjudicationRubric: AdjudicationRubric;
   public readonly assessmentInstrument: AssessmentInstrument | null;
   public readonly perceptionSurvey: PerceptionSurvey | null;
+  public readonly isSystemPack: boolean;
+  public readonly isArchived: boolean;
+  public readonly createdBy: string | null;
+  public readonly authorName: string | null;
+  public readonly createdAt: Date;
+  public readonly archivedAt: Date | null;
 
   readonly #cardsById: ReadonlyMap<string, KeywordCard>;
   readonly #cardsByLookupKey: ReadonlyMap<string, KeywordCard>;
@@ -53,6 +59,14 @@ export class CurriculumPack {
       props.assessmentInstrument,
     );
     this.perceptionSurvey = CurriculumPack.#cloneSurvey(props.perceptionSurvey);
+    this.isSystemPack = props.isSystemPack;
+    this.isArchived = props.isArchived;
+    this.createdBy = props.createdBy;
+    this.authorName = props.authorName;
+    this.createdAt = new Date(props.createdAt);
+    this.archivedAt = props.archivedAt
+      ? new Date(props.archivedAt)
+      : null;
 
     const { byId, byLookup } = CurriculumPack.#buildCardIndices(this.cards);
     this.#cardsById = byId;
@@ -62,6 +76,48 @@ export class CurriculumPack {
 
   public static create(props: CurriculumPackProps): CurriculumPack {
     return new CurriculumPack(props);
+  }
+
+  public archive(archivedAt: Date = new Date()): CurriculumPack {
+    return new CurriculumPack({
+      id: this.id,
+      title: this.title,
+      version: this.version,
+      description: this.description,
+      boardConfig: this.boardConfig,
+      domains: this.domains,
+      cards: this.cards,
+      adjudicationRubric: this.adjudicationRubric,
+      assessmentInstrument: this.assessmentInstrument,
+      perceptionSurvey: this.perceptionSurvey,
+      isSystemPack: this.isSystemPack,
+      isArchived: true,
+      createdBy: this.createdBy,
+      authorName: this.authorName,
+      createdAt: this.createdAt,
+      archivedAt,
+    });
+  }
+
+  public unarchive(): CurriculumPack {
+    return new CurriculumPack({
+      id: this.id,
+      title: this.title,
+      version: this.version,
+      description: this.description,
+      boardConfig: this.boardConfig,
+      domains: this.domains,
+      cards: this.cards,
+      adjudicationRubric: this.adjudicationRubric,
+      assessmentInstrument: this.assessmentInstrument,
+      perceptionSurvey: this.perceptionSurvey,
+      isSystemPack: this.isSystemPack,
+      isArchived: false,
+      createdBy: this.createdBy,
+      authorName: this.authorName,
+      createdAt: this.createdAt,
+      archivedAt: null,
+    });
   }
 
   public getCardById(cardId: string): KeywordCard | undefined {

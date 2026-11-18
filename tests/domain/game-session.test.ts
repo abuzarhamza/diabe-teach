@@ -61,7 +61,7 @@ describe("gameSession aggregate", () => {
   it("allows valid phase transition from pretest to trial-orientation", () => {
     const session = GameSession.create(validProps);
 
-    session.transitionTo("trial-orientation");
+    session.transitionTo("trial-orientation", new Date());
 
     expect(session.currentPhase).toBe("trial-orientation");
   });
@@ -69,16 +69,16 @@ describe("gameSession aggregate", () => {
   it("allows full phase progression through the FSM", () => {
     const session = GameSession.create(validProps);
 
-    session.transitionTo("trial-orientation");
-    session.transitionTo("round-1:chain-mapping");
-    session.transitionTo("round-1:peer-adjudication");
-    session.transitionTo("round-1:round-summary");
-    session.transitionTo("round-2:chain-mapping");
-    session.transitionTo("round-2:peer-adjudication");
-    session.transitionTo("round-2:round-summary");
-    session.transitionTo("posttest");
-    session.transitionTo("feedback-survey");
-    session.transitionTo("completed");
+    session.transitionTo("trial-orientation", new Date());
+    session.transitionTo("round-1:chain-mapping", new Date());
+    session.transitionTo("round-1:peer-adjudication", new Date());
+    session.transitionTo("round-1:round-summary", new Date());
+    session.transitionTo("round-2:chain-mapping", new Date());
+    session.transitionTo("round-2:peer-adjudication", new Date());
+    session.transitionTo("round-2:round-summary", new Date());
+    session.transitionTo("posttest", new Date());
+    session.transitionTo("feedback-survey", new Date());
+    session.transitionTo("completed", new Date());
 
     expect(session.currentPhase).toBe("completed");
   });
@@ -86,7 +86,7 @@ describe("gameSession aggregate", () => {
   it("throws InvalidPhaseTransitionError for invalid transition", () => {
     const session = GameSession.create(validProps);
 
-    expect(() => session.transitionTo("round-1:chain-mapping")).toThrow(
+    expect(() => session.transitionTo("round-1:chain-mapping", new Date())).toThrow(
       InvalidPhaseTransitionError,
     );
   });
@@ -103,9 +103,9 @@ describe("gameSession aggregate", () => {
 
   it("generates active board when entering round-1:chain-mapping", () => {
     const session = GameSession.create(validProps);
-    session.transitionTo("trial-orientation");
+    session.transitionTo("trial-orientation", new Date());
 
-    session.transitionTo("round-1:chain-mapping");
+    session.transitionTo("round-1:chain-mapping", new Date());
 
     expect(session.activeRoundNumber).toBe(1);
   });

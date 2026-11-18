@@ -1,11 +1,17 @@
 import type { MiddlewareObj } from "@middy/core";
 import {
   AdjudicationLockedError,
+  AssessmentAlreadySubmittedError,
+  AssessmentIncompleteError,
+  ChainAlreadySubmittedError,
   ChainNotFoundError,
   ChainTopologyInvalidError,
+  ConcurrentUpdateConflictError,
   DomainError,
   ForbiddenRoleError,
   InvalidPhaseTransitionError,
+  InvalidSurveyResponseError,
+  InvalidTimerConfigError,
   PackAlreadyArchivedError,
   PackAlreadyExistsError,
   PackIsSystemPackError,
@@ -14,6 +20,8 @@ import {
   PhaseClosedForSubmissionsError,
   RoomCodeNotFoundError,
   SessionNotFoundError,
+  SurveyAlreadySubmittedError,
+  SurveyCommentsTooLongError,
   UnauthorizedTokenError,
 } from "../../../../domain/errors/domain-errors.js";
 
@@ -26,6 +34,9 @@ export function domainErrorMiddleware(): MiddlewareObj<any, any> {
         let statusCode = 500;
         if (error instanceof UnauthorizedTokenError) {
           statusCode = 401;
+        }
+        else if (error instanceof InvalidTimerConfigError) {
+          statusCode = 400;
         }
         else if (
           error instanceof PackNotFoundError
@@ -41,6 +52,10 @@ export function domainErrorMiddleware(): MiddlewareObj<any, any> {
           || error instanceof PackAlreadyArchivedError
           || error instanceof PackNotArchivedError
           || error instanceof PackAlreadyExistsError
+          || error instanceof AssessmentAlreadySubmittedError
+          || error instanceof SurveyAlreadySubmittedError
+          || error instanceof ConcurrentUpdateConflictError
+          || error instanceof ChainAlreadySubmittedError
         ) {
           statusCode = 409;
         }
@@ -53,7 +68,12 @@ export function domainErrorMiddleware(): MiddlewareObj<any, any> {
         else if (error instanceof ChainNotFoundError) {
           statusCode = 404;
         }
-        else if (error instanceof ChainTopologyInvalidError) {
+        else if (
+          error instanceof ChainTopologyInvalidError
+          || error instanceof AssessmentIncompleteError
+          || error instanceof SurveyCommentsTooLongError
+          || error instanceof InvalidSurveyResponseError
+        ) {
           statusCode = 422;
         }
 

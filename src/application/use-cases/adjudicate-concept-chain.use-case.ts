@@ -1,3 +1,5 @@
+import type { ConceptChain } from "../../domain/game-session/concept-chain.js";
+import type { GameSession } from "../../domain/game-session/game-session.js";
 import type {
   AdjudicateConceptChainCommand,
   AdjudicateConceptChainDependencies,
@@ -5,33 +7,54 @@ import type {
   AdjudicateConceptChainUseCasePort,
   AdjudicatedChainDto,
 } from "../ports/adjudicate-concept-chain.port.js";
-import type { GameSessionRepositoryPort } from "../ports/game-session-repository.port.js";
 import {
   AdjudicationLockedError,
   ChainNotFoundError,
   ForbiddenRoleError,
-  SessionNotFoundError,
 } from "../../domain/errors/domain-errors.js";
 import { SessionId } from "../../domain/game-session/session-id.js";
+import { GameSessionUpdateRetrier } from "../services/game-session-update-retrier.js";
 
 export class AdjudicateConceptChainUseCase
 implements AdjudicateConceptChainUseCasePort {
-  readonly #sessionRepo: GameSessionRepositoryPort;
+  readonly #sessionUpdates: GameSessionUpdateRetrier;
 
   public constructor(deps: AdjudicateConceptChainDependencies) {
-    this.#sessionRepo = deps.sessionRepo;
+    this.#sessionUpdates = new GameSessionUpdateRetrier(deps.sessionRepo);
   }
 
   public async execute(
     command: AdjudicateConceptChainCommand,
   ): Promise<AdjudicateConceptChainResult> {
-    const sessionId = SessionId.from(command.sessionId);
-    const session = await this.#sessionRepo.findById(sessionId);
+    const decidedAt = new Date();
 
-    if (!session) {
-      throw new SessionNotFoundError(command.sessionId);
-    }
+    const chain = await this.#sessionUpdates.run(
+      SessionId.from(command.sessionId),
+      session => this.#adjudicate(session, command, decidedAt),
+    );
 
+    const chainDto: AdjudicatedChainDto = {
+      chainId: chain.chainId,
+      participantId: chain.participantId,
+      roundNumber: chain.roundNumber,
+      path: chain.path,
+      keywordIds: chain.keywordIds,
+      narrativeExplanation: chain.narrativeExplanation,
+      chainLength: chain.chainLength,
+      status: chain.status,
+      peerVotes: chain.peerVotes,
+      verdict: chain.verdict,
+      submittedAt: chain.submittedAt.toISOString(),
+    };
+
+    return { chain: chainDto };
+  }
+
+  #adjudicate(
+    session: GameSession,
+    command: AdjudicateConceptChainCommand,
+    decidedAt: Date,
+  ): ConceptChain {
     const chain = session.getChain(command.chainId);
     if (!chain) {
       throw new ChainNotFoundError(command.chainId);
@@ -74,7 +97,7 @@ implements AdjudicateConceptChainUseCasePort {
         feedback: command.feedback,
         qualityScore: command.qualityScore,
         decidedBy: "instructor",
-        decidedAt: new Date(),
+        decidedAt,
       });
     }
     else if (action === "ai-evaluate") {
@@ -84,26 +107,10 @@ implements AdjudicateConceptChainUseCasePort {
         feedback: "AI evaluation placeholder",
         qualityScore: 75,
         decidedBy: "ai",
-        decidedAt: new Date(),
+        decidedAt,
       });
     }
 
-    await this.#sessionRepo.update(session);
-
-    const chainDto: AdjudicatedChainDto = {
-      chainId: chain.chainId,
-      participantId: chain.participantId,
-      roundNumber: chain.roundNumber,
-      path: chain.path,
-      keywordIds: chain.keywordIds,
-      narrativeExplanation: chain.narrativeExplanation,
-      chainLength: chain.chainLength,
-      status: chain.status,
-      peerVotes: chain.peerVotes,
-      verdict: chain.verdict,
-      submittedAt: chain.submittedAt.toISOString(),
-    };
-
-    return { chain: chainDto };
+    return chain;
   }
 }

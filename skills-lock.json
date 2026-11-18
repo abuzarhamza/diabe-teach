@@ -151,6 +151,12 @@
       "skillPath": "skills/in-progress/setup-ts-deep-modules/SKILL.md",
       "computedHash": "61508216ede38d8cfa712879197a76f75f4896615dbf7abc3f62571f8f5923cc"
     },
+    "show-me-mr": {
+      "source": "abuzarhamza/show-me-k",
+      "sourceType": "github",
+      "skillPath": "plugins/show-me-mr/skills/show-me-mr/SKILL.md",
+      "computedHash": "960e08b22921c9ecbb341b7cfaf6044214d3586e62d3d5dd0cd98e872a8d2a0e"
+    },
     "tdd": {
       "source": "mattpocock/skills",
       "sourceType": "github",

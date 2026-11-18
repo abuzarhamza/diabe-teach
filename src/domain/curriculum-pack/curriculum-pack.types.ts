@@ -81,4 +81,10 @@ export interface CurriculumPackProps {
   readonly adjudicationRubric: AdjudicationRubric;
   readonly assessmentInstrument: AssessmentInstrument | null;
   readonly perceptionSurvey: PerceptionSurvey | null;
+  readonly isSystemPack: boolean;
+  readonly isArchived: boolean;
+  readonly createdBy: string | null;
+  readonly authorName: string | null;
+  readonly createdAt: Date;
+  readonly archivedAt: Date | null;
 }

@@ -15,3 +15,94 @@
 
 [context.dev.environment]
   NODE_ENV = "development"
+
+# API Routes - direct to Netlify Functions (force = true ensures no fallback)
+[[redirects]]
+  from = "/api/v1/sessions"
+  to = "/.netlify/functions/create-session"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/v1/sessions/join"
+  to = "/.netlify/functions/join-session"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/v1/sessions/:sessionId"
+  to = "/.netlify/functions/get-session"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/v1/sessions/:sessionId/phase"
+  to = "/.netlify/functions/transition-phase"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/v1/sessions/:sessionId/rounds/:roundNumber/chains"
+  to = "/.netlify/functions/submit-chain"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/v1/sessions/:sessionId/assessments/:stage"
+  to = "/.netlify/functions/submit-assessment"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/v1/sessions/:sessionId/survey"
+  to = "/.netlify/functions/submit-survey"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/v1/sessions/:sessionId/rounds/:roundNumber/chains/:chainId/adjudicate"
+  to = "/.netlify/functions/adjudicate-chain"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/v1/sessions/:sessionId/rounds/:roundNumber/standings"
+  to = "/.netlify/functions/get-standings"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/v1/packs"
+  to = "/.netlify/functions/list-packs"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/v1/packs/register"
+  to = "/.netlify/functions/register-pack"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/v1/packs/validate"
+  to = "/.netlify/functions/validate-pack"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/v1/packs/:packId"
+  to = "/.netlify/functions/get-pack-by-id"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/v1/packs/:packId/archive"
+  to = "/.netlify/functions/archive-pack"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/v1/packs/:packId/unarchive"
+  to = "/.netlify/functions/unarchive-pack"
+  status = 200
+  force = true

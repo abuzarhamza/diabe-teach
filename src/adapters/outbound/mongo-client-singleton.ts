@@ -13,8 +13,11 @@ export class MongoConnectionManager {
     if (!connPromise) {
       const connection = mongoose.createConnection(uri, {
         dbName,
-        maxPoolSize: 5,
-        serverSelectionTimeoutMS: 5000,
+        maxPoolSize: 10,
+        minPoolSize: 2,
+        serverSelectionTimeoutMS: 15000,
+        connectTimeoutMS: 15000,
+        socketTimeoutMS: 45000,
       });
       connPromise = connection.asPromise().catch((err: unknown) => {
         MongoConnectionManager.#cachedConnections.delete(cacheKey);

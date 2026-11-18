@@ -3,6 +3,26 @@ import type { SessionId } from "./session-id.js";
 
 export type SessionMode = "solo" | "classroom" | "study-rct";
 
+export type McqAnswerChoice = 0 | 1 | 2 | 3 | "I_DONT_KNOW";
+
+export type AssessmentStage = "pretest" | "posttest";
+
+export interface AssessmentAttempt {
+  readonly participantId: string;
+  readonly stage: AssessmentStage;
+  readonly answers: ReadonlyMap<string, McqAnswerChoice>;
+  readonly submittedAt: Date;
+}
+
+export type LikertRating = 1 | 2 | 3 | 4 | 5;
+
+export interface SurveyResponse {
+  readonly participantId: string;
+  readonly responses: ReadonlyMap<string, LikertRating>;
+  readonly comments?: string;
+  readonly submittedAt: Date;
+}
+
 export type AdjudicationMode = "ai" | "peer-instructor" | "hybrid";
 
 export type PhaseIdentifier
@@ -18,13 +38,18 @@ export type PhaseIdentifier
     | "feedback-survey"
     | "completed";
 
+/**
+ * Phase durations in whole seconds (at least 1). `null` makes the phase
+ * instructor-driven: it has no deadline and ends only when the instructor
+ * transitions it.
+ */
 export interface SessionTimerConfig {
-  readonly pretestSec: number;
-  readonly trialOrientationSec: number;
-  readonly roundMappingSec: number;
-  readonly roundAdjudicationSec: number;
-  readonly posttestSec: number;
-  readonly feedbackSurveySec: number;
+  readonly pretestSec: number | null;
+  readonly trialOrientationSec: number | null;
+  readonly roundMappingSec: number | null;
+  readonly roundAdjudicationSec: number | null;
+  readonly posttestSec: number | null;
+  readonly feedbackSurveySec: number | null;
 }
 
 export interface Participant {
@@ -45,7 +70,24 @@ export interface GameSessionProps {
   readonly participants?: readonly Participant[];
   readonly activeRoundNumber?: 1 | 2 | null;
   readonly createdAt?: Date;
+  /**
+   * Stored version for optimistic concurrency. New sessions start at 0;
+   * sessions stored before versioning have none and load as 0.
+   */
+  readonly version?: number;
+  /** Used for rehydration from persistence - bypasses phase validation */
+  readonly _chains?: readonly import("./concept-chain.js").ConceptChain[];
+  /** Used for rehydration from persistence - bypasses phase validation */
+  readonly _assessments?: readonly AssessmentAttempt[];
+  /** Used for rehydration from persistence - bypasses phase validation */
+  readonly _surveyResponses?: readonly SurveyResponse[];
 }
+
+/**
+ * How long after `phaseEndsAt` a Chain-Mapping phase still accepts
+ * Concept Chains, to absorb network delay on last-second submissions.
+ */
+export const SUBMISSION_GRACE_PERIOD_SEC = 5;
 
 export const DEFAULT_TIMER_CONFIG: SessionTimerConfig = {
   pretestSec: 900,
@@ -54,6 +96,41 @@ export const DEFAULT_TIMER_CONFIG: SessionTimerConfig = {
   roundAdjudicationSec: 600,
   posttestSec: 900,
   feedbackSurveySec: 900,
+};
+
+/** The fields of SessionTimerConfig, in declaration order. */
+export const TIMER_FIELDS: readonly (keyof SessionTimerConfig)[] = [
+  "pretestSec",
+  "trialOrientationSec",
+  "roundMappingSec",
+  "roundAdjudicationSec",
+  "posttestSec",
+  "feedbackSurveySec",
+];
+
+/**
+ * Longest allowed phase duration (24 hours). Keeps `phaseEndsAt` a valid
+ * date; a phase that should run longer can be untimed (`null`).
+ */
+export const MAX_TIMER_DURATION_SEC = 86_400;
+
+/**
+ * Which timer-config field sets each phase's duration. `null` means the phase
+ * has no configured duration (it ends the moment it starts). Typed as a full
+ * Record so adding a phase forces a decision here.
+ */
+export const PHASE_TIMER_FIELD: Readonly<Record<PhaseIdentifier, keyof SessionTimerConfig | null>> = {
+  "pretest": "pretestSec",
+  "trial-orientation": "trialOrientationSec",
+  "round-1:chain-mapping": "roundMappingSec",
+  "round-1:peer-adjudication": "roundAdjudicationSec",
+  "round-1:round-summary": null,
+  "round-2:chain-mapping": "roundMappingSec",
+  "round-2:peer-adjudication": "roundAdjudicationSec",
+  "round-2:round-summary": null,
+  "posttest": "posttestSec",
+  "feedback-survey": "feedbackSurveySec",
+  "completed": null,
 };
 
 export const PHASE_TRANSITIONS: ReadonlyMap<PhaseIdentifier, PhaseIdentifier> = new Map([

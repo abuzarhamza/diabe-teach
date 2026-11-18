@@ -1,0 +1,169 @@
+import type { Response } from "supertest";
+import request from "supertest";
+import { getTestConfig } from "./test-config-loader.js";
+
+const config = getTestConfig();
+const BASE_URL = process.env.NETLIFY_DEV_URL || config.env.base_url;
+const API_KEY = config.env.api_key;
+
+/**
+ * Converts supertest Response to AWS Lambda APIGatewayProxyResult format
+ * for compatibility with existing test assertions
+ */
+function toApiGatewayResult(res: Response) {
+  return {
+    statusCode: res.status,
+    headers: res.headers as Record<string, string>,
+    body: typeof res.body === "object" ? JSON.stringify(res.body) : res.text,
+  };
+}
+
+export async function createSession(body: {
+  packId: string;
+  mode: "solo" | "classroom" | "study-rct";
+  adjudicationMode: "ai" | "peer-instructor" | "hybrid";
+  creatorDisplayName?: string;
+  timerConfig?: Record<string, number | null>;
+}) {
+  const res = await request(BASE_URL)
+    .post("/api/v1/sessions")
+    .set("Content-Type", "application/json")
+    .set("x-api-key", API_KEY)
+    .send(body);
+
+  return toApiGatewayResult(res);
+}
+
+export async function joinSession(body: {
+  roomCode: string;
+  displayName: string;
+}) {
+  const res = await request(BASE_URL)
+    .post("/api/v1/sessions/join")
+    .set("Content-Type", "application/json")
+    .set("x-api-key", API_KEY)
+    .send(body);
+
+  return toApiGatewayResult(res);
+}
+
+export async function getSession(sessionId: string, token: string) {
+  const res = await request(BASE_URL)
+    .get(`/api/v1/sessions/${sessionId}`)
+    .set("x-api-key", API_KEY)
+    .set("Authorization", `Bearer ${token}`);
+
+  return toApiGatewayResult(res);
+}
+
+export async function transitionPhase(
+  sessionId: string,
+  token: string,
+  body: {
+    action?: "advance" | "jump";
+    targetPhase?: string;
+    seed?: number;
+  } = {},
+) {
+  const res = await request(BASE_URL)
+    .post(`/api/v1/sessions/${sessionId}/phase`)
+    .set("Content-Type", "application/json")
+    .set("x-api-key", API_KEY)
+    .set("Authorization", `Bearer ${token}`)
+    .send(body);
+
+  return toApiGatewayResult(res);
+}
+
+export async function submitChain(
+  sessionId: string,
+  roundNumber: number,
+  token: string,
+  body: {
+    path: Array<{ row: number; col: number }>;
+    keywordIds: string[];
+    narrativeExplanation: string;
+    stepRationales?: string[];
+  },
+) {
+  const res = await request(BASE_URL)
+    .post(`/api/v1/sessions/${sessionId}/rounds/${roundNumber}/chains`)
+    .set("Content-Type", "application/json")
+    .set("x-api-key", API_KEY)
+    .set("Authorization", `Bearer ${token}`)
+    .send(body);
+
+  return toApiGatewayResult(res);
+}
+
+export async function adjudicateChain(
+  sessionId: string,
+  roundNumber: number,
+  chainId: string,
+  token: string,
+  body: {
+    action?: "peer-approve" | "peer-reject" | "instructor-final";
+    comment?: string;
+    feedback?: string;
+    qualityScore?: number;
+  } = {},
+) {
+  const res = await request(BASE_URL)
+    .post(`/api/v1/sessions/${sessionId}/rounds/${roundNumber}/chains/${chainId}/adjudicate`)
+    .set("Content-Type", "application/json")
+    .set("x-api-key", API_KEY)
+    .set("Authorization", `Bearer ${token}`)
+    .send(body);
+
+  return toApiGatewayResult(res);
+}
+
+export async function getStandings(
+  sessionId: string,
+  roundNumber: number,
+  token: string,
+) {
+  const res = await request(BASE_URL)
+    .get(`/api/v1/sessions/${sessionId}/rounds/${roundNumber}/standings`)
+    .set("x-api-key", API_KEY)
+    .set("Authorization", `Bearer ${token}`);
+
+  return toApiGatewayResult(res);
+}
+
+export async function submitAssessment(
+  sessionId: string,
+  stage: "pretest" | "posttest",
+  token: string,
+  answers: Record<string, 0 | 1 | 2 | 3 | "I_DONT_KNOW">,
+) {
+  const res = await request(BASE_URL)
+    .post(`/api/v1/sessions/${sessionId}/assessments/${stage}`)
+    .set("Content-Type", "application/json")
+    .set("x-api-key", API_KEY)
+    .set("Authorization", `Bearer ${token}`)
+    .send({ answers });
+
+  return toApiGatewayResult(res);
+}
+
+export async function submitSurvey(
+  sessionId: string,
+  token: string,
+  responses: Record<string, number>,
+  comments?: string,
+) {
+  const body: { responses: Record<string, number>; comments?: string } = { responses };
+  if (comments !== undefined) {
+    body.comments = comments;
+  }
+
+  const res = await request(BASE_URL)
+    .post(`/api/v1/sessions/${sessionId}/survey`)
+    .set("Content-Type", "application/json")
+    .set("x-api-key", API_KEY)
+    .set("Authorization", `Bearer ${token}`)
+    .send(body);
+
+  return toApiGatewayResult(res);
+}

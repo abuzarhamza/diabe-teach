@@ -183,6 +183,15 @@ paths:
                 $ref: "#/components/schemas/JoinSessionResponse"
         "404":
           $ref: "#/components/responses/NotFoundError"
+        "409":
+          description: >-
+            CONCURRENT_UPDATE_CONFLICT. Other requests kept changing the Game
+            Session while this one was being saved, and it still conflicted
+            after 3 attempts. Nothing was recorded. Safe to retry.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
 
   /api/v1/sessions/{sessionId}:
     get:
@@ -255,7 +264,16 @@ paths:
         "404":
           $ref: "#/components/responses/NotFoundError"
         "409":
-          $ref: "#/components/responses/ConflictError"
+          description: >-
+            INVALID_PHASE_TRANSITION. The requested phase does not follow the current phase.
+
+            CONCURRENT_UPDATE_CONFLICT. Other requests kept changing the Game
+            Session while this one was being saved, and it still conflicted
+            after 3 attempts. Nothing was recorded. Safe to retry.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
 
   /api/v1/sessions/{sessionId}/rounds/{roundNumber}/chains:
     post:
@@ -289,7 +307,22 @@ paths:
         "404":
           $ref: "#/components/responses/NotFoundError"
         "409":
-          description: Round is not in the chain-mapping sub-phase (PHASE_CLOSED_FOR_SUBMISSIONS)
+          description: >-
+            PHASE_CLOSED_FOR_SUBMISSIONS. Either the round is not in the
+            chain-mapping sub-phase, the chain was sent to a round other than
+            the session's active round, or the chain arrived more than 5 seconds
+            (the fixed grace period) after the session's `phaseEndsAt`. An
+            expired chain-mapping phase stays current, closed for submissions,
+            until the instructor transitions to peer-adjudication.
+
+            CHAIN_ALREADY_SUBMITTED. The participant already submitted this
+            Concept Chain in this round: the same board cells in the same or
+            exactly reverse order (the narrative is ignored). Nothing is
+            recorded. Other participants may submit the same chain.
+
+            CONCURRENT_UPDATE_CONFLICT. Other requests kept changing the Game
+            Session while this one was being saved, and it still conflicted
+            after 3 attempts. Nothing was recorded. Safe to retry.
           content:
             application/json:
               schema:
@@ -340,7 +373,12 @@ paths:
         "404":
           $ref: "#/components/responses/NotFoundError"
         "409":
-          description: Chain verdict is locked by an Instructor Final Ruling (ADJUDICATION_LOCKED_BY_INSTRUCTOR)
+          description: >-
+            ADJUDICATION_LOCKED_BY_INSTRUCTOR. The chain verdict is locked by an Instructor Final Ruling.
+
+            CONCURRENT_UPDATE_CONFLICT. Other requests kept changing the Game
+            Session while this one was being saved, and it still conflicted
+            after 3 attempts. Nothing was recorded. Safe to retry.
           content:
             application/json:
               schema:
@@ -410,7 +448,15 @@ paths:
         "404":
           $ref: "#/components/responses/NotFoundError"
         "409":
-          description: Participant has already submitted this assessment stage (ASSESSMENT_ALREADY_SUBMITTED)
+          description: >-
+            ASSESSMENT_ALREADY_SUBMITTED. The participant has already submitted this assessment stage.
+
+            PHASE_CLOSED_FOR_SUBMISSIONS. The session is not in this stage's
+            phase, or a posttest was sent before the participant's pretest.
+
+            CONCURRENT_UPDATE_CONFLICT. Other requests kept changing the Game
+            Session while this one was being saved, and it still conflicted
+            after 3 attempts. Nothing was recorded. Safe to retry.
           content:
             application/json:
               schema:
@@ -457,6 +503,19 @@ paths:
           $ref: "#/components/responses/UnauthorizedError"
         "404":
           $ref: "#/components/responses/NotFoundError"
+        "409":
+          description: >-
+            SURVEY_ALREADY_SUBMITTED. This participant has already submitted the perception survey.
+
+            PHASE_CLOSED_FOR_SUBMISSIONS. The session is not in the feedback-survey phase.
+
+            CONCURRENT_UPDATE_CONFLICT. Other requests kept changing the Game
+            Session while this one was being saved, and it still conflicted
+            after 3 attempts. Nothing was recorded. Safe to retry.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
         "422":
           $ref: "#/components/responses/UnprocessableEntityError"
 
@@ -570,6 +629,9 @@ components:
         - PACK_VALIDATION_FAILED
         - CHAIN_TOPOLOGY_INVALID
         - ASSESSMENT_INCOMPLETE
+        - CONCURRENT_UPDATE_CONFLICT
+        - CHAIN_ALREADY_SUBMITTED
+        - SURVEY_ALREADY_SUBMITTED
 
     ApiErrorResponse:
       type: object
@@ -847,24 +909,43 @@ components:
 
     SessionTimerConfig:
       type: object
+      additionalProperties: false
+      description: >
+        Phase durations in whole seconds (1 to 86400). Omitted fields use the default.
+        Set a field to `null` to make that phase instructor-driven: it has no
+        deadline (`phaseEndsAt` is `null`) and lasts until the instructor
+        transitions it. An out-of-range duration or an unknown field is
+        rejected with `INVALID_REQUEST_BODY`.
       properties:
         pretestSec:
-          type: integer
+          type: [integer, "null"]
+          minimum: 1
+          maximum: 86400
           default: 900
         trialOrientationSec:
-          type: integer
+          type: [integer, "null"]
+          minimum: 1
+          maximum: 86400
           default: 900
         roundMappingSec:
-          type: integer
+          type: [integer, "null"]
+          minimum: 1
+          maximum: 86400
           default: 1200
         roundAdjudicationSec:
-          type: integer
+          type: [integer, "null"]
+          minimum: 1
+          maximum: 86400
           default: 600
         posttestSec:
-          type: integer
+          type: [integer, "null"]
+          minimum: 1
+          maximum: 86400
           default: 900
         feedbackSurveySec:
-          type: integer
+          type: [integer, "null"]
+          minimum: 1
+          maximum: 86400
           default: 900
 
     CreateSessionRequest:
@@ -986,8 +1067,11 @@ components:
           type: string
           format: date-time
         phaseEndsAt:
-          type: string
+          type: [string, "null"]
           format: date-time
+          description: >
+            When the current phase is scheduled to end. `null` when the
+            phase is instructor-driven (its timer is set to `null`).
         activeBoard:
           oneOf:
             - $ref: "#/components/schemas/BoardGridView"

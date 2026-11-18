@@ -1,10 +1,12 @@
 import type { PhaseIdentifier } from "../../domain/game-session/game-session.types.js";
 import type { VerifiedCapability } from "./capability-token.port.js";
+import type { ClockPort } from "./clock.port.js";
 import type { PublicSessionStateDto } from "./create-game-session.port.js";
 import type { GameSessionRepositoryPort } from "./game-session-repository.port.js";
 
 export interface TransitionSessionPhaseDependencies {
   readonly sessionRepo: GameSessionRepositoryPort;
+  readonly clock: ClockPort;
 }
 
 export interface TransitionSessionPhaseCommand {

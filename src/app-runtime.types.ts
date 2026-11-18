@@ -1,4 +1,5 @@
 import type { CapabilityTokenPort, CapabilityTokenSignerPort } from "./application/ports/capability-token.port.js";
+import type { ClockPort } from "./application/ports/clock.port.js";
 import type { CurriculumPackRepositoryPort } from "./application/ports/curriculum-pack-repository.port.js";
 import type { GameSessionRepositoryPort } from "./application/ports/game-session-repository.port.js";
 
@@ -14,6 +15,7 @@ export interface ProductionDependencies {
   readonly sessionRepo?: GameSessionRepositoryPort;
   readonly tokenSigner?: CapabilityTokenSignerPort;
   readonly tokenVerifier?: CapabilityTokenPort;
+  readonly clock?: ClockPort;
   readonly apiKey?: string;
   readonly requireApiKey?: boolean;
 }

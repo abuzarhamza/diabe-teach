@@ -1,11 +1,26 @@
 import type { CurriculumPack } from "../../domain/curriculum-pack/curriculum-pack.js";
 import type {
   CurriculumPackProjectionOptions,
+  CurriculumPackSummaryDto,
   PublicAssessmentQuestionDto,
   PublicCurriculumPackDto,
 } from "./curriculum-pack.dto.js";
 
 export class CurriculumPackProjector {
+  public static toSummaryDto(pack: CurriculumPack): CurriculumPackSummaryDto {
+    return {
+      id: pack.id.value,
+      title: pack.title,
+      version: pack.version,
+      subjectDomain: pack.adjudicationRubric.subjectDomain,
+      boardConfig: pack.boardConfig,
+      cardCount: pack.cards.length,
+      domainCount: pack.domains.length,
+      hasAssessmentInstrument: pack.assessmentInstrument !== null,
+      hasPerceptionSurvey: pack.perceptionSurvey !== null,
+    };
+  }
+
   public static toPublicDto(
     pack: CurriculumPack,
     options: CurriculumPackProjectionOptions,

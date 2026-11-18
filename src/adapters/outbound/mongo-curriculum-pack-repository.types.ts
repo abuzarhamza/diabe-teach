@@ -9,6 +9,17 @@ export interface CurriculumPackCollectionLike {
   findOne: (
     filter: { readonly _id: string },
   ) => Promise<CurriculumPackDocument | null>;
+  find: (
+    filter?: { readonly isArchived?: boolean },
+  ) => Promise<readonly CurriculumPackDocument[]>;
+  create: (doc: CurriculumPackDocument) => Promise<void>;
+  updateOne: (
+    filter: { readonly _id: string },
+    update: Partial<CurriculumPackDocument>,
+  ) => Promise<void>;
+  exists: (
+    filter: { readonly _id: string; readonly version: string },
+  ) => Promise<boolean>;
 }
 
 export interface MongoCurriculumPackRepositoryOptions {

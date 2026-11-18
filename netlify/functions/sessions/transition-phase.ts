@@ -1,5 +1,6 @@
 import type { APIGatewayProxyEvent, APIGatewayProxyResult } from "aws-lambda";
 import type { CapabilityTokenPort, VerifiedCapability } from "../../../src/application/ports/capability-token.port.js";
+import type { ClockPort } from "../../../src/application/ports/clock.port.js";
 import type { GameSessionRepositoryPort } from "../../../src/application/ports/game-session-repository.port.js";
 import type { TransitionSessionPhaseCommand } from "../../../src/application/ports/transition-session-phase.port.js";
 import middy from "@middy/core";
@@ -13,6 +14,7 @@ import { ForbiddenRoleError, UnauthorizedTokenError } from "../../../src/domain/
 export interface TransitionPhaseHandlerDependencies {
   readonly sessionRepo: GameSessionRepositoryPort;
   readonly tokenVerifier: CapabilityTokenPort;
+  readonly clock?: ClockPort;
   readonly apiKey?: string;
   readonly requireApiKey?: boolean;
 }
@@ -21,15 +23,17 @@ export function createTransitionPhaseHandler(
   dependencies?: TransitionPhaseHandlerDependencies,
 ) {
   const prodDeps = AppRuntime.getProductionDependencies();
-  const deps = dependencies ?? {
+  const deps: TransitionPhaseHandlerDependencies = dependencies ?? {
     sessionRepo: prodDeps.sessionRepo!,
     tokenVerifier: prodDeps.tokenVerifier!,
     apiKey: prodDeps.apiKey,
     requireApiKey: prodDeps.requireApiKey,
   };
+  const clock = deps.clock ?? prodDeps.clock!;
 
   const useCase = new TransitionSessionPhaseUseCase({
     sessionRepo: deps.sessionRepo,
+    clock,
   });
 
   const rawHandler = async (

@@ -1,0 +1,148 @@
+import type { GameSession } from "../../domain/game-session/game-session.js";
+import type { LikertRating } from "../../domain/game-session/game-session.types.js";
+import type { CurriculumPackRepositoryPort } from "../ports/curriculum-pack-repository.port.js";
+import type { GameSessionRepositoryPort } from "../ports/game-session-repository.port.js";
+import type {
+  SubmitPerceptionSurveyCommand,
+  SubmitPerceptionSurveyDependencies,
+  SubmitPerceptionSurveyUseCasePort,
+  SurveySubmissionReceipt,
+} from "./submit-perception-survey.port.js";
+import wordCount from "word-count";
+import { PackId } from "../../domain/curriculum-pack/pack-id.js";
+import {
+  ForbiddenRoleError,
+  InvalidSurveyResponseError,
+  PackNotFoundError,
+  PhaseClosedForSubmissionsError,
+  SessionNotFoundError,
+  SurveyCommentsTooLongError,
+} from "../../domain/errors/domain-errors.js";
+import { SessionId } from "../../domain/game-session/session-id.js";
+import { GameSessionUpdateRetrier } from "../services/game-session-update-retrier.js";
+
+const MAX_COMMENT_WORDS = 1000;
+const VALID_LIKERT_VALUES = new Set<LikertRating>([1, 2, 3, 4, 5]);
+
+export class SubmitPerceptionSurveyUseCase implements SubmitPerceptionSurveyUseCasePort {
+  readonly #sessionRepo: GameSessionRepositoryPort;
+  readonly #sessionUpdates: GameSessionUpdateRetrier;
+  readonly #packRepo: CurriculumPackRepositoryPort;
+
+  public constructor(deps: SubmitPerceptionSurveyDependencies) {
+    this.#sessionRepo = deps.sessionRepo;
+    this.#sessionUpdates = new GameSessionUpdateRetrier(deps.sessionRepo);
+    this.#packRepo = deps.packRepo;
+  }
+
+  public async execute(
+    command: SubmitPerceptionSurveyCommand,
+  ): Promise<SurveySubmissionReceipt> {
+    // Validate participant role (only participants can submit, not instructors)
+    if (command.verifiedCapability.role !== "participant") {
+      throw new ForbiddenRoleError("Only participants can submit perception surveys.");
+    }
+
+    const participantId = command.verifiedCapability.participantId;
+    if (!participantId) {
+      throw new ForbiddenRoleError("Participant ID is required.");
+    }
+
+    // Load the session once up front, to find and load its curriculum pack.
+    // The command below runs synchronously, so the pack must be ready first.
+    const sessionId = SessionId.from(command.sessionId);
+    const loaded = await this.#sessionRepo.findById(sessionId);
+
+    if (!loaded) {
+      throw new SessionNotFoundError(command.sessionId);
+    }
+
+    // Validate phase is feedback-survey
+    this.#validatePhase(loaded);
+
+    // Load curriculum pack for valid item IDs
+    const packId = PackId.create(loaded.packId);
+    const pack = await this.#packRepo.findById(packId);
+
+    if (!pack) {
+      throw new PackNotFoundError(loaded.packId);
+    }
+
+    // Validate all response values are valid Likert ratings (1-5)
+    this.#validateResponseValues(command.responses);
+
+    // Validate comments length if provided
+    if (command.comments !== undefined) {
+      this.#validateCommentsLength(command.comments);
+    }
+
+    // Filter out response keys for item IDs not in pack's perceptionSurvey.items
+    const validItemIds = new Set(
+      pack.perceptionSurvey?.items.map(item => item.id) ?? [],
+    );
+    const filteredResponses = this.#filterValidResponses(
+      command.responses,
+      validItemIds,
+    );
+
+    // Convert to Map for domain method
+    const responsesMap = new Map<string, LikertRating>(
+      Object.entries(filteredResponses),
+    );
+
+    // Re-check the phase against fresh state on every attempt, then submit
+    // (domain handles duplicate check with SurveyAlreadySubmittedError)
+    const surveyResponse = await this.#sessionUpdates.run(
+      sessionId,
+      (session) => {
+        this.#validatePhase(session);
+        return session.submitSurvey(participantId, responsesMap, command.comments);
+      },
+    );
+
+    // Return receipt
+    return {
+      participantId: surveyResponse.participantId,
+      recordedItemCount: surveyResponse.responses.size,
+      submittedAt: surveyResponse.submittedAt.toISOString(),
+    };
+  }
+
+  #validatePhase(session: GameSession): void {
+    if (session.currentPhase !== "feedback-survey") {
+      throw new PhaseClosedForSubmissionsError(session.currentPhase);
+    }
+  }
+
+  #validateResponseValues(
+    responses: Readonly<Record<string, LikertRating>>,
+  ): void {
+    for (const [field, value] of Object.entries(responses)) {
+      if (!VALID_LIKERT_VALUES.has(value as LikertRating)) {
+        throw new InvalidSurveyResponseError(field, value);
+      }
+    }
+  }
+
+  #validateCommentsLength(comments: string): void {
+    const count = wordCount(comments);
+    if (count > MAX_COMMENT_WORDS) {
+      throw new SurveyCommentsTooLongError(count, MAX_COMMENT_WORDS);
+    }
+  }
+
+  #filterValidResponses(
+    responses: Readonly<Record<string, LikertRating>>,
+    validItemIds: Set<string>,
+  ): Record<string, LikertRating> {
+    const filtered: Record<string, LikertRating> = {};
+
+    for (const [itemId, value] of Object.entries(responses)) {
+      if (validItemIds.has(itemId)) {
+        filtered[itemId] = value;
+      }
+    }
+
+    return filtered;
+  }
+}

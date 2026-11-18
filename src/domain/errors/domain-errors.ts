@@ -1,3 +1,5 @@
+import type { PhaseClosedReason } from "./domain-errors.types.js";
+
 export abstract class DomainError extends Error {
   public abstract readonly code: string;
   public readonly details?: Readonly<Record<string, unknown>>;
@@ -66,10 +68,53 @@ export class ForbiddenRoleError extends DomainError {
 export class PhaseClosedForSubmissionsError extends DomainError {
   public readonly code = "PHASE_CLOSED_FOR_SUBMISSIONS" as const;
 
-  public constructor(currentPhase: string) {
+  // Without `reason`, the current phase does not accept submissions at all.
+  // `phaseEndsAt` means the phase's deadline (plus the grace period) passed;
+  // `requestedRoundNumber` means the chain was sent to a round that is not
+  // the active one.
+  public constructor(currentPhase: string, reason?: PhaseClosedReason) {
     super(
-      `Chain submissions are not allowed during phase '${currentPhase}'.`,
-      { currentPhase },
+      PhaseClosedForSubmissionsError.#message(currentPhase, reason),
+      PhaseClosedForSubmissionsError.#details(currentPhase, reason),
+    );
+  }
+
+  static #message(currentPhase: string, reason?: PhaseClosedReason): string {
+    if (reason === undefined) {
+      return `Chain submissions are not allowed during phase '${currentPhase}'.`;
+    }
+    if ("phaseEndsAt" in reason) {
+      return `Chain submissions for phase '${currentPhase}' are closed: the phase ended at ${reason.phaseEndsAt.toISOString()} (plus a ${reason.gracePeriodSec}s grace period).`;
+    }
+    return `Chain submissions for round ${reason.requestedRoundNumber} are closed: the active round is ${reason.activeRoundNumber ?? "none"} (phase '${currentPhase}').`;
+  }
+
+  static #details(currentPhase: string, reason?: PhaseClosedReason): Record<string, unknown> {
+    if (reason === undefined) {
+      return { currentPhase };
+    }
+    if ("phaseEndsAt" in reason) {
+      return {
+        currentPhase,
+        phaseEndsAt: reason.phaseEndsAt.toISOString(),
+        gracePeriodSec: reason.gracePeriodSec,
+      };
+    }
+    return {
+      currentPhase,
+      requestedRoundNumber: reason.requestedRoundNumber,
+      activeRoundNumber: reason.activeRoundNumber,
+    };
+  }
+}
+
+export class ChainAlreadySubmittedError extends DomainError {
+  public readonly code = "CHAIN_ALREADY_SUBMITTED" as const;
+
+  public constructor(participantId: string, roundNumber: number, existingChainId: string) {
+    super(
+      `Participant '${participantId}' already submitted this Concept Chain in round ${roundNumber}.`,
+      { participantId, roundNumber, existingChainId },
     );
   }
 }
@@ -141,6 +186,88 @@ export class PackNotArchivedError extends DomainError {
     super(
       `Curriculum Pack '${packId}' is not archived.`,
       { packId },
+    );
+  }
+}
+
+export class AssessmentAlreadySubmittedError extends DomainError {
+  public readonly code = "ASSESSMENT_ALREADY_SUBMITTED" as const;
+
+  public constructor(participantId: string, stage: string) {
+    super(
+      `Participant '${participantId}' has already submitted the ${stage} assessment.`,
+      { participantId, stage },
+    );
+  }
+}
+
+export class AssessmentIncompleteError extends DomainError {
+  public readonly code = "ASSESSMENT_INCOMPLETE" as const;
+
+  public constructor(answeredCount: number, requiredCount: number) {
+    super(
+      `Assessment is incomplete: ${answeredCount} of ${requiredCount} questions answered.`,
+      { answeredCount, requiredCount },
+    );
+  }
+}
+
+export class SurveyAlreadySubmittedError extends DomainError {
+  public readonly code = "SURVEY_ALREADY_SUBMITTED" as const;
+
+  public constructor(participantId: string, sessionId: string) {
+    super(
+      `Participant '${participantId}' has already submitted the perception survey for session '${sessionId}'.`,
+      { participantId, sessionId },
+    );
+  }
+}
+
+export class SurveyCommentsTooLongError extends DomainError {
+  public readonly code = "SURVEY_COMMENTS_TOO_LONG" as const;
+
+  public constructor(wordCount: number, maxWords: number) {
+    super(
+      `Survey comments exceed maximum length: ${wordCount} words provided, maximum is ${maxWords}.`,
+      { wordCount, maxWords },
+    );
+  }
+}
+
+export class InvalidSurveyResponseError extends DomainError {
+  public readonly code = "INVALID_SURVEY_RESPONSE" as const;
+
+  public constructor(field: string, invalidValue: unknown) {
+    super(
+      `Invalid survey response for '${field}': value '${invalidValue}' is not a valid Likert scale option.`,
+      { field, invalidValue },
+    );
+  }
+}
+
+export class InvalidTimerConfigError extends DomainError {
+  public readonly code = "INVALID_REQUEST_BODY" as const;
+
+  public constructor(field: string, value: unknown) {
+    super(
+      `Invalid timer config '${field}': timerConfig must be an object of known phase durations, each a whole number of seconds from 1 to 86400, or null for an instructor-driven phase.`,
+      { field, value },
+    );
+  }
+}
+
+/**
+ * A Game Session save found the stored session at a different version than
+ * the one that was loaded (or no stored session at all), so another write got
+ * there first. Nothing was overwritten; the request is safe to retry.
+ */
+export class ConcurrentUpdateConflictError extends DomainError {
+  public readonly code = "CONCURRENT_UPDATE_CONFLICT" as const;
+
+  public constructor(sessionId: string, expectedVersion: number) {
+    super(
+      `Game Session '${sessionId}' was changed by another request. Reload it and try again.`,
+      { sessionId, expectedVersion },
     );
   }
 }

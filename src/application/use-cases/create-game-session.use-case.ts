@@ -1,27 +1,29 @@
 import type { CapabilityTokenSignerPort } from "../ports/capability-token.port.js";
+import type { ClockPort } from "../ports/clock.port.js";
 import type {
   CreateGameSessionCommand,
   CreateGameSessionDependencies,
   CreateGameSessionResult,
   CreateGameSessionUseCasePort,
-  PublicSessionStateDto,
 } from "../ports/create-game-session.port.js";
 import type { CurriculumPackRepositoryPort } from "../ports/curriculum-pack-repository.port.js";
 import type { GameSessionRepositoryPort } from "../ports/game-session-repository.port.js";
 import { PackId } from "../../domain/curriculum-pack/pack-id.js";
 import { PackNotFoundError } from "../../domain/errors/domain-errors.js";
 import { GameSession } from "../../domain/game-session/game-session.js";
-import { DEFAULT_TIMER_CONFIG } from "../../domain/game-session/game-session.types.js";
+import { PublicSessionStateProjector } from "../dtos/public-session-state-projector.js";
 
 export class CreateGameSessionUseCase implements CreateGameSessionUseCasePort {
   readonly #packRepo: CurriculumPackRepositoryPort;
   readonly #sessionRepo: GameSessionRepositoryPort;
   readonly #tokenSigner: CapabilityTokenSignerPort;
+  readonly #clock: ClockPort;
 
   public constructor(deps: CreateGameSessionDependencies) {
     this.#packRepo = deps.packRepo;
     this.#sessionRepo = deps.sessionRepo;
     this.#tokenSigner = deps.tokenSigner;
+    this.#clock = deps.clock;
   }
 
   public async execute(
@@ -34,11 +36,14 @@ export class CreateGameSessionUseCase implements CreateGameSessionUseCasePort {
       throw new PackNotFoundError(command.packId);
     }
 
+    const now = this.#clock.now();
     const session = GameSession.create({
       packId: command.packId,
       mode: command.mode,
       adjudicationMode: command.adjudicationMode,
       timerConfig: command.timerConfig,
+      phaseStartedAt: now,
+      createdAt: now,
     });
 
     let participantId: string | null = null;
@@ -63,30 +68,7 @@ export class CreateGameSessionUseCase implements CreateGameSessionUseCasePort {
       sessionId: session.sessionId.value,
     });
 
-    const timerConfig = {
-      ...DEFAULT_TIMER_CONFIG,
-      ...command.timerConfig,
-    };
-    const phaseDuration = this.#getPhaseDuration(
-      session.currentPhase,
-      timerConfig,
-    );
-    const phaseEndsAt = new Date(
-      session.phaseStartedAt.getTime() + phaseDuration * 1000,
-    );
-
-    const state: PublicSessionStateDto = {
-      sessionId: session.sessionId.value,
-      roomCode: session.roomCode.value,
-      packId: session.packId,
-      mode: session.mode,
-      adjudicationMode: session.adjudicationMode,
-      currentPhase: session.currentPhase,
-      activeRoundNumber: session.activeRoundNumber,
-      phaseStartedAt: session.phaseStartedAt.toISOString(),
-      phaseEndsAt: phaseEndsAt.toISOString(),
-      participantCount: session.participantCount,
-    };
+    const state = PublicSessionStateProjector.toDto(session);
 
     return {
       sessionId: session.sessionId.value,
@@ -96,29 +78,5 @@ export class CreateGameSessionUseCase implements CreateGameSessionUseCasePort {
       participantToken,
       state,
     };
-  }
-
-  #getPhaseDuration(
-    phase: string,
-    timerConfig: typeof DEFAULT_TIMER_CONFIG,
-  ): number {
-    switch (phase) {
-      case "pretest":
-        return timerConfig.pretestSec;
-      case "trial-orientation":
-        return timerConfig.trialOrientationSec;
-      case "round-1:chain-mapping":
-      case "round-2:chain-mapping":
-        return timerConfig.roundMappingSec;
-      case "round-1:peer-adjudication":
-      case "round-2:peer-adjudication":
-        return timerConfig.roundAdjudicationSec;
-      case "posttest":
-        return timerConfig.posttestSec;
-      case "feedback-survey":
-        return timerConfig.feedbackSurveySec;
-      default:
-        return 0;
-    }
   }
 }

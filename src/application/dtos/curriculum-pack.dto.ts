@@ -6,6 +6,18 @@ import type {
   SemanticDomain,
 } from "../../domain/curriculum-pack/curriculum-pack.types.js";
 
+export interface CurriculumPackSummaryDto {
+  readonly id: string;
+  readonly title: string;
+  readonly version: string;
+  readonly subjectDomain: string;
+  readonly boardConfig: BoardConfig;
+  readonly cardCount: number;
+  readonly domainCount: number;
+  readonly hasAssessmentInstrument: boolean;
+  readonly hasPerceptionSurvey: boolean;
+}
+
 export interface PublicAssessmentQuestionDto {
   readonly id: string;
   readonly bloomLevel: 2 | 3;

@@ -40,8 +40,8 @@ describe("post /api/v1/sessions/{sessionId}/rounds/{n}/chains/{chainId}/adjudica
       mode: "classroom",
       adjudicationMode: "peer-instructor",
     });
-    session.transitionTo("trial-orientation");
-    session.transitionTo("round-1:chain-mapping");
+    session.transitionTo("trial-orientation", new Date());
+    session.transitionTo("round-1:chain-mapping", new Date());
 
     const participant = session.addParticipant("Alice");
     const chain = ConceptChain.create({
@@ -56,7 +56,7 @@ describe("post /api/v1/sessions/{sessionId}/rounds/{n}/chains/{chainId}/adjudica
       keywordIds: ["kw-1", "kw-2", "kw-3", "kw-4"],
       narrativeExplanation: "Test chain",
     });
-    session.addChain(chain);
+    session.addChain(chain, new Date());
 
     return { session, participant, chain };
   };

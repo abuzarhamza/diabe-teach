@@ -4,14 +4,14 @@
  */
 export default {
   import: [
-    "tests/support/**/*.ts",
-    "tests/step-definitions/**/*.ts",
+    "tests/integration/support/**/*.ts",
+    "tests/integration/step-definitions/**/*.ts",
   ],
   format: [
     "progress-bar",
     "summary",
   ],
-  paths: ["tests/features/**/*.feature"],
+  paths: ["tests/integration/features/**/*.feature"],
   requireModule: [],
   publishQuiet: true,
 };

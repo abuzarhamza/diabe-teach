@@ -1,9 +1,11 @@
 import type { GridCoord } from "../../domain/game-session/concept-chain.js";
 import type { VerifiedCapability } from "./capability-token.port.js";
+import type { ClockPort } from "./clock.port.js";
 import type { GameSessionRepositoryPort } from "./game-session-repository.port.js";
 
 export interface SubmitConceptChainDependencies {
   readonly sessionRepo: GameSessionRepositoryPort;
+  readonly clock: ClockPort;
   readonly minChainLength?: number;
 }
 

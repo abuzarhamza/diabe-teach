@@ -5,6 +5,7 @@ import type {
   SessionTimerConfig,
 } from "../../domain/game-session/game-session.types.js";
 import type { CapabilityTokenSignerPort } from "./capability-token.port.js";
+import type { ClockPort } from "./clock.port.js";
 import type { CurriculumPackRepositoryPort } from "./curriculum-pack-repository.port.js";
 import type { GameSessionRepositoryPort } from "./game-session-repository.port.js";
 
@@ -12,6 +13,7 @@ export interface CreateGameSessionDependencies {
   readonly packRepo: CurriculumPackRepositoryPort;
   readonly sessionRepo: GameSessionRepositoryPort;
   readonly tokenSigner: CapabilityTokenSignerPort;
+  readonly clock: ClockPort;
 }
 
 export interface CreateGameSessionCommand {
@@ -32,7 +34,8 @@ export interface PublicSessionStateDto {
   readonly currentPhase: PhaseIdentifier;
   readonly activeRoundNumber: 1 | 2 | null;
   readonly phaseStartedAt: string;
-  readonly phaseEndsAt: string;
+  /** `null` while the current phase is instructor-driven (no timer). */
+  readonly phaseEndsAt: string | null;
   readonly participantCount: number;
 }
 
