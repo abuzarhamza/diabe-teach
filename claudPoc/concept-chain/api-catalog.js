@@ -14,6 +14,7 @@
 //   (a step or target may name a `variant`; its fields replace the operation's, and its notes are appended)
 //   gaps[key]        = { title, note, ops?: opId[] }   (UI elements with no API; ops may name "missing" operations)
 //   targets[key]     = { step?, gap?, ops?, note?, variant? }  (optional finer keys used as data-api="G.reject")
+//   noScreen[]       = { title, actor, ops: opId[] }  (operations no screen uses yet; legend only)
 // An element whose operations include a `missing` one is drawn in the bad (red) color.
 //
 // Pages mark elements with data-api="<letter>" | "<letter>.<detail>" | "gap.<key>"
@@ -499,6 +500,52 @@
           "Malformed JSON is not mapped to 400 INVALID_REQUEST_BODY.",
         ],
       },
+      // Operations with no screen in this prototype yet: listed in the legend's "no screen yet" section only.
+      submitAssessmentAttempt: {
+        method: "POST",
+        path: "/api/v1/sessions/{sessionId}/assessments/{stage}",
+        pathParams: { stage: ["pretest", "posttest"] },
+        auth: ["apiKey", "participant"],
+        errors: [
+          { status: 401, code: "UNAUTHORIZED_TOKEN" },
+          { status: 404, code: "SESSION_NOT_FOUND" },
+          { status: 409, code: "ASSESSMENT_ALREADY_SUBMITTED" },
+          { status: 409, code: "PHASE_CLOSED_FOR_SUBMISSIONS" },
+          { status: 409, code: "CONCURRENT_UPDATE_CONFLICT" },
+          { status: 422, code: "ASSESSMENT_INCOMPLETE" },
+        ],
+        status: "implemented",
+        deviations: ["An unknown `stage` returns 400 INVALID_STAGE with an `{ error, message }` body; the spec declares no 400 here."],
+        notes: ["Pretest returns an ungraded receipt; Posttest returns the LearnerMetacognitiveReport. Handler exists; not re-audited in detail for the overlay."],
+      },
+      submitPerceptionSurvey: {
+        method: "POST",
+        path: "/api/v1/sessions/{sessionId}/survey",
+        auth: ["apiKey", "participant"],
+        errors: [
+          { status: 401, code: "UNAUTHORIZED_TOKEN" },
+          { status: 404, code: "SESSION_NOT_FOUND" },
+          { status: 409, code: "SURVEY_ALREADY_SUBMITTED" },
+          { status: 409, code: "PHASE_CLOSED_FOR_SUBMISSIONS" },
+          { status: 409, code: "CONCURRENT_UPDATE_CONFLICT" },
+          { status: 422, code: "INVALID_SURVEY_RESPONSE" },
+          { status: 422, code: "SURVEY_COMMENTS_TOO_LONG" },
+        ],
+        status: "implemented",
+        deviations: [],
+        notes: ["5-point Likert ratings, once per participant, in the feedback-survey phase. Handler exists; not re-audited in detail for the overlay."],
+      },
+      getSessionAnalytics: {
+        method: "GET",
+        path: "/api/v1/sessions/{sessionId}/analytics",
+        auth: ["apiKey", "instructor", "participant"],
+        errors: [
+          { status: 401, code: "UNAUTHORIZED_TOKEN" },
+          { status: 404, code: "SESSION_NOT_FOUND" },
+        ],
+        status: "specced-only",
+        deviations: ["No handler: nothing in src/ or netlify/functions/ serves this route yet."],
+      },
     },
 
     gaps: {
@@ -507,6 +554,14 @@
         note: "No API can extend a phase: `phaseEndsAt` is fixed from the session's timerConfig when the phase starts, and a timerConfig can only be set at createGameSession. The demo changes its local timer only.",
       },
     },
+
+    // Operations no screen uses yet (Pre-test, Post-test, survey, analytics). Shown at the bottom of the
+    // flow legend as "no screen yet"; no letter, so later steps can still be appended without re-lettering.
+    noScreen: [
+      { title: "Pretest / Posttest Assessment Attempt", actor: "learner", ops: ["submitAssessmentAttempt"] },
+      { title: "Perception survey", actor: "learner", ops: ["submitPerceptionSurvey"] },
+      { title: "Session analytics", actor: "both", ops: ["getSessionAnalytics"] },
+    ],
 
     // Finer keys for data-api="<letter>.<detail>". Keys not listed here fall back to the step letter.
     targets: {

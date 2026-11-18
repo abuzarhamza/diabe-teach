@@ -20,10 +20,11 @@ interface CatalogTarget {
 }
 
 interface ApiCatalog {
-  readonly steps: Record<string, { readonly ops: readonly string[]; readonly variant?: string }>;
+  readonly steps: Record<string, { readonly ops: readonly string[]; readonly screens: readonly string[]; readonly variant?: string }>;
   readonly operations: Record<string, CatalogOperation>;
   readonly gaps: Record<string, { readonly ops?: readonly string[] }>;
   readonly targets: Record<string, CatalogTarget>;
+  readonly noScreen?: ReadonlyArray<{ readonly title: string; readonly actor: string; readonly ops: readonly string[] }>;
 }
 
 interface SpecOperation {
@@ -128,9 +129,29 @@ describe("claudPoc Concept Chain API catalog matches docs/api/openapi.yaml", () 
       ...Object.values(catalog.steps).flatMap(step => step.ops),
       ...Object.values(catalog.gaps).flatMap(gap => gap.ops ?? []),
       ...Object.values(catalog.targets).flatMap(target => target.ops ?? []),
+      ...(catalog.noScreen ?? []).flatMap(entry => entry.ops),
     ]);
     for (const opId of Object.keys(catalog.operations)) {
       expect(used.has(opId), `${opId} is not referenced`).toBe(true);
+    }
+  });
+
+  it("every \"no screen yet\" legend entry references catalog operations that are in the spec", () => {
+    for (const entry of catalog.noScreen ?? []) {
+      expect(entry.ops.length, entry.title).toBeGreaterThan(0);
+      for (const opId of entry.ops) {
+        expect(catalog.operations, `noScreen ${entry.title} → ${opId}`).toHaveProperty([opId]);
+        expect(specOps.has(opId), `noScreen ${entry.title} → ${opId} not in openapi.yaml`).toBe(true);
+      }
+    }
+  });
+
+  it("every step names the screens it happens on", () => {
+    for (const [letter, step] of Object.entries(catalog.steps)) {
+      expect(step.screens.length, `step ${letter}`).toBeGreaterThan(0);
+      for (const screen of step.screens) {
+        expect(["teacher", "lobby", "learner"], `step ${letter} screen ${screen}`).toContain(screen);
+      }
     }
   });
 

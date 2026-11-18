@@ -128,3 +128,33 @@ table.lb{width:100%;border-collapse:collapse;font-size:14px;font-variant-numeric
 .cc-api-path{margin-top:4px}
 .cc-api-dev li{color:var(--warn)}
 .cc-api-live,.cc-api-note{font-size:12px;color:var(--muted);text-transform:none;letter-spacing:0;font-weight:400}
+
+/* Flow legend (api-overlay.js): fixed bottom right, narrower than the 400px side column so it never
+   sits over the board on desktop. Collapsible; steps not on this page are dimmed. */
+.cc-api-card{z-index:2}
+.cc-api-legend{position:fixed;right:12px;bottom:12px;z-index:1;width:min(300px,calc(100vw - 24px));max-height:calc(100vh - 24px);display:flex;flex-direction:column;pointer-events:auto;background:var(--api-card);border:1px solid var(--line);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.25);font-size:13px;line-height:1.35}
+.cc-api-legend.collapsed{width:auto}
+.cc-api-leg-toggle{all:unset;box-sizing:border-box;display:flex;align-items:center;gap:8px;width:100%;padding:8px 12px;cursor:pointer;font:600 14px/1.2 var(--font-display);border-radius:10px}
+.cc-api-leg-toggle::after{content:"▾";margin-left:auto;font-size:12px;color:var(--muted)}
+.cc-api-legend.collapsed .cc-api-leg-toggle::after{content:"▸"}
+.cc-api-leg-toggle:focus-visible,.cc-api-leg-step:focus-visible{outline:2px solid var(--api-write);outline-offset:-2px}
+.cc-api-leg-body{overflow:auto;padding:0 8px 8px;border-top:1px solid var(--line)}
+.cc-api-leg-body[hidden]{display:none}
+.cc-api-leg-body h4{margin:10px 4px 4px;font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+.cc-api-leg-steps,.cc-api-leg-none{list-style:none;margin:0;padding:0}
+.cc-api-leg-step{all:unset;box-sizing:border-box;display:flex;align-items:flex-start;gap:8px;width:100%;padding:4px;border-radius:6px;cursor:pointer}
+.cc-api-leg-step:hover{background:var(--sunk)}
+.cc-api-leg-none li{display:flex;align-items:flex-start;gap:8px;padding:4px}
+.cc-api-leg-main{display:flex;flex-direction:column;min-width:0;flex:1}
+.cc-api-leg-title{font-weight:700}
+.cc-api-leg-where{font-size:12px;color:var(--muted);overflow-wrap:anywhere}
+.cc-api-leg-status{display:flex;flex-direction:column;align-items:flex-end;gap:2px}
+.cc-api-leg-status .cc-api-status{font-size:10px;padding:1px 6px}
+.cc-api-legend li.off .cc-api-leg-step{opacity:.55;cursor:default}
+.cc-api-legend li.off .cc-api-leg-step:hover{background:none}
+.cc-api-legend li.off .cc-api-step{background:var(--muted)}
+/* Flash: a steady highlight always; it pulses only when motion is fine. */
+.cc-api-box.flash{border-width:3px;box-shadow:0 0 0 4px color-mix(in srgb,var(--api-write) 35%,transparent);background:color-mix(in srgb,var(--api-write) 12%,transparent)}
+.cc-api-box.read.flash{box-shadow:0 0 0 4px color-mix(in srgb,var(--api-read) 35%,transparent);background:color-mix(in srgb,var(--api-read) 12%,transparent)}
+@keyframes cc-api-flash{50%{box-shadow:0 0 0 10px transparent}}
+@media (prefers-reduced-motion:no-preference){.cc-api-box.flash{animation:cc-api-flash .5s ease-in-out 3}}

@@ -11,6 +11,10 @@
 //
 // On/off is kept in tab-scoped sessionStorage (STORE_KEY), so it survives join → lobby → game redirects.
 //
+// When on, a flow legend (steps A → H from CC_API_CATALOG.steps, then CC_API_CATALOG.noScreen) sits
+// fixed at the bottom right. Steps with no visible element on this page are dimmed and say which
+// screen they're on; clicking a step flashes its elements. Collapsed/open is kept in LEGEND_KEY.
+//
 // The overlay draws in its own layer (appended to <html>, outside the page root), re-scans after
 // page re-renders via a MutationObserver on <body>, and never calls preventDefault on page elements.
 /* eslint-disable */
@@ -20,12 +24,16 @@ const CCOverlay = (() => {
   const json = (v) => esc(JSON.stringify(v, null, 2));
 
   const STORE_KEY = "cc-api-overlay"; // own key: separate from the demo session store and the learner identity
-  let on = false, layer = null, card = null, observer = null, current = null, frame = 0;
+  const LEGEND_KEY = "cc-api-legend"; // "collapsed" | "open"; unset = open on wide screens, collapsed on narrow
+  const FLASH_MS = 1600;
+  let on = false, layer = null, card = null, legend = null, observer = null, current = null, frame = 0;
+  let flash = null, flashTimer = 0; // { letter } while a legend click is flashing that step's elements
   const toggles = [];
   const remember = (value) => { try { if (value) sessionStorage.setItem(STORE_KEY, "on"); else sessionStorage.removeItem(STORE_KEY); } catch {} };
   const remembered = () => { try { return sessionStorage.getItem(STORE_KEY) === "on"; } catch { return false; } };
   const pressed = () => toggles.forEach((t) => t.setAttribute("aria-pressed", String(on)));
   const cat = () => window.CC_API_CATALOG;
+  const reducedMotion = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
 
   // ---- catalog lookup (by data-api key only) ----
   // `missing` is true when any operation the element needs has status "missing" (drawn in the bad color).
@@ -47,19 +55,22 @@ const CCOverlay = (() => {
 
   function draw() {
     if (!layer) return;
-    const marks = [];
+    const marks = [], present = new Set();
     document.querySelectorAll(SEL).forEach((el) => {
       const info = resolve(el.dataset.api); if (!info) return;
       const r = el.getBoundingClientRect(); if (!r.width && !r.height) return; // hidden
+      if (info.letter) present.add(info.letter);
       const x = r.left + scrollX, y = r.top + scrollY;
       const io = el.dataset.apiIo === "read" ? "read" : "write";
       const actor = info.actor ? cat().actors?.[info.actor] : null;
       const label = info.letter ? `${info.letter}${actor ? ` ${actor.badge}` : ""}${info.missing ? " · missing API" : ""}` : "no API";
       const bad = info.kind === "gap" || info.missing ? " gap" : "";
-      marks.push(`<div class="cc-api-box ${io}${bad}" style="left:${x - 3}px;top:${y - 3}px;width:${r.width + 6}px;height:${r.height + 6}px"></div>`
+      const lit = flash && info.letter === flash.letter ? " flash" : "";
+      marks.push(`<div class="cc-api-box ${io}${bad}${lit}" style="left:${x - 3}px;top:${y - 3}px;width:${r.width + 6}px;height:${r.height + 6}px"></div>`
         + `<span class="cc-api-tag ${io}${bad}" aria-hidden="true" style="left:${x - 3}px;top:${y - 3}px">${esc(label)}</span>`);
     });
     layer.querySelector(".cc-api-marks").innerHTML = marks.join("");
+    updateLegend(present);
     if (current) { if (current.isConnected) placeCard(current); else hideCard(); }
   }
 
@@ -136,6 +147,103 @@ const CCOverlay = (() => {
     card.style.left = `${left + scrollX}px`; card.style.top = `${top + scrollY}px`;
   }
 
+
+  // ---- flow legend ----
+  const SCREEN_LABELS = { teacher: "teacher screen", lobby: "lobby", learner: "learner screen" };
+  const where = (screens) => `on ${(screens ?? []).map((s) => SCREEN_LABELS[s] ?? s).join(" / ")}`;
+  const STATUS_CLS = { implemented: "good", partial: "warn", "specced-only": "warn", missing: "bad" };
+
+  function statusBadges(ops, variant) {
+    const c = cat();
+    return [...new Set(ops)].map((opId) => {
+      const op = c.operations?.[opId]; if (!op) return "";
+      const name = variant && op.variants?.[variant] ? `${opId} (${variant})` : opId;
+      return `<span class="cc-api-status ${STATUS_CLS[op.status] ?? "warn"}" title="${esc(name)}">${esc(c.statusLabels?.[op.status] ?? op.status)}</span>`;
+    }).join("");
+  }
+
+  function legendHtml() {
+    const c = cat(), actorOf = (a) => c.actors?.[a];
+    const steps = Object.entries(c.steps ?? {}).map(([letter, step]) => {
+      const actor = actorOf(step.actor);
+      return `<li data-step="${esc(letter)}"><button type="button" class="cc-api-leg-step" title="Flash the ${esc(letter)} elements on this page">
+        <span class="cc-api-step">${esc(letter)}</span>
+        <span class="cc-api-leg-main"><span class="cc-api-leg-title">${esc(step.title)}${actor ? ` <span class="cc-api-actor" title="${esc(actor.label)}">${actor.badge}</span>` : ""}</span>
+        <span class="cc-api-leg-where" data-where="${esc(where(step.screens))}"></span></span>
+        <span class="cc-api-leg-status">${statusBadges(step.ops, step.variant)}</span>
+      </button></li>`;
+    }).join("");
+    const none = (c.noScreen ?? []).map((entry) => {
+      const actor = actorOf(entry.actor);
+      return `<li><span class="cc-api-leg-main"><span class="cc-api-leg-title">${esc(entry.title)}${actor ? ` <span class="cc-api-actor" title="${esc(actor.label)}">${actor.badge}</span>` : ""}</span>
+        <code class="cc-api-leg-where">${entry.ops.map(esc).join(", ")}</code></span>
+        <span class="cc-api-leg-status">${statusBadges(entry.ops)}</span></li>`;
+    }).join("");
+    return `<div class="cc-api-leg-head"><button type="button" class="cc-api-leg-toggle" aria-controls="cc-api-leg-body">API flow A → ${esc(Object.keys(c.steps ?? {}).slice(-1)[0] ?? "")}</button></div>
+      <div class="cc-api-leg-body" id="cc-api-leg-body">
+        <ol class="cc-api-leg-steps">${steps}</ol>
+        ${none ? `<h4>No screen yet</h4><ul class="cc-api-leg-none">${none}</ul>` : ""}
+        <p class="cc-api-leg-live visually-hidden" aria-live="polite"></p>
+      </div>`;
+  }
+
+  function legendCollapsed() {
+    try { const v = sessionStorage.getItem(LEGEND_KEY); if (v) return v === "collapsed"; } catch {}
+    return !matchMedia("(min-width: 921px)").matches; // single-column layout: don't sit over the page
+  }
+
+  function setCollapsed(collapsed, persist) {
+    if (!legend) return;
+    legend.classList.toggle("collapsed", collapsed);
+    legend.querySelector(".cc-api-leg-toggle").setAttribute("aria-expanded", String(!collapsed));
+    legend.querySelector(".cc-api-leg-body").hidden = collapsed;
+    if (persist) { try { sessionStorage.setItem(LEGEND_KEY, collapsed ? "collapsed" : "open"); } catch {} }
+  }
+
+  function buildLegend() {
+    legend = document.createElement("aside");
+    legend.className = "cc-api-legend";
+    legend.setAttribute("aria-label", "API flow legend");
+    legend.innerHTML = legendHtml();
+    legend.querySelector(".cc-api-leg-toggle").addEventListener("click", () => setCollapsed(!legend.classList.contains("collapsed"), true));
+    legend.querySelector(".cc-api-leg-steps").addEventListener("click", (e) => {
+      const li = e.target instanceof Element ? e.target.closest("li[data-step]") : null;
+      if (li) flashStep(li.dataset.step);
+    });
+    layer.appendChild(legend);
+    setCollapsed(legendCollapsed(), false);
+  }
+
+  // Dim steps with no visible element on this page and say where they happen instead.
+  function updateLegend(present) {
+    if (!legend) return;
+    legend.querySelectorAll("li[data-step]").forEach((li) => {
+      const here = present.has(li.dataset.step);
+      li.classList.toggle("off", !here);
+      const w = li.querySelector(".cc-api-leg-where");
+      const text = here ? "on this screen" : w.dataset.where; // dimmed: not visible on this page right now
+      if (w.textContent !== text) w.textContent = text;
+      li.querySelector("button").setAttribute("aria-disabled", String(!here));
+    });
+  }
+
+  // Flash every visible element of one step (pulsing outline; a steady highlight with reduced motion).
+  function flashStep(letter) {
+    const els = [...document.querySelectorAll(SEL)].filter((el) => {
+      const r = el.getBoundingClientRect();
+      return (r.width || r.height) && resolve(el.dataset.api)?.letter === letter;
+    });
+    const live = legend?.querySelector(".cc-api-leg-live");
+    if (live) live.textContent = els.length ? `Step ${letter}: ${els.length} element${els.length > 1 ? "s" : ""} highlighted` : `Step ${letter} is not on this screen`;
+    if (!els.length) return;
+    clearTimeout(flashTimer);
+    flash = { letter };
+    const r = els[0].getBoundingClientRect();
+    if (r.bottom < 0 || r.top > innerHeight) els[0].scrollIntoView({ block: "center", behavior: reducedMotion() ? "auto" : "smooth" });
+    draw();
+    flashTimer = setTimeout(() => { flash = null; schedule(); }, FLASH_MS);
+  }
+
   // ---- listeners (delegated, so they survive re-renders) ----
   const marked = (t) => (t instanceof Element ? t.closest(SEL) : null);
   function onOver(e) { const el = marked(e.target); if (el && el !== current) showCard(el); }
@@ -153,6 +261,7 @@ const CCOverlay = (() => {
     layer.innerHTML = `<div class="cc-api-marks"></div><div class="cc-api-card" id="cc-api-card" role="tooltip" hidden></div>`;
     document.documentElement.appendChild(layer); // outside <body>, so the observer never sees our own drawing
     card = layer.querySelector(".cc-api-card");
+    buildLegend();
     LISTENERS.forEach(([t, fn]) => document.addEventListener(t, fn, true));
     window.addEventListener("resize", schedule);
     observer = new MutationObserver(schedule);
@@ -168,7 +277,8 @@ const CCOverlay = (() => {
     window.removeEventListener("resize", schedule);
     observer?.disconnect(); observer = null;
     if (frame) cancelAnimationFrame(frame); frame = 0;
-    layer?.remove(); layer = null; card = null;
+    clearTimeout(flashTimer); flash = null;
+    layer?.remove(); layer = null; card = null; legend = null;
     remember(false); pressed();
   }
 
