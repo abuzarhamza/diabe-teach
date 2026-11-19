@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parse as parseYaml } from "yaml";
+import { EnvYamlConfigLoader } from "../../../src/adapters/outbound/env-yaml-config-loader.js";
 
 export interface EnvironmentConfig {
   base_url: string;
@@ -29,12 +30,33 @@ export interface ResolvedTestConfig {
 
 /**
  * Resolves environment variable references in strings.
- * Supports ${VAR_NAME} syntax.
+ * Supports ${VAR_NAME} syntax. When a variable is unset or blank, the value in
+ * `fallbacks` (if any) is used instead, then "".
  */
-function resolveEnvVars(value: string): string {
-  return value.replace(/\$\{([^}]+)\}/g, (_, varName) => {
-    return process.env[varName] ?? "";
+function resolveEnvVars(
+  value: string,
+  fallbacks: Readonly<Record<string, string | undefined>> = {},
+): string {
+  return value.replace(/\$\{([^}]+)\}/g, (_, varName: string) => {
+    const fromEnv = process.env[varName]?.trim();
+    if (fromEnv) {
+      return fromEnv;
+    }
+    return fallbacks[varName]?.trim() ?? "";
   });
+}
+
+/**
+ * Fallbacks for the `local` environment, read from the gitignored
+ * `.env.dev.yaml` with the same loader `AppRuntime` uses, so `npm run test:bdd`
+ * sends the same API key `npm run dev:local` enforces without any export.
+ * Values are never logged.
+ */
+function localFallbacks(repoRoot: string): Record<string, string | undefined> {
+  const yaml = EnvYamlConfigLoader.loadFromFile(join(repoRoot, ".env.dev.yaml"));
+  return {
+    API_KEY: EnvYamlConfigLoader.toRuntimeEnvConfig(yaml).apiKey,
+  };
 }
 
 /**
@@ -57,10 +79,14 @@ export function loadTestConfig(): ResolvedTestConfig {
     );
   }
 
-  // Resolve environment variables in the config
+  // Resolve environment variables in the config. Only `local` falls back to
+  // the developer's own .env.dev.yaml; remote environments need explicit vars.
+  const fallbacks = envName === "local"
+    ? localFallbacks(join(__dirname, "..", "..", ".."))
+    : {};
   const resolvedEnv: EnvironmentConfig = {
-    base_url: resolveEnvVars(envConfig.base_url),
-    api_key: resolveEnvVars(envConfig.api_key),
+    base_url: resolveEnvVars(envConfig.base_url, fallbacks),
+    api_key: resolveEnvVars(envConfig.api_key, fallbacks),
     timeout_ms: envConfig.timeout_ms,
     use_mongodb: envConfig.use_mongodb,
   };

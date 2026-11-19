@@ -5,7 +5,7 @@
 environments:
   local:
     base_url: "http://localhost:8888"
-    api_key: "dev-api-key-diabe-teach-local"
+    api_key: "${API_KEY}"  # Unset: falls back to auth.api_key in .env.dev.yaml (gitignored)
     timeout_ms: 30000
     use_mongodb: false
 
