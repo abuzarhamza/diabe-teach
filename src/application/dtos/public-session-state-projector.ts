@@ -9,6 +9,7 @@ export class PublicSessionStateProjector {
       sessionId: session.sessionId.value,
       roomCode: session.roomCode.value,
       packId: session.packId,
+      packVersion: session.packVersion,
       mode: session.mode,
       adjudicationMode: session.adjudicationMode,
       currentPhase: session.currentPhase,

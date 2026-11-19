@@ -70,6 +70,8 @@ export interface GameSessionDocument {
   _id: string;
   roomCode: string;
   packId: string;
+  /** The pinned Pack Version. Absent on sessions stored before pinning (read as null). */
+  packVersion?: string | null;
   mode: SessionMode;
   adjudicationMode: AdjudicationMode;
   timerConfig: SessionTimerConfig;

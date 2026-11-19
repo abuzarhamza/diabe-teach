@@ -31,6 +31,8 @@ export interface PublicSessionStateDto {
   readonly sessionId: string;
   readonly roomCode: string;
   readonly packId: string;
+  /** The pinned Pack Version; `null` for sessions stored before pinning. */
+  readonly packVersion: string | null;
   readonly mode: SessionMode;
   readonly adjudicationMode: AdjudicationMode;
   readonly currentPhase: PhaseIdentifier;

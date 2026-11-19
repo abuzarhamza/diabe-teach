@@ -39,6 +39,7 @@ export class GameSession {
   readonly #sessionId: SessionId;
   readonly #roomCode: RoomCode;
   readonly #packId: string;
+  readonly #packVersion: string | null;
   readonly #mode: SessionMode;
   readonly #adjudicationMode: AdjudicationMode;
   readonly #timerConfig: SessionTimerConfig;
@@ -72,6 +73,7 @@ export class GameSession {
         : RoomCode.generate();
 
     this.#packId = props.packId;
+    this.#packVersion = props.packVersion ?? null;
     this.#mode = props.mode;
     this.#adjudicationMode = props.adjudicationMode;
     this.#timerConfig = GameSession.#resolveTimerConfig(props.timerConfig);
@@ -132,6 +134,11 @@ export class GameSession {
 
   public get packId(): string {
     return this.#packId;
+  }
+
+  /** The pinned Pack Version, or `null` for sessions stored before pinning. */
+  public get packVersion(): string | null {
+    return this.#packVersion;
   }
 
   public get mode(): SessionMode {

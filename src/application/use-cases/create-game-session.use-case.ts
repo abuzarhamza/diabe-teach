@@ -44,6 +44,7 @@ export class CreateGameSessionUseCase implements CreateGameSessionUseCasePort {
     const now = this.#clock.now();
     const session = GameSession.create({
       packId: command.packId,
+      packVersion: pack.version,
       mode: command.mode,
       adjudicationMode: command.adjudicationMode,
       timerConfig: command.timerConfig,

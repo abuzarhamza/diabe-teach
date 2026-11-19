@@ -1,7 +1,11 @@
 import type { LikertRating } from "../../src/domain/game-session/game-session.types.js";
 import mongoose from "mongoose";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { MongoCurriculumPackRepository } from "../../src/adapters/outbound/mongo-curriculum-pack-repository.js";
 import { MongoGameSessionRepository } from "../../src/adapters/outbound/mongo-game-session-repository.js";
+import { SessionPackLoader } from "../../src/application/services/session-pack-loader.js";
+import { CurriculumPack } from "../../src/domain/curriculum-pack/curriculum-pack.js";
+import { DIABE_TEACH_PACK } from "../../src/domain/curriculum-pack/diabe-teach-pack.js";
 import { GameSession } from "../../src/domain/game-session/game-session.js";
 import { SessionId } from "../../src/domain/game-session/session-id.js";
 import { startMongoTestServer, stopMongoTestServer } from "../integration/support/mongo-test-server.js";
@@ -239,5 +243,68 @@ describe("mongoGameSessionRepository timer config persistence", () => {
     const reloaded = await repo.findById(SessionId.from("legacy-no-board"));
     expect(reloaded?.currentPhase).toBe("round-1:peer-adjudication");
     expect(reloaded?.activeBoard).toBeNull();
+  });
+
+  it("loads a session stored before Pack Versions were pinned and reads the pack's latest version for it", async () => {
+    const packRepo = MongoCurriculumPackRepository.fromConfig({ mongoUri, mongoDbName });
+    for (const version of ["1.0.0", "2.0.0"]) {
+      await packRepo.create(CurriculumPack.create({
+        id: "unpinned-pack",
+        title: `Unpinned ${version}`,
+        version,
+        description: DIABE_TEACH_PACK.description,
+        boardConfig: DIABE_TEACH_PACK.boardConfig,
+        domains: DIABE_TEACH_PACK.domains,
+        cards: DIABE_TEACH_PACK.cards,
+        adjudicationRubric: DIABE_TEACH_PACK.adjudicationRubric,
+        assessmentInstrument: DIABE_TEACH_PACK.assessmentInstrument,
+        perceptionSurvey: DIABE_TEACH_PACK.perceptionSurvey,
+        isSystemPack: false,
+        isArchived: false,
+        createdBy: null,
+        authorName: null,
+        createdAt: new Date("2026-11-01T00:00:00.000Z"),
+        archivedAt: null,
+      }));
+    }
+    const connection = await mongoose.createConnection(mongoUri, { dbName: mongoDbName }).asPromise();
+    try {
+      await connection.collection(MongoGameSessionRepository.collectionName).insertOne({
+        _id: "legacy-unpinned" as unknown as never,
+        roomCode: "LGPIN1",
+        packId: "unpinned-pack",
+        mode: "classroom",
+        adjudicationMode: "peer-instructor",
+        timerConfig: {
+          pretestSec: 900,
+          trialOrientationSec: 900,
+          roundMappingSec: 1200,
+          roundAdjudicationSec: 600,
+          posttestSec: 900,
+          feedbackSurveySec: 900,
+        },
+        currentPhase: "pretest",
+        phaseStartedAt: new Date("2026-03-01T09:00:00.000Z"),
+        participants: [],
+        activeRoundNumber: null,
+        chains: [],
+        assessments: [],
+        surveyResponses: [],
+        createdAt: new Date("2026-03-01T09:00:00.000Z"),
+        version: 0,
+      });
+    }
+    finally {
+      await connection.close();
+    }
+
+    const found = await repo.findById(SessionId.from("legacy-unpinned"));
+
+    expect(found?.packVersion).toBeNull();
+    expect((await new SessionPackLoader(packRepo).load(found!)).version).toBe("2.0.0");
+
+    found!.transitionTo("trial-orientation", new Date("2026-03-01T09:10:00.000Z"));
+    await repo.update(found!);
+    expect((await repo.findById(SessionId.from("legacy-unpinned")))?.packVersion).toBeNull();
   });
 });

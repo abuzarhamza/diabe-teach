@@ -246,6 +246,37 @@ function defineGameSessionRepositoryContract(
       expect(reloaded?.activeBoard).toEqual(round2Board);
     });
 
+    it("round-trips the pinned Pack Version across an update", async () => {
+      const session = GameSession.create({
+        packId: "diabe-teach",
+        packVersion: "1.2.0",
+        mode: "classroom",
+        adjudicationMode: "peer-instructor",
+      });
+      await harness.repo.create(session);
+
+      const loaded = await harness.repo.findById(session.sessionId);
+      expect(loaded?.packVersion).toBe("1.2.0");
+      loaded!.transitionTo("trial-orientation", new Date("2026-03-01T09:10:00.000Z"));
+      await harness.repo.update(loaded!);
+
+      expect((await harness.repo.findById(session.sessionId))?.packVersion).toBe("1.2.0");
+    });
+
+    it("loads a session stored before Pack Versions were pinned with no pinned version", async () => {
+      const seed: LegacySessionSeed = {
+        sessionId: `unpinned-${name}`,
+        roomCode: "UNPIN1",
+        phaseStartedAt: new Date("2026-03-01T09:00:00.000Z"),
+      };
+      await harness.seedLegacySession(seed);
+
+      const loaded = await harness.repo.findById(SessionId.from(seed.sessionId));
+
+      expect(loaded?.packId).toBe("diabe-teach");
+      expect(loaded?.packVersion).toBeNull();
+    });
+
     it("stores a session created without a seed with no creation seed and no boards", async () => {
       const session = newSession();
       await harness.repo.create(session);

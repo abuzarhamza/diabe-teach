@@ -2,7 +2,6 @@ import type { PhaseIdentifier } from "../../domain/game-session/game-session.typ
 import type { RoundBoard } from "../../domain/game-session/round-board.types.js";
 import type { BoardSeedGeneratorPort, SeededRandomPort } from "../ports/board-randomness.port.js";
 import type { ClockPort } from "../ports/clock.port.js";
-import type { CurriculumPackRepositoryPort } from "../ports/curriculum-pack-repository.port.js";
 import type { GameSessionRepositoryPort } from "../ports/game-session-repository.port.js";
 import type {
   TransitionSessionPhaseCommand,
@@ -10,11 +9,9 @@ import type {
   TransitionSessionPhaseResult,
   TransitionSessionPhaseUseCasePort,
 } from "../ports/transition-session-phase.port.js";
-import { PackId } from "../../domain/curriculum-pack/pack-id.js";
 import {
   ForbiddenRoleError,
   InvalidPhaseTransitionError,
-  PackNotFoundError,
   SessionNotFoundError,
 } from "../../domain/errors/domain-errors.js";
 import { BoardDealer } from "../../domain/game-session/board-dealer.js";
@@ -23,12 +20,14 @@ import { PHASE_TRANSITIONS } from "../../domain/game-session/game-session.types.
 import { SessionId } from "../../domain/game-session/session-id.js";
 import { PublicSessionStateProjector } from "../dtos/public-session-state-projector.js";
 import { GameSessionUpdateRetrier } from "../services/game-session-update-retrier.js";
+import { SessionPackLoader } from "../services/session-pack-loader.js";
 
 export class TransitionSessionPhaseUseCase
 implements TransitionSessionPhaseUseCasePort {
   readonly #sessionRepo: GameSessionRepositoryPort;
   readonly #sessionUpdates: GameSessionUpdateRetrier;
-  readonly #packRepo: CurriculumPackRepositoryPort;
+  /** Reads the session's pinned Pack Version (or the latest, for legacy sessions). */
+  readonly #packs: SessionPackLoader;
   readonly #clock: ClockPort;
   readonly #seededRandom: SeededRandomPort;
   readonly #seedGenerator: BoardSeedGeneratorPort;
@@ -36,7 +35,7 @@ implements TransitionSessionPhaseUseCasePort {
   public constructor(deps: TransitionSessionPhaseDependencies) {
     this.#sessionRepo = deps.sessionRepo;
     this.#sessionUpdates = new GameSessionUpdateRetrier(deps.sessionRepo);
-    this.#packRepo = deps.packRepo;
+    this.#packs = new SessionPackLoader(deps.packRepo);
     this.#clock = deps.clock;
     this.#seededRandom = deps.seededRandom;
     this.#seedGenerator = deps.seedGenerator;
@@ -103,10 +102,7 @@ implements TransitionSessionPhaseUseCasePort {
       return undefined;
     }
 
-    const pack = await this.#packRepo.findById(PackId.create(session.packId));
-    if (!pack) {
-      throw new PackNotFoundError(session.packId);
-    }
+    const pack = await this.#packs.load(session);
 
     const creationSeed = roundNumber === 1
       ? session.creationSeed

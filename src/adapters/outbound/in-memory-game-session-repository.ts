@@ -63,6 +63,7 @@ implements GameSessionRepositoryPort {
       sessionId: session.sessionId,
       roomCode: session.roomCode,
       packId: session.packId,
+      packVersion: session.packVersion,
       mode: session.mode,
       adjudicationMode: session.adjudicationMode,
       timerConfig: session.timerConfig,

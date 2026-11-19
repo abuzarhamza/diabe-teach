@@ -1268,6 +1268,14 @@ components:
           type: string
         packId:
           type: string
+        packVersion:
+          type: [string, "null"]
+          description: >
+            The Pack Version the session started with (the latest version
+            when it was created). The board deal, Pretest, Posttest and
+            perception survey all read this version, even after a newer one
+            is registered. `null` for sessions stored before versions were
+            pinned, which read the pack's latest version.
         mode:
           $ref: "#/components/schemas/SessionMode"
         adjudicationMode:

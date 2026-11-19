@@ -7,7 +7,11 @@ export const CURRICULUM_PACK_MODEL_NAME = "CurriculumPack";
 
 export const curriculumPackSchema = new Schema<CurriculumPackDocument>(
   {
+    // `<packId>@<version>` for versions registered since version lookup
+    // existed; the bare pack id for older documents and seeded System Packs.
     _id: { type: String, required: true },
+    // Absent on older documents, whose `_id` is the pack id.
+    packId: { type: String, index: true },
     title: { type: String, required: true },
     version: { type: String, required: true },
     description: { type: String },

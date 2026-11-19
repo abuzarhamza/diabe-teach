@@ -63,6 +63,12 @@ export interface GameSessionProps {
   readonly sessionId?: SessionId | string;
   readonly roomCode?: RoomCode | string;
   readonly packId: string;
+  /**
+   * The Pack Version the session started with, used for everything it reads
+   * from the pack. `null` for sessions stored before pinning, which read the
+   * latest version instead.
+   */
+  readonly packVersion?: string | null;
   readonly mode: SessionMode;
   readonly adjudicationMode: AdjudicationMode;
   readonly timerConfig?: Partial<SessionTimerConfig>;
