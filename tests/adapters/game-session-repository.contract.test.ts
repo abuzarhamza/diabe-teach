@@ -263,6 +263,34 @@ function defineGameSessionRepositoryContract(
       expect((await harness.repo.findById(session.sessionId))?.packVersion).toBe("1.2.0");
     });
 
+    it("round-trips the owning Instructor Account across an update", async () => {
+      const session = GameSession.create({
+        packId: "diabe-teach",
+        ownerAccountId: "account-owner-1",
+        mode: "classroom",
+        adjudicationMode: "peer-instructor",
+      });
+      await harness.repo.create(session);
+
+      const loaded = await harness.repo.findById(session.sessionId);
+      expect(loaded?.ownerAccountId).toBe("account-owner-1");
+      loaded!.transitionTo("trial-orientation", new Date("2026-03-01T09:10:00.000Z"));
+      await harness.repo.update(loaded!);
+
+      expect((await harness.repo.findById(session.sessionId))?.ownerAccountId).toBe("account-owner-1");
+    });
+
+    it("stores a solo session with no owner", async () => {
+      const session = GameSession.create({
+        packId: "diabe-teach",
+        mode: "solo",
+        adjudicationMode: "ai",
+      });
+      await harness.repo.create(session);
+
+      expect((await harness.repo.findById(session.sessionId))?.ownerAccountId).toBeNull();
+    });
+
     it("loads a session stored before Pack Versions were pinned with no pinned version", async () => {
       const seed: LegacySessionSeed = {
         sessionId: `unpinned-${name}`,
@@ -275,6 +303,7 @@ function defineGameSessionRepositoryContract(
 
       expect(loaded?.packId).toBe("diabe-teach");
       expect(loaded?.packVersion).toBeNull();
+      expect(loaded?.ownerAccountId).toBeNull();
     });
 
     it("stores a session created without a seed with no creation seed and no boards", async () => {

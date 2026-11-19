@@ -5,7 +5,6 @@ import type { GameSession } from "../../src/domain/game-session/game-session.js"
 import type { RoomCode } from "../../src/domain/game-session/room-code.js";
 import type { SessionId } from "../../src/domain/game-session/session-id.js";
 import { describe, expect, it } from "vitest";
-import { createCreateSessionHandler } from "../../netlify/functions/sessions/create-session.js";
 import { createGetSessionHandler } from "../../netlify/functions/sessions/get-session.js";
 import { createJoinSessionHandler } from "../../netlify/functions/sessions/join-session.js";
 import { createTransitionPhaseHandler } from "../../netlify/functions/sessions/transition-phase.js";
@@ -13,6 +12,7 @@ import { FakeCapabilityTokenAdapter } from "../../src/adapters/outbound/fake-cap
 import { InMemoryCurriculumPackRepository } from "../../src/adapters/outbound/in-memory-curriculum-pack-repository.js";
 import { InMemoryGameSessionRepository } from "../../src/adapters/outbound/in-memory-game-session-repository.js";
 import { DIABE_TEACH_PACK } from "../../src/domain/curriculum-pack/diabe-teach-pack.js";
+import { createSignedInCreateSessionHandler } from "./support/signed-in-teacher.js";
 
 interface BoardCellView {
   readonly row: number;
@@ -130,7 +130,7 @@ function makeHandlers(options: {
   const seedGenerator = options.seedGenerator ?? new CountingSeedGenerator();
 
   return {
-    create: createCreateSessionHandler({ packRepo, sessionRepo, tokenSigner: tokenAdapter }),
+    create: createSignedInCreateSessionHandler({ packRepo, sessionRepo, tokenSigner: tokenAdapter }),
     join: createJoinSessionHandler({ sessionRepo, tokenSigner: tokenAdapter }),
     get: createGetSessionHandler({ sessionRepo, tokenVerifier: tokenAdapter }),
     transition: createTransitionPhaseHandler({

@@ -286,6 +286,19 @@ paths:
       operationId: createGameSession
       tags: [Sessions]
       summary: Create a new Game Session (auto-joins and starts Round 1 when mode is "solo")
+      description: >-
+        A **classroom** (or any non-solo) Game Session needs a signed-in
+        teacher: send an Account Token (`AccountAuth`). The session records
+        that Instructor Account as its owner. A **solo** session needs no
+        Account Token and records no owner. Either way the response returns
+        the per-session `instructorToken` Capability Token, and every in-game
+        route (state, phase transition, adjudication, standings) keeps using
+        it, so the Account Token expiring or the teacher signing out never
+        breaks a running game. `creatorDisplayName` stays a per-game choice.
+      security:
+        - ApiKeyAuth: []
+          AccountAuth: []
+        - ApiKeyAuth: []
       requestBody:
         required: true
         content:
@@ -301,6 +314,16 @@ paths:
                 $ref: "#/components/schemas/CreateSessionResponse"
         "400":
           $ref: "#/components/responses/BadRequestError"
+        "401":
+          description: >-
+            UNAUTHORIZED_TOKEN. A classroom (non-solo) start sent no Account
+            Token, or any start sent one that is malformed, tampered, expired,
+            or of another kind (an instructor Capability Token is never
+            accepted here). No session is created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
         "404":
           $ref: "#/components/responses/NotFoundError"
         "422":

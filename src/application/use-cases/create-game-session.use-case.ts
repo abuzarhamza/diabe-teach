@@ -9,7 +9,7 @@ import type {
 import type { CurriculumPackRepositoryPort } from "../ports/curriculum-pack-repository.port.js";
 import type { GameSessionRepositoryPort } from "../ports/game-session-repository.port.js";
 import { PackId } from "../../domain/curriculum-pack/pack-id.js";
-import { PackCannotFillBoardError, PackNotFoundError } from "../../domain/errors/domain-errors.js";
+import { PackCannotFillBoardError, PackNotFoundError, UnauthorizedTokenError } from "../../domain/errors/domain-errors.js";
 import { GameSession } from "../../domain/game-session/game-session.js";
 import { PublicSessionStateProjector } from "../dtos/public-session-state-projector.js";
 
@@ -29,6 +29,16 @@ export class CreateGameSessionUseCase implements CreateGameSessionUseCasePort {
   public async execute(
     command: CreateGameSessionCommand,
   ): Promise<CreateGameSessionResult> {
+    const isSolo = command.mode === "solo";
+    const ownerAccountId = isSolo
+      ? null
+      : command.ownerAccountId ?? null;
+    if (!isSolo && !ownerAccountId) {
+      throw new UnauthorizedTokenError(
+        "Starting a classroom Game Session requires an Account Token. Sign in first.",
+      );
+    }
+
     const packId = PackId.create(command.packId);
     const pack = await this.#packRepo.findById(packId);
 
@@ -45,6 +55,7 @@ export class CreateGameSessionUseCase implements CreateGameSessionUseCasePort {
     const session = GameSession.create({
       packId: command.packId,
       packVersion: pack.version,
+      ownerAccountId,
       mode: command.mode,
       adjudicationMode: command.adjudicationMode,
       timerConfig: command.timerConfig,
@@ -56,7 +67,7 @@ export class CreateGameSessionUseCase implements CreateGameSessionUseCasePort {
     let participantId: string | null = null;
     let participantToken: string | null = null;
 
-    if (command.mode === "solo") {
+    if (isSolo) {
       const participant = session.addParticipant(
         command.creatorDisplayName ?? "Player",
       );

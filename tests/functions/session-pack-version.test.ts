@@ -3,7 +3,6 @@ import type { PosttestSubmissionResult } from "../../src/application/ports/submi
 import type { CurriculumPack } from "../../src/domain/curriculum-pack/curriculum-pack.js";
 import { describe, expect, it } from "vitest";
 import { createRegisterPackHandler } from "../../netlify/functions/packs/register-pack.js";
-import { createCreateSessionHandler } from "../../netlify/functions/sessions/create-session.js";
 import { createGetSessionHandler } from "../../netlify/functions/sessions/get-session.js";
 import { createJoinSessionHandler } from "../../netlify/functions/sessions/join-session.js";
 import { createSubmitAssessmentHandler } from "../../netlify/functions/sessions/submit-assessment.js";
@@ -15,6 +14,7 @@ import { InMemoryGameSessionRepository } from "../../src/adapters/outbound/in-me
 import { CurriculumPack as CurriculumPackEntity } from "../../src/domain/curriculum-pack/curriculum-pack.js";
 import { DIABE_TEACH_PACK } from "../../src/domain/curriculum-pack/diabe-teach-pack.js";
 import { GameSession } from "../../src/domain/game-session/game-session.js";
+import { createSignedInCreateSessionHandler } from "./support/signed-in-teacher.js";
 
 const PACK_ID = "pinning-pack";
 const API_KEY = "test-api-key";
@@ -125,7 +125,7 @@ async function sessionStartedOnV1ThenV2Registered() {
     requireApiKey: true,
   };
   const handlers = {
-    create: createCreateSessionHandler(deps),
+    create: createSignedInCreateSessionHandler(deps),
     join: createJoinSessionHandler(deps),
     get: createGetSessionHandler(deps),
     transition: createTransitionPhaseHandler(deps),

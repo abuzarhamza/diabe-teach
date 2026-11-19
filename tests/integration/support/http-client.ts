@@ -14,7 +14,9 @@ function toApiGatewayResult(res: Response) {
   return {
     statusCode: res.status,
     headers: res.headers as Record<string, string>,
-    body: typeof res.body === "object" ? JSON.stringify(res.body) : res.text,
+    body: typeof res.body === "object"
+      ? JSON.stringify(res.body)
+      : res.text,
   };
 }
 
@@ -24,12 +26,15 @@ export async function createSession(body: {
   adjudicationMode: "ai" | "peer-instructor" | "hybrid";
   creatorDisplayName?: string;
   timerConfig?: Record<string, number | null>;
-}) {
-  const res = await request(BASE_URL)
+}, accountToken?: string) {
+  const req = request(BASE_URL)
     .post("/api/v1/sessions")
     .set("Content-Type", "application/json")
-    .set("x-api-key", API_KEY)
-    .send(body);
+    .set("x-api-key", API_KEY);
+  if (accountToken) {
+    req.set("Authorization", `Bearer ${accountToken}`);
+  }
+  const res = await req.send(body);
 
   return toApiGatewayResult(res);
 }

@@ -174,6 +174,9 @@ export const gameSessionSchema = new Schema(
     // The pinned Pack Version. Sessions stored before pinning have none and
     // read the pack's latest version.
     packVersion: { type: String, default: null },
+    // The Instructor Account that started the session; null for solo
+    // sessions and for sessions stored before accounts existed.
+    ownerAccountId: { type: String, default: null },
     mode: {
       type: String,
       enum: ["solo", "classroom", "study-rct"],

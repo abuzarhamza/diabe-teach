@@ -69,6 +69,11 @@ export interface GameSessionProps {
    * latest version instead.
    */
   readonly packVersion?: string | null;
+  /**
+   * The Instructor Account that started the session. `null` for solo
+   * sessions and for sessions stored before accounts existed.
+   */
+  readonly ownerAccountId?: string | null;
   readonly mode: SessionMode;
   readonly adjudicationMode: AdjudicationMode;
   readonly timerConfig?: Partial<SessionTimerConfig>;

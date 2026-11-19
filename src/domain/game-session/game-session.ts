@@ -40,6 +40,7 @@ export class GameSession {
   readonly #roomCode: RoomCode;
   readonly #packId: string;
   readonly #packVersion: string | null;
+  readonly #ownerAccountId: string | null;
   readonly #mode: SessionMode;
   readonly #adjudicationMode: AdjudicationMode;
   readonly #timerConfig: SessionTimerConfig;
@@ -74,6 +75,7 @@ export class GameSession {
 
     this.#packId = props.packId;
     this.#packVersion = props.packVersion ?? null;
+    this.#ownerAccountId = props.ownerAccountId ?? null;
     this.#mode = props.mode;
     this.#adjudicationMode = props.adjudicationMode;
     this.#timerConfig = GameSession.#resolveTimerConfig(props.timerConfig);
@@ -139,6 +141,15 @@ export class GameSession {
   /** The pinned Pack Version, or `null` for sessions stored before pinning. */
   public get packVersion(): string | null {
     return this.#packVersion;
+  }
+
+  /**
+   * The Instructor Account that started the session: set for classroom
+   * sessions, `null` for solo sessions and for sessions stored before
+   * accounts existed.
+   */
+  public get ownerAccountId(): string | null {
+    return this.#ownerAccountId;
   }
 
   public get mode(): SessionMode {

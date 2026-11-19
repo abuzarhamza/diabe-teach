@@ -1,6 +1,7 @@
 import type { TestWorld } from "../support/world.js";
+import { randomUUID } from "node:crypto";
 import { Given, When } from "@cucumber/cucumber";
-import { createSession, joinSession } from "../support/http-client.js";
+import { createSession, joinSession, signUpInstructor } from "../support/http-client.js";
 
 Given(
   "the curriculum pack {string} is available",
@@ -9,6 +10,24 @@ Given(
     // via InMemoryCurriculumPackRepository with DIABE_TEACH_PACK
   },
 );
+
+/**
+ * The scenario's Account Token. Starting a classroom game needs a signed-in
+ * teacher, so a scenario that hasn't signed in signs up a fresh teacher here.
+ */
+async function signedInTeacherToken(world: TestWorld): Promise<string> {
+  if (world.accountToken) {
+    return world.accountToken;
+  }
+  // The dev server's database outlives a run, so every teacher needs its own email.
+  world.teacherEmail ??= `teacher-${randomUUID()}@example.edu`;
+  const response = await signUpInstructor({ email: world.teacherEmail, password: "correct horse battery" });
+  if (response.statusCode !== 201) {
+    throw new Error(`Signing up the scenario's teacher failed with ${response.statusCode}: ${response.body}`);
+  }
+  world.accountToken = (JSON.parse(response.body) as { accountToken: string }).accountToken;
+  return world.accountToken;
+}
 
 async function createClassroomSession(
   world: TestWorld,
@@ -20,7 +39,7 @@ async function createClassroomSession(
     mode: "classroom",
     adjudicationMode: "peer-instructor",
     timerConfig,
-  });
+  }, await signedInTeacherToken(world));
   world.parseLastResponse();
 
   if (world.lastResponse.statusCode === 201) {
@@ -46,6 +65,18 @@ When(
   "the instructor creates a classroom session with pack {string} and an instructor-driven chain-mapping phase",
   async function (this: TestWorld, packId: string) {
     await createClassroomSession(this, packId, { roundMappingSec: null });
+  },
+);
+
+When(
+  "someone who has not signed in tries to create a classroom session with pack {string}",
+  async function (this: TestWorld, packId: string) {
+    this.lastResponse = await createSession({
+      packId,
+      mode: "classroom",
+      adjudicationMode: "peer-instructor",
+    });
+    this.parseLastResponse();
   },
 );
 

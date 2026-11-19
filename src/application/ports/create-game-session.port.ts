@@ -25,6 +25,12 @@ export interface CreateGameSessionCommand {
   /** Seeds Round 1's board (unless the transition into Round 1 sends its own). */
   readonly seed?: string;
   readonly creatorDisplayName?: string;
+  /**
+   * The Instructor Account whose Account Token came with the request, or
+   * null without one. Every mode except solo requires it and stores it as
+   * the session's owner; solo sessions ignore it and stay anonymous.
+   */
+  readonly ownerAccountId?: string | null;
 }
 
 export interface PublicSessionStateDto {

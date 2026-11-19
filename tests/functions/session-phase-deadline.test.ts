@@ -1,6 +1,5 @@
 import type { APIGatewayProxyEvent } from "aws-lambda";
 import { describe, expect, it } from "vitest";
-import { createCreateSessionHandler } from "../../netlify/functions/sessions/create-session.js";
 import { createGetSessionHandler } from "../../netlify/functions/sessions/get-session.js";
 import { createJoinSessionHandler } from "../../netlify/functions/sessions/join-session.js";
 import { createSubmitChainHandler } from "../../netlify/functions/sessions/submit-chain.js";
@@ -10,6 +9,7 @@ import { FakeClock } from "../../src/adapters/outbound/fake-clock.js";
 import { InMemoryCurriculumPackRepository } from "../../src/adapters/outbound/in-memory-curriculum-pack-repository.js";
 import { InMemoryGameSessionRepository } from "../../src/adapters/outbound/in-memory-game-session-repository.js";
 import { DIABE_TEACH_PACK } from "../../src/domain/curriculum-pack/diabe-teach-pack.js";
+import { createSignedInCreateSessionHandler } from "./support/signed-in-teacher.js";
 
 function makeEvent(
   method: string,
@@ -49,7 +49,7 @@ function makeHandlers(clock: FakeClock) {
   const tokenAdapter = new FakeCapabilityTokenAdapter();
 
   return {
-    create: createCreateSessionHandler({
+    create: createSignedInCreateSessionHandler({
       packRepo,
       sessionRepo,
       tokenSigner: tokenAdapter,

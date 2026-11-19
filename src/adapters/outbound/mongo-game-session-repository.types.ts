@@ -1,4 +1,10 @@
 import type {
+  ChainStatus,
+  ChainVerdict,
+  GridCoord,
+  PeerVote,
+} from "../../domain/game-session/concept-chain.js";
+import type {
   AdjudicationMode,
   AssessmentStage,
   LikertRating,
@@ -7,12 +13,6 @@ import type {
   SessionMode,
   SessionTimerConfig,
 } from "../../domain/game-session/game-session.types.js";
-import type {
-  ChainStatus,
-  ChainVerdict,
-  GridCoord,
-  PeerVote,
-} from "../../domain/game-session/concept-chain.js";
 
 export interface ParticipantDocument {
   participantId: string;
@@ -72,6 +72,8 @@ export interface GameSessionDocument {
   packId: string;
   /** The pinned Pack Version. Absent on sessions stored before pinning (read as null). */
   packVersion?: string | null;
+  /** The Instructor Account that started the session; null for solo. Absent on sessions stored before accounts (read as null). */
+  ownerAccountId?: string | null;
   mode: SessionMode;
   adjudicationMode: AdjudicationMode;
   timerConfig: SessionTimerConfig;

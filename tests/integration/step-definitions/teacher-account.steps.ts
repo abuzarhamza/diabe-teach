@@ -22,7 +22,9 @@ When(
     this.lastResponse = await signUpInstructor({ email: this.teacherEmail!, password });
     this.parseLastResponse();
     if (this.lastResponse.statusCode === 201) {
-      this.signedUpAccountId = (this.lastResponseBody as AccountTokenResponse).accountId;
+      const body = this.lastResponseBody as AccountTokenResponse;
+      this.signedUpAccountId = body.accountId;
+      this.accountToken = body.accountToken;
     }
   },
 );
@@ -32,6 +34,9 @@ When(
   async function (this: TestWorld, password: string) {
     this.lastResponse = await signInInstructor({ email: this.teacherEmail!, password });
     this.parseLastResponse();
+    if (this.lastResponse.statusCode === 200) {
+      this.accountToken = (this.lastResponseBody as AccountTokenResponse).accountToken;
+    }
   },
 );
 

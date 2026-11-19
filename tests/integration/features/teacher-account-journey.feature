@@ -21,3 +21,23 @@ Feature: Teacher account journey
     And the teacher signs in with the password "not my password"
     Then the response status should be 401
     And the response error code should be "INVALID_CREDENTIALS"
+
+  @classroom
+  Scenario: A signed-up teacher starts a classroom game and a learner joins with the room code
+    Given a teacher with a new email address
+    When the teacher signs up with the password "correct horse battery"
+    Then the response status should be 201
+    When the instructor creates a classroom session with pack "diabe-teach"
+    Then the response status should be 201
+    And the response should contain sessionId
+    And the response should contain a 6-character roomCode
+    And the response should contain instructorToken
+    When participant "Alice" joins using the room code
+    Then the response status should be 200
+    And the participant count should be 1
+
+  @classroom
+  Scenario: Starting a classroom game without signing in is refused
+    When someone who has not signed in tries to create a classroom session with pack "diabe-teach"
+    Then the response status should be 401
+    And the response error code should be "UNAUTHORIZED_TOKEN"

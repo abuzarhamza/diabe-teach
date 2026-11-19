@@ -245,7 +245,7 @@ describe("mongoGameSessionRepository timer config persistence", () => {
     expect(reloaded?.activeBoard).toBeNull();
   });
 
-  it("loads a session stored before Pack Versions were pinned and reads the pack's latest version for it", async () => {
+  it("loads a session stored before Pack Versions were pinned and accounts existed: no owner, and the pack's latest version", async () => {
     const packRepo = MongoCurriculumPackRepository.fromConfig({ mongoUri, mongoDbName });
     for (const version of ["1.0.0", "2.0.0"]) {
       await packRepo.create(CurriculumPack.create({
@@ -301,10 +301,13 @@ describe("mongoGameSessionRepository timer config persistence", () => {
     const found = await repo.findById(SessionId.from("legacy-unpinned"));
 
     expect(found?.packVersion).toBeNull();
+    expect(found?.ownerAccountId).toBeNull();
     expect((await new SessionPackLoader(packRepo).load(found!)).version).toBe("2.0.0");
 
     found!.transitionTo("trial-orientation", new Date("2026-03-01T09:10:00.000Z"));
     await repo.update(found!);
-    expect((await repo.findById(SessionId.from("legacy-unpinned")))?.packVersion).toBeNull();
+    const reloaded = await repo.findById(SessionId.from("legacy-unpinned"));
+    expect(reloaded?.packVersion).toBeNull();
+    expect(reloaded?.ownerAccountId).toBeNull();
   });
 });
