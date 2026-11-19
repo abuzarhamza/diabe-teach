@@ -1,11 +1,8 @@
 import type { APIGatewayProxyResult } from "aws-lambda";
 import type { AuthenticatedEvent } from "../../../src/adapters/inbound/http/middy/auth.middleware.js";
 import type { ProductionDependencies } from "../../../src/app-runtime.types.js";
-import middy from "@middy/core";
-import httpJsonBodyParser from "@middy/http-json-body-parser";
 import { wrapLambdaHandler } from "../../../src/adapters/inbound/http/lambda-to-v2-wrapper.js";
-import { authMiddleware } from "../../../src/adapters/inbound/http/middy/auth.middleware.js";
-import { domainErrorMiddleware } from "../../../src/adapters/inbound/http/middy/domain-error.middleware.js";
+import { createApiHandler } from "../../../src/adapters/inbound/http/middy/api-handler.js";
 import { AppRuntime } from "../../../src/app-runtime.js";
 import { RegisterCurriculumPackUseCase } from "../../../src/application/use-cases/register-curriculum-pack.use-case.js";
 import { UnauthorizedTokenError } from "../../../src/domain/errors/domain-errors.js";
@@ -78,17 +75,14 @@ export function createRegisterPackHandler(
     };
   };
 
-  return middy(rawHandler)
-    .use(httpJsonBodyParser())
-    .use(
-      authMiddleware({
-        bearerScheme: "AccountAuth",
-        accountTokenVerifier: deps.accountTokenVerifier,
-        apiKey: deps.apiKey,
-        requireApiKey: deps.requireApiKey,
-      }),
-    )
-    .use(domainErrorMiddleware());
+  return createApiHandler(rawHandler, {
+    bearerScheme: "AccountAuth",
+    accountTokenVerifier: deps.accountTokenVerifier,
+    apiKey: deps.apiKey,
+    requireApiKey: deps.requireApiKey,
+    tokenRequired: true,
+    missingTokenMessage: "An Account Token is required to register curriculum packs. Sign in first.",
+  });
 }
 
 export const lambdaHandler = createRegisterPackHandler();

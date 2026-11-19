@@ -34,6 +34,14 @@ export interface AuthMiddlewareOptions {
   readonly accountTokenVerifier?: AccountTokenVerifierPort;
   readonly apiKey?: string;
   readonly requireApiKey?: boolean;
+  /**
+   * When true, a request with no Authorization header is refused with 401
+   * here, before the body is read, so a caller without a token learns
+   * nothing about how bodies are parsed.
+   */
+  readonly tokenRequired?: boolean;
+  /** The 401 message when `tokenRequired` and no token was sent. */
+  readonly missingTokenMessage?: string;
 }
 
 /**
@@ -159,6 +167,11 @@ export function authMiddleware(
         event.account = null;
       }
       else {
+        if (options.tokenRequired === true) {
+          throw new UnauthorizedTokenError(
+            options.missingTokenMessage ?? "Authentication required.",
+          );
+        }
         event.auth = null;
         event.account = null;
       }

@@ -3,10 +3,9 @@ import type { CapabilityTokenPort, VerifiedCapability } from "../../../src/appli
 import type { CurriculumPackRepositoryPort } from "../../../src/application/ports/curriculum-pack-repository.port.js";
 import type { GameSessionRepositoryPort } from "../../../src/application/ports/game-session-repository.port.js";
 import type { McqAnswerChoice } from "../../../src/domain/game-session/game-session.types.js";
-import middy from "@middy/core";
+import { readOptionalJsonObjectBody } from "../../../src/adapters/inbound/http/json-object-body.js";
 import { wrapLambdaHandler } from "../../../src/adapters/inbound/http/lambda-to-v2-wrapper.js";
-import { authMiddleware } from "../../../src/adapters/inbound/http/middy/auth.middleware.js";
-import { domainErrorMiddleware } from "../../../src/adapters/inbound/http/middy/domain-error.middleware.js";
+import { createApiHandler } from "../../../src/adapters/inbound/http/middy/api-handler.js";
 import { AppRuntime } from "../../../src/app-runtime.js";
 import { SubmitAssessmentUseCase } from "../../../src/application/use-cases/submit-assessment.use-case.js";
 import { ForbiddenRoleError, UnauthorizedTokenError } from "../../../src/domain/errors/domain-errors.js";
@@ -73,7 +72,7 @@ export function createSubmitAssessmentHandler(
       );
     }
 
-    const body = JSON.parse(event.body ?? "{}") as Partial<SubmitAssessmentRequestBody>;
+    const body = readOptionalJsonObjectBody(event.body) as Partial<SubmitAssessmentRequestBody>;
 
     if (!body.answers || typeof body.answers !== "object") {
       return {
@@ -104,15 +103,13 @@ export function createSubmitAssessmentHandler(
     };
   };
 
-  return middy(rawHandler)
-    .use(
-      authMiddleware({
-        tokenVerifier: deps.tokenVerifier,
-        apiKey: deps.apiKey,
-        requireApiKey: deps.requireApiKey ?? false,
-      }),
-    )
-    .use(domainErrorMiddleware());
+  return createApiHandler(rawHandler, {
+    tokenVerifier: deps.tokenVerifier,
+    apiKey: deps.apiKey,
+    requireApiKey: deps.requireApiKey ?? false,
+    tokenRequired: true,
+    missingTokenMessage: "Authentication required.",
+  });
 }
 
 export const lambdaHandler = createSubmitAssessmentHandler();

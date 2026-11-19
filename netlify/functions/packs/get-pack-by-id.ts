@@ -1,9 +1,7 @@
 import type { APIGatewayProxyEvent, APIGatewayProxyResult } from "aws-lambda";
 import type { ProductionDependencies } from "../../../src/app-runtime.types.js";
-import middy from "@middy/core";
 import { wrapLambdaHandler } from "../../../src/adapters/inbound/http/lambda-to-v2-wrapper.js";
-import { authMiddleware } from "../../../src/adapters/inbound/http/middy/auth.middleware.js";
-import { domainErrorMiddleware } from "../../../src/adapters/inbound/http/middy/domain-error.middleware.js";
+import { createApiHandler } from "../../../src/adapters/inbound/http/middy/api-handler.js";
 import { AppRuntime } from "../../../src/app-runtime.js";
 import { GetCurriculumPackByIdUseCase } from "../../../src/application/use-cases/get-curriculum-pack-by-id.use-case.js";
 import { PackNotFoundError } from "../../../src/domain/errors/domain-errors.js";
@@ -38,15 +36,11 @@ export function createGetPackByIdHandler(
     };
   };
 
-  return middy(rawHandler)
-    .use(
-      authMiddleware({
-        tokenVerifier: deps.tokenVerifier,
-        apiKey: deps.apiKey,
-        requireApiKey: deps.requireApiKey,
-      }),
-    )
-    .use(domainErrorMiddleware());
+  return createApiHandler(rawHandler, {
+    tokenVerifier: deps.tokenVerifier,
+    apiKey: deps.apiKey,
+    requireApiKey: deps.requireApiKey,
+  });
 }
 
 export const lambdaHandler = createGetPackByIdHandler();

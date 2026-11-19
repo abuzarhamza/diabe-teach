@@ -6,10 +6,9 @@ import type { ClockPort } from "../../../src/application/ports/clock.port.js";
 import type { CreateGameSessionCommand } from "../../../src/application/ports/create-game-session.port.js";
 import type { CurriculumPackRepositoryPort } from "../../../src/application/ports/curriculum-pack-repository.port.js";
 import type { GameSessionRepositoryPort } from "../../../src/application/ports/game-session-repository.port.js";
-import middy from "@middy/core";
+import { readOptionalJsonObjectBody } from "../../../src/adapters/inbound/http/json-object-body.js";
 import { wrapLambdaHandler } from "../../../src/adapters/inbound/http/lambda-to-v2-wrapper.js";
-import { authMiddleware } from "../../../src/adapters/inbound/http/middy/auth.middleware.js";
-import { domainErrorMiddleware } from "../../../src/adapters/inbound/http/middy/domain-error.middleware.js";
+import { createApiHandler } from "../../../src/adapters/inbound/http/middy/api-handler.js";
 import { AppRuntime } from "../../../src/app-runtime.js";
 import { CreateGameSessionUseCase } from "../../../src/application/use-cases/create-game-session.use-case.js";
 
@@ -51,11 +50,7 @@ export function createCreateSessionHandler(
   const rawHandler = async (
     event: AuthenticatedEvent,
   ): Promise<APIGatewayProxyResult> => {
-    const body = JSON.parse(
-      typeof event.body === "string"
-        ? event.body
-        : "{}",
-    ) as CreateGameSessionCommand;
+    const body = readOptionalJsonObjectBody(event.body) as unknown as CreateGameSessionCommand;
 
     // A classroom start needs the teacher's Account Token (checked by the
     // use case); a solo start needs none. The response still carries the
@@ -74,16 +69,12 @@ export function createCreateSessionHandler(
     };
   };
 
-  return middy(rawHandler)
-    .use(
-      authMiddleware({
-        bearerScheme: "AccountAuth",
-        accountTokenVerifier,
-        apiKey: deps.apiKey,
-        requireApiKey: deps.requireApiKey ?? false,
-      }),
-    )
-    .use(domainErrorMiddleware());
+  return createApiHandler(rawHandler, {
+    bearerScheme: "AccountAuth",
+    accountTokenVerifier,
+    apiKey: deps.apiKey,
+    requireApiKey: deps.requireApiKey ?? false,
+  });
 }
 
 export const lambdaHandler = createCreateSessionHandler();

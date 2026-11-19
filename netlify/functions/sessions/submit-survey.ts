@@ -3,10 +3,9 @@ import type { CapabilityTokenPort, VerifiedCapability } from "../../../src/appli
 import type { CurriculumPackRepositoryPort } from "../../../src/application/ports/curriculum-pack-repository.port.js";
 import type { GameSessionRepositoryPort } from "../../../src/application/ports/game-session-repository.port.js";
 import type { LikertRating } from "../../../src/domain/game-session/game-session.types.js";
-import middy from "@middy/core";
+import { readOptionalJsonObjectBody } from "../../../src/adapters/inbound/http/json-object-body.js";
 import { wrapLambdaHandler } from "../../../src/adapters/inbound/http/lambda-to-v2-wrapper.js";
-import { authMiddleware } from "../../../src/adapters/inbound/http/middy/auth.middleware.js";
-import { domainErrorMiddleware } from "../../../src/adapters/inbound/http/middy/domain-error.middleware.js";
+import { createApiHandler } from "../../../src/adapters/inbound/http/middy/api-handler.js";
 import { AppRuntime } from "../../../src/app-runtime.js";
 import { SubmitPerceptionSurveyUseCase } from "../../../src/application/use-cases/submit-perception-survey.use-case.js";
 import { ForbiddenRoleError, UnauthorizedTokenError } from "../../../src/domain/errors/domain-errors.js";
@@ -60,7 +59,7 @@ export function createSubmitSurveyHandler(
       );
     }
 
-    const body = JSON.parse(event.body ?? "{}") as Partial<SubmitSurveyRequestBody>;
+    const body = readOptionalJsonObjectBody(event.body) as Partial<SubmitSurveyRequestBody>;
 
     if (!body.responses || typeof body.responses !== "object") {
       return {
@@ -91,15 +90,13 @@ export function createSubmitSurveyHandler(
     };
   };
 
-  return middy(rawHandler)
-    .use(
-      authMiddleware({
-        tokenVerifier: deps.tokenVerifier,
-        apiKey: deps.apiKey,
-        requireApiKey: deps.requireApiKey ?? false,
-      }),
-    )
-    .use(domainErrorMiddleware());
+  return createApiHandler(rawHandler, {
+    tokenVerifier: deps.tokenVerifier,
+    apiKey: deps.apiKey,
+    requireApiKey: deps.requireApiKey ?? false,
+    tokenRequired: true,
+    missingTokenMessage: "Authentication required.",
+  });
 }
 
 export const lambdaHandler = createSubmitSurveyHandler();

@@ -2,10 +2,9 @@ import type { APIGatewayProxyEvent, APIGatewayProxyResult } from "aws-lambda";
 import type { CapabilityTokenSignerPort } from "../../../src/application/ports/capability-token.port.js";
 import type { GameSessionRepositoryPort } from "../../../src/application/ports/game-session-repository.port.js";
 import type { JoinGameSessionCommand } from "../../../src/application/ports/join-game-session.port.js";
-import middy from "@middy/core";
+import { readOptionalJsonObjectBody } from "../../../src/adapters/inbound/http/json-object-body.js";
 import { wrapLambdaHandler } from "../../../src/adapters/inbound/http/lambda-to-v2-wrapper.js";
-import { authMiddleware } from "../../../src/adapters/inbound/http/middy/auth.middleware.js";
-import { domainErrorMiddleware } from "../../../src/adapters/inbound/http/middy/domain-error.middleware.js";
+import { createApiHandler } from "../../../src/adapters/inbound/http/middy/api-handler.js";
 import { AppRuntime } from "../../../src/app-runtime.js";
 import { JoinGameSessionUseCase } from "../../../src/application/use-cases/join-game-session.use-case.js";
 
@@ -37,7 +36,7 @@ export function createJoinSessionHandler(
   const rawHandler = async (
     event: APIGatewayProxyEvent,
   ): Promise<APIGatewayProxyResult> => {
-    const body = JSON.parse(event.body ?? "{}") as JoinGameSessionCommand;
+    const body = readOptionalJsonObjectBody(event.body) as unknown as JoinGameSessionCommand;
 
     const result = await useCase.execute(body);
 
@@ -50,15 +49,11 @@ export function createJoinSessionHandler(
     };
   };
 
-  return middy(rawHandler)
-    .use(
-      authMiddleware({
-        tokenVerifier: undefined,
-        apiKey: deps.apiKey,
-        requireApiKey: deps.requireApiKey ?? false,
-      }),
-    )
-    .use(domainErrorMiddleware());
+  return createApiHandler(rawHandler, {
+    tokenVerifier: undefined,
+    apiKey: deps.apiKey,
+    requireApiKey: deps.requireApiKey ?? false,
+  });
 }
 
 export const lambdaHandler = createJoinSessionHandler();

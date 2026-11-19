@@ -308,6 +308,8 @@ paths:
                     type: array
                     items:
                       $ref: "#/components/schemas/PackValidationIssue"
+        "400":
+          $ref: "#/components/responses/BadRequestError"
         "401":
           description: >-
             UNAUTHORIZED_TOKEN. No Account Token, or one that is malformed,
@@ -547,6 +549,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/JoinSessionResponse"
+        "400":
+          $ref: "#/components/responses/BadRequestError"
         "404":
           $ref: "#/components/responses/NotFoundError"
         "409":
@@ -623,6 +627,8 @@ paths:
                 properties:
                   state:
                     $ref: "#/components/schemas/PublicSessionState"
+        "400":
+          $ref: "#/components/responses/BadRequestError"
         "401":
           $ref: "#/components/responses/UnauthorizedError"
         "403":
@@ -668,6 +674,8 @@ paths:
                 properties:
                   chain:
                     $ref: "#/components/schemas/SubmittedChain"
+        "400":
+          $ref: "#/components/responses/BadRequestError"
         "401":
           $ref: "#/components/responses/UnauthorizedError"
         "404":
@@ -732,6 +740,8 @@ paths:
                 properties:
                   chain:
                     $ref: "#/components/schemas/SubmittedChain"
+        "400":
+          $ref: "#/components/responses/BadRequestError"
         "401":
           $ref: "#/components/responses/UnauthorizedError"
         "403":
@@ -809,6 +819,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/AssessmentSubmissionResponse"
+        "400":
+          $ref: "#/components/responses/BadRequestError"
         "401":
           $ref: "#/components/responses/UnauthorizedError"
         "404":
@@ -865,6 +877,8 @@ paths:
                   submittedAt:
                     type: string
                     format: date-time
+        "400":
+          $ref: "#/components/responses/BadRequestError"
         "401":
           $ref: "#/components/responses/UnauthorizedError"
         "404":
@@ -953,7 +967,12 @@ components:
 
   responses:
     BadRequestError:
-      description: Malformed request payload
+      description: >-
+        INVALID_REQUEST_BODY. The body is not valid JSON, was sent without
+        `Content-Type: application/json`, or is not a JSON object (an array,
+        string, number or null). Checked for every route after the token, so a
+        request without a valid token gets 401 first. The response never
+        contains a stack trace.
       content:
         application/json:
           schema:
@@ -1017,6 +1036,7 @@ components:
         - PACK_IS_SYSTEM_PACK
         - PACK_ALREADY_ARCHIVED
         - PACK_NOT_ARCHIVED
+        - INTERNAL_ERROR
 
     ApiErrorResponse:
       type: object

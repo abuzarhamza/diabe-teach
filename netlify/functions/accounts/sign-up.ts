@@ -1,11 +1,9 @@
 import type { APIGatewayProxyResult } from "aws-lambda";
 import type { AuthenticatedEvent } from "../../../src/adapters/inbound/http/middy/auth.middleware.js";
 import type { ProductionDependencies } from "../../../src/app-runtime.types.js";
-import middy from "@middy/core";
 import { readJsonObjectBody } from "../../../src/adapters/inbound/http/json-object-body.js";
 import { wrapLambdaHandler } from "../../../src/adapters/inbound/http/lambda-to-v2-wrapper.js";
-import { authMiddleware } from "../../../src/adapters/inbound/http/middy/auth.middleware.js";
-import { domainErrorMiddleware } from "../../../src/adapters/inbound/http/middy/domain-error.middleware.js";
+import { createApiHandler } from "../../../src/adapters/inbound/http/middy/api-handler.js";
 import { AppRuntime } from "../../../src/app-runtime.js";
 import { SignUpInstructorUseCase } from "../../../src/application/use-cases/sign-up-instructor.use-case.js";
 
@@ -46,15 +44,11 @@ export function createSignUpHandler(dependencies?: SignUpHandlerDependencies) {
     };
   };
 
-  return middy(rawHandler)
-    .use(
-      authMiddleware({
-        bearerScheme: "none",
-        apiKey: deps.apiKey,
-        requireApiKey: deps.requireApiKey,
-      }),
-    )
-    .use(domainErrorMiddleware());
+  return createApiHandler(rawHandler, {
+    bearerScheme: "none",
+    apiKey: deps.apiKey,
+    requireApiKey: deps.requireApiKey,
+  });
 }
 
 export const lambdaHandler = createSignUpHandler();

@@ -19,3 +19,14 @@ export function readJsonObjectBody(body: unknown): Record<string, unknown> {
   }
   return parsed as Record<string, unknown>;
 }
+
+/**
+ * Like readJsonObjectBody, but a request with no body reads as `{}`. The
+ * shared middleware chain has already refused any body that is not a JSON
+ * object, so this only narrows the type.
+ */
+export function readOptionalJsonObjectBody(body: unknown): Record<string, unknown> {
+  return body === undefined || body === null || body === ""
+    ? {}
+    : readJsonObjectBody(body);
+}

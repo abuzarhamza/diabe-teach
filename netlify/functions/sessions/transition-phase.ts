@@ -5,10 +5,9 @@ import type { ClockPort } from "../../../src/application/ports/clock.port.js";
 import type { CurriculumPackRepositoryPort } from "../../../src/application/ports/curriculum-pack-repository.port.js";
 import type { GameSessionRepositoryPort } from "../../../src/application/ports/game-session-repository.port.js";
 import type { TransitionSessionPhaseCommand } from "../../../src/application/ports/transition-session-phase.port.js";
-import middy from "@middy/core";
+import { readOptionalJsonObjectBody } from "../../../src/adapters/inbound/http/json-object-body.js";
 import { wrapLambdaHandler } from "../../../src/adapters/inbound/http/lambda-to-v2-wrapper.js";
-import { authMiddleware } from "../../../src/adapters/inbound/http/middy/auth.middleware.js";
-import { domainErrorMiddleware } from "../../../src/adapters/inbound/http/middy/domain-error.middleware.js";
+import { createApiHandler } from "../../../src/adapters/inbound/http/middy/api-handler.js";
 import { AppRuntime } from "../../../src/app-runtime.js";
 import { TransitionSessionPhaseUseCase } from "../../../src/application/use-cases/transition-session-phase.use-case.js";
 import { ForbiddenRoleError, UnauthorizedTokenError } from "../../../src/domain/errors/domain-errors.js";
@@ -65,7 +64,7 @@ export function createTransitionPhaseHandler(
       );
     }
 
-    const body = JSON.parse(event.body ?? "{}") as Partial<TransitionSessionPhaseCommand>;
+    const body = readOptionalJsonObjectBody(event.body) as Partial<TransitionSessionPhaseCommand>;
 
     const result = await useCase.execute({
       sessionId,
@@ -84,15 +83,13 @@ export function createTransitionPhaseHandler(
     };
   };
 
-  return middy(rawHandler)
-    .use(
-      authMiddleware({
-        tokenVerifier: deps.tokenVerifier,
-        apiKey: deps.apiKey,
-        requireApiKey: deps.requireApiKey ?? false,
-      }),
-    )
-    .use(domainErrorMiddleware());
+  return createApiHandler(rawHandler, {
+    tokenVerifier: deps.tokenVerifier,
+    apiKey: deps.apiKey,
+    requireApiKey: deps.requireApiKey ?? false,
+    tokenRequired: true,
+    missingTokenMessage: "Authentication required.",
+  });
 }
 
 export const lambdaHandler = createTransitionPhaseHandler();

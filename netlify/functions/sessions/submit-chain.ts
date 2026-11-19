@@ -3,10 +3,9 @@ import type { CapabilityTokenPort, VerifiedCapability } from "../../../src/appli
 import type { ClockPort } from "../../../src/application/ports/clock.port.js";
 import type { GameSessionRepositoryPort } from "../../../src/application/ports/game-session-repository.port.js";
 import type { SubmitConceptChainCommand } from "../../../src/application/ports/submit-concept-chain.port.js";
-import middy from "@middy/core";
+import { readOptionalJsonObjectBody } from "../../../src/adapters/inbound/http/json-object-body.js";
 import { wrapLambdaHandler } from "../../../src/adapters/inbound/http/lambda-to-v2-wrapper.js";
-import { authMiddleware } from "../../../src/adapters/inbound/http/middy/auth.middleware.js";
-import { domainErrorMiddleware } from "../../../src/adapters/inbound/http/middy/domain-error.middleware.js";
+import { createApiHandler } from "../../../src/adapters/inbound/http/middy/api-handler.js";
 import { AppRuntime } from "../../../src/app-runtime.js";
 import { SubmitConceptChainUseCase } from "../../../src/application/use-cases/submit-concept-chain.use-case.js";
 import { ForbiddenRoleError, UnauthorizedTokenError } from "../../../src/domain/errors/domain-errors.js";
@@ -59,7 +58,7 @@ export function createSubmitChainHandler(
     }
 
     const roundNumber = Number.parseInt(roundNumberStr, 10) as 1 | 2;
-    const body = JSON.parse(event.body ?? "{}") as Partial<SubmitConceptChainCommand>;
+    const body = readOptionalJsonObjectBody(event.body) as Partial<SubmitConceptChainCommand>;
 
     const result = await useCase.execute({
       sessionId,
@@ -80,15 +79,13 @@ export function createSubmitChainHandler(
     };
   };
 
-  return middy(rawHandler)
-    .use(
-      authMiddleware({
-        tokenVerifier: deps.tokenVerifier,
-        apiKey: deps.apiKey,
-        requireApiKey: deps.requireApiKey ?? false,
-      }),
-    )
-    .use(domainErrorMiddleware());
+  return createApiHandler(rawHandler, {
+    tokenVerifier: deps.tokenVerifier,
+    apiKey: deps.apiKey,
+    requireApiKey: deps.requireApiKey ?? false,
+    tokenRequired: true,
+    missingTokenMessage: "Authentication required.",
+  });
 }
 
 export const lambdaHandler = createSubmitChainHandler();

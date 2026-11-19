@@ -293,7 +293,6 @@
           "Needs the instructor Capability Token (403 FORBIDDEN_ROLE without one), and only createGameSession issues one: a teacher has to start a Game Session before they can register the pack they want to play. The spec declares no security, 401 or 403 here.",
           "Returns 201 `{ packId, version, warnings }`, not `{ pack: CurriculumPackSummary }`.",
           "409 and 422 bodies are `{ error: { code, ... } }` (422 carries `errors` and `warnings`, no `message`), not ApiErrorResponse.",
-          "Malformed JSON is not mapped to 400 INVALID_REQUEST_BODY.",
           "netlify.toml force-redirects `/api/v1/packs` (any method) to the list function and `/api/v1/packs/register` (not in the spec) to register, so a POST to the spec path may never reach it. Not checked at runtime.",
           "Packs live in MongoDB when MONGODB_URI is set; the in-memory store loses them between function instances.",
           "Deleting a pack is not in the spec; the backend has an undocumented POST /api/v1/packs/{packId}/archive (instructor token).",
@@ -343,7 +342,6 @@
           "`creatorDisplayName` is only used in solo mode (as the auto-joined learner's name); in classroom mode it is dropped and the teacher's name is stored nowhere.",
           "Only `diabe-teach` ships with the backend: the prototype's other built-in topics and teacher-made packs get 404 PACK_NOT_FOUND unless they were registered first (step P).",
           "`mode` and `adjudicationMode` are not validated; only `timerConfig` is (400 INVALID_REQUEST_BODY).",
-          "Malformed JSON is not mapped to 400 INVALID_REQUEST_BODY.",
         ],
       },
 
@@ -376,7 +374,7 @@
         deviations: [
           "Joining is accepted in any phase, including `completed`.",
           "A missing `displayName` becomes \"Anonymous\"; joining twice creates two participants.",
-          "A missing `roomCode` or malformed JSON is not mapped to 400 INVALID_REQUEST_BODY (unmapped server error).",
+          "A missing `roomCode` is not mapped to 400 INVALID_REQUEST_BODY (it gets a generic 500 INTERNAL_ERROR).",
         ],
       },
 
@@ -416,7 +414,6 @@
           "An empty `narrativeExplanation` is accepted (spec `minLength: 1`).",
           "The returned chain has no `sessionId`, `stepRationales`, `peerVotes` or `verdict`, and adds `chainLength` and `keywordIds`.",
           "An instructor token, or a token for another Game Session, gets 403 FORBIDDEN_ROLE, which the spec doesn't declare for this route.",
-          "Malformed JSON is not mapped to 400 INVALID_REQUEST_BODY.",
         ],
       },
 
@@ -647,7 +644,6 @@
           "Round Summary and Completed report `phaseEndsAt` equal to `phaseStartedAt` instead of null.",
           "Only the instructor token is accepted (a participant gets 403 FORBIDDEN_ROLE).",
           "x-api-key is checked when the server has API_KEY set, but the spec does not declare it here.",
-          "Malformed JSON is not mapped to 400 INVALID_REQUEST_BODY.",
         ],
       },
       // Operations with no screen in this prototype yet: listed in the legend's "no screen yet" section only.
