@@ -30,6 +30,7 @@ export class PackValidator {
 
     PackValidator.#validateSchema(pack, errors);
     PackValidator.#validateSemantics(pack, errors);
+    PackValidator.#validateBoardCapacity(pack, errors);
     PackValidator.#validateCalibration(pack, errors);
     PackValidator.#checkOptionalFields(pack, warnings);
 
@@ -305,6 +306,34 @@ export class PackValidator {
           message: `Card '${card.id}' references unknown domain '${card.domainId}'.`,
         });
       }
+    });
+  }
+
+  /**
+   * A Game Session deals `rows × cols` distinct Keyword Cards per round, so a
+   * pack must have at least that many. Only checked once the board size and
+   * the cards are themselves well formed; those have their own issues.
+   */
+  static #validateBoardCapacity(pack: PackInput, errors: ValidationError[]): void {
+    const config = pack.boardConfig;
+    if (
+      !config
+      || !Array.isArray(pack.cards)
+      || !Number.isInteger(config.rows) || config.rows < 1
+      || !Number.isInteger(config.cols) || config.cols < 1
+    ) {
+      return;
+    }
+
+    const requiredCardCount = config.rows * config.cols;
+    const cardCount = pack.cards.length;
+    if (cardCount >= requiredCardCount)
+      return;
+
+    errors.push({
+      path: "cards",
+      code: "INSUFFICIENT_CARDS",
+      message: `Pack has ${cardCount} Keyword Cards but its ${config.rows}×${config.cols} board needs at least ${requiredCardCount} (${requiredCardCount - cardCount} short).`,
     });
   }
 

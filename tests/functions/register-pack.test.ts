@@ -4,6 +4,17 @@ import { createRegisterPackHandler } from "../../netlify/functions/packs/registe
 import { FakeCapabilityTokenAdapter } from "../../src/adapters/outbound/fake-capability-token-adapter.js";
 import { InMemoryCurriculumPackRepository } from "../../src/adapters/outbound/in-memory-curriculum-pack-repository.js";
 
+function createCards(count: number): Array<Record<string, unknown>> {
+  return Array.from({ length: count }, (_, index) => ({
+    id: `card-${index + 1}`,
+    verbatimLabel: `Card ${index + 1}`,
+    displayLabel: `Card ${index + 1}`,
+    aliases: [],
+    domainId: "domain-1",
+    summary: `Card number ${index + 1}`,
+  }));
+}
+
 function createMinimalValidPack(): Record<string, unknown> {
   return {
     id: "test-pack",
@@ -19,16 +30,8 @@ function createMinimalValidPack(): Record<string, unknown> {
     domains: [
       { id: "domain-1", label: "Domain 1", description: "First domain" },
     ],
-    cards: [
-      {
-        id: "card-1",
-        verbatimLabel: "Card 1",
-        displayLabel: "Card 1",
-        aliases: [],
-        domainId: "domain-1",
-        summary: "First card",
-      },
-    ],
+    // A 3×3 board needs at least 9 Keyword Cards.
+    cards: createCards(9),
     adjudicationRubric: {
       evaluatorPersona: "Test Evaluator",
       subjectDomain: "Testing",
@@ -196,5 +199,54 @@ describe("pOST /api/v1/packs", () => {
     expect(result.statusCode).toBe(201);
     const body = JSON.parse(result.body);
     expect(body.version).toBe("2.0.0");
+  });
+
+  describe("pack capacity: the cards must fill the board", () => {
+    async function register(ctx: TestContext, pack: Record<string, unknown>) {
+      const handler = createRegisterPackHandler(ctx.deps);
+      const token = await ctx.tokenAdapter.signToken({
+        sessionId: "instructor-session",
+        role: "instructor",
+      });
+      return (await handler(
+        createEvent(pack, token),
+        {} as never,
+      )) as APIGatewayProxyResult;
+    }
+
+    it("refuses a pack with fewer cards than rows × cols and stores nothing", async () => {
+      const ctx = createTestContext();
+      const pack = createMinimalValidPack();
+      pack.cards = createCards(8);
+
+      const result = await register(ctx, pack);
+
+      expect(result.statusCode).toBe(422);
+      const body = JSON.parse(result.body);
+      expect(body.error.code).toBe("PACK_VALIDATION_FAILED");
+      expect(
+        body.error.errors.some((e: { code: string; path: string }) =>
+          e.code === "INSUFFICIENT_CARDS" && e.path === "cards"),
+      ).toBe(true);
+      expect(await ctx.packRepo.existsByIdAndVersion("test-pack", "1.0.0")).toBe(false);
+    });
+
+    it("registers a pack with exactly rows × cols cards", async () => {
+      const ctx = createTestContext();
+
+      const result = await register(ctx, createMinimalValidPack());
+
+      expect(result.statusCode).toBe(201);
+    });
+
+    it("registers a pack with more cards than rows × cols", async () => {
+      const ctx = createTestContext();
+      const pack = createMinimalValidPack();
+      pack.cards = createCards(12);
+
+      const result = await register(ctx, pack);
+
+      expect(result.statusCode).toBe(201);
+    });
   });
 });

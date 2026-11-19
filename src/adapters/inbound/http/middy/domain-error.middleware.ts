@@ -16,6 +16,7 @@ import {
   NotEnoughKeywordCardsError,
   PackAlreadyArchivedError,
   PackAlreadyExistsError,
+  PackCannotFillBoardError,
   PackIsSystemPackError,
   PackNotArchivedError,
   PackNotFoundError,
@@ -75,6 +76,7 @@ export function domainErrorMiddleware(): MiddlewareObj<any, any> {
         }
         else if (
           error instanceof ChainTopologyInvalidError
+          || error instanceof PackCannotFillBoardError
           || error instanceof AssessmentIncompleteError
           || error instanceof SurveyCommentsTooLongError
           || error instanceof InvalidSurveyResponseError

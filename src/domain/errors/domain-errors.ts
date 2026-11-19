@@ -190,6 +190,29 @@ export class PackNotArchivedError extends DomainError {
   }
 }
 
+/**
+ * The Curriculum Pack has fewer Keyword Cards than its `rows × cols` board,
+ * so a Game Session could not deal a full board. Guards packs stored before
+ * the pack validator enforced this.
+ */
+export class PackCannotFillBoardError extends DomainError {
+  public readonly code = "PACK_VALIDATION_FAILED" as const;
+
+  public constructor(packId: string, cardCount: number, rows: number, cols: number) {
+    const requiredCardCount = rows * cols;
+    super(
+      `Curriculum Pack '${packId}' has ${cardCount} Keyword Cards but its ${rows}×${cols} board needs at least ${requiredCardCount}, so a Game Session cannot deal a full board.`,
+      {
+        packId,
+        cardCount,
+        rows,
+        cols,
+        requiredCardCount,
+      },
+    );
+  }
+}
+
 export class AssessmentAlreadySubmittedError extends DomainError {
   public readonly code = "ASSESSMENT_ALREADY_SUBMITTED" as const;
 

@@ -9,7 +9,7 @@ import type {
 import type { CurriculumPackRepositoryPort } from "../ports/curriculum-pack-repository.port.js";
 import type { GameSessionRepositoryPort } from "../ports/game-session-repository.port.js";
 import { PackId } from "../../domain/curriculum-pack/pack-id.js";
-import { PackNotFoundError } from "../../domain/errors/domain-errors.js";
+import { PackCannotFillBoardError, PackNotFoundError } from "../../domain/errors/domain-errors.js";
 import { GameSession } from "../../domain/game-session/game-session.js";
 import { PublicSessionStateProjector } from "../dtos/public-session-state-projector.js";
 
@@ -34,6 +34,11 @@ export class CreateGameSessionUseCase implements CreateGameSessionUseCasePort {
 
     if (!pack) {
       throw new PackNotFoundError(command.packId);
+    }
+
+    const { rows, cols } = pack.boardConfig;
+    if (pack.cards.length < rows * cols) {
+      throw new PackCannotFillBoardError(command.packId, pack.cards.length, rows, cols);
     }
 
     const now = this.#clock.now();

@@ -3,6 +3,17 @@ import { describe, expect, it } from "vitest";
 import { createValidatePackHandler } from "../../netlify/functions/packs/validate-pack.js";
 import { FakeCapabilityTokenAdapter } from "../../src/adapters/outbound/fake-capability-token-adapter.js";
 
+function createCards(count: number): Array<Record<string, unknown>> {
+  return Array.from({ length: count }, (_, index) => ({
+    id: `card-${index + 1}`,
+    verbatimLabel: `Card ${index + 1}`,
+    displayLabel: `Card ${index + 1}`,
+    aliases: [],
+    domainId: "domain-1",
+    summary: `Card number ${index + 1}`,
+  }));
+}
+
 function createMinimalValidPack(): Record<string, unknown> {
   return {
     id: "test-pack",
@@ -18,16 +29,8 @@ function createMinimalValidPack(): Record<string, unknown> {
     domains: [
       { id: "domain-1", label: "Domain 1", description: "First domain" },
     ],
-    cards: [
-      {
-        id: "card-1",
-        verbatimLabel: "Card 1",
-        displayLabel: "Card 1",
-        aliases: [],
-        domainId: "domain-1",
-        summary: "First card",
-      },
-    ],
+    // A 3×3 board needs at least 9 Keyword Cards.
+    cards: createCards(9),
     adjudicationRubric: {
       evaluatorPersona: "Test Evaluator",
       subjectDomain: "Testing",
@@ -234,5 +237,57 @@ describe("pOST /api/v1/packs/validate", () => {
     const body = JSON.parse(result.body);
     expect(body.valid).toBe(false);
     expect(body.errors.some((e: { code: string }) => e.code === "INVALID_VERSION")).toBe(true);
+  });
+
+  describe("pack capacity: the cards must fill the board", () => {
+    async function validate(pack: Record<string, unknown>) {
+      const ctx = createTestContext();
+      const handler = createValidatePackHandler(ctx.deps);
+      const token = await ctx.tokenAdapter.signToken({
+        sessionId: "instructor-session",
+        role: "instructor",
+      });
+      const result = (await handler(
+        createEvent(pack, token),
+        {} as never,
+      )) as APIGatewayProxyResult;
+      expect(result.statusCode).toBe(200);
+      return JSON.parse(result.body) as {
+        valid: boolean;
+        errors: Array<{ path: string; code: string; message: string }>;
+      };
+    }
+
+    it("reports the card shortfall when a pack has fewer cards than rows × cols", async () => {
+      const pack = createMinimalValidPack();
+      pack.cards = createCards(8);
+
+      const body = await validate(pack);
+
+      expect(body.valid).toBe(false);
+      const issue = body.errors.find(e => e.code === "INSUFFICIENT_CARDS");
+      expect(issue).toBeDefined();
+      expect(issue?.path).toBe("cards");
+      expect(issue?.message).toContain("8");
+      expect(issue?.message).toContain("9");
+      expect(issue?.message).toContain("3×3");
+    });
+
+    it("accepts a pack with exactly rows × cols cards", async () => {
+      const body = await validate(createMinimalValidPack());
+
+      expect(body.valid).toBe(true);
+      expect(body.errors).toHaveLength(0);
+    });
+
+    it("accepts a pack with more cards than rows × cols", async () => {
+      const pack = createMinimalValidPack();
+      pack.cards = createCards(12);
+
+      const body = await validate(pack);
+
+      expect(body.valid).toBe(true);
+      expect(body.errors).toHaveLength(0);
+    });
   });
 });

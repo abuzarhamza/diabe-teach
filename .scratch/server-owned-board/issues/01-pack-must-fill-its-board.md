@@ -6,11 +6,11 @@ See spec: `.scratch/server-owned-board/spec.md` (Implementation Decisions → Pa
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] Handler test: validating a pack with fewer cards than `rows × cols` returns `valid: false` with an issue naming the card shortfall
-- [ ] Handler test: registering such a pack is refused with the existing pack-validation error response
-- [ ] Handler test: creating a session with a stored pack that can't fill its board is refused with a clear error, and no session is stored
-- [ ] Handler test: a pack with exactly `rows × cols` cards, and one with more, validate and register as before
-- [ ] OpenAPI documents the new validation issue and the session-creation refusal
-- [ ] Existing tests, BDD and the lint baselines (132 lint errors, 6 boundary violations) are no worse
+- [x] Handler test: validating a pack with fewer cards than `rows × cols` returns `valid: false` with an issue naming the card shortfall
+- [x] Handler test: registering such a pack is refused with the existing pack-validation error response
+- [x] Handler test: creating a session with a stored pack that can't fill its board is refused with a clear error, and no session is stored
+- [x] Handler test: a pack with exactly `rows × cols` cards, and one with more, validate and register as before
+- [x] OpenAPI documents the new validation issue and the session-creation refusal
+- [x] Existing tests, BDD and the lint baselines (132 lint errors, 6 boundary violations) are no worse
