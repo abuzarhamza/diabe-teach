@@ -20,3 +20,7 @@ Observations to turn into pit-of-success fixes. Each item is dated; mark it done
 - **2026-11-17 (as of `18264ad`):** Peer votes don't stop a chain's author from voting on their own chain, or a participant from voting twice.
 - **2026-11-17 (as of `18264ad`):** Domain methods still call `new Date()` themselves (joins, `joinedAt`); the lint-rule idea above would catch this.
 - **2026-11-17 (as of `18264ad`):** Join, assessment and survey read the session twice per request (the retrier reloads it). Accepted trade-off.
+
+- **2026-11-18:** Worktree agents start from a stale base (`2976821`, not HEAD) and lack the gitignored `.env.dev.yaml`, so `tests/app-runtime-yaml-integration.test.ts` fails there. Fix idea: make that test skip or fall back when the file is absent, or document copying the file into worktrees. Source: board ticket 01 report.
+- **2026-11-18:** OpenAPI drift: `validateCurriculumPack` documents `issues[]` with `jsonPointer`/`rule`, but the handler returns `errors`/`warnings` with `path`/`code` (as of `5948759`). Source: board ticket 01 report.
+- **2026-11-19:** BDD against plain `netlify dev` (remote MongoDB) failed in assessment and survey with Mongo TLS errors (`tlsv1 alert internal error`, SSL alert 80, in `MongoCurriculumPackRepository`), and it was about 10× slower. Against `npm run dev:local` (in-memory Mongo) everything passes. Fix idea: make `test:bdd` document or start `dev:local`, and run one feature per process.

@@ -15,15 +15,15 @@ See spec: `.scratch/server-owned-board/spec.md`.
 
 **Blocked by:** None (can start immediately; can run in parallel with 01)
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] Handler test: create with a `seed`, transition to round 1 chain-mapping → `activeBoard` is `rows × cols`, carries that seed, every card is from the pack and appears at most once
-- [ ] Handler test: two sessions with the same pack and seed get identical round 1 boards; different seeds give different boards
-- [ ] Handler test: `activeBoard` is `null` before round 1 and in posttest, and identical across one round's chain-mapping, peer-adjudication and round-summary
-- [ ] Handler test: round 2 with no seed gets a new board with its own seed; a transition `seed` reproduces a known board
-- [ ] Handler test: get-state and join return the same `activeBoard` as the transition response
-- [ ] Handler test: a transition whose write conflicts once is retried and deals the same board (seed stable across retries)
-- [ ] Repository contract suite (in-memory + Mongo): per-round boards and the creation seed round-trip intact; Mongo-only case: a legacy document with no boards loads with `activeBoard: null`
-- [ ] Cucumber classroom scenario: after the instructor starts round 1, the instructor and a participant see the same board
-- [ ] OpenAPI: `activeBoard` is required and nullable (`BoardGridView | null`); the create and transition `seed` fields document what they control
-- [ ] Existing tests, BDD and lint baselines are no worse
+- [x] Handler test: create with a `seed`, transition to round 1 chain-mapping → `activeBoard` is `rows × cols`, carries that seed, every card is from the pack and appears at most once
+- [x] Handler test: two sessions with the same pack and seed get identical round 1 boards; different seeds give different boards
+- [x] Handler test: `activeBoard` is `null` before round 1 and in posttest, and identical across one round's chain-mapping, peer-adjudication and round-summary
+- [x] Handler test: round 2 with no seed gets a new board with its own seed; a transition `seed` reproduces a known board
+- [x] Handler test: get-state and join return the same `activeBoard` as the transition response
+- [x] Handler test: a transition whose write conflicts once is retried and deals the same board (seed stable across retries)
+- [x] Repository contract suite (in-memory + Mongo): per-round boards and the creation seed round-trip intact; Mongo-only case: a legacy document with no boards loads with `activeBoard: null`
+- [x] Cucumber classroom scenario: after the instructor starts round 1, the instructor and a participant see the same board
+- [x] OpenAPI: `activeBoard` is required and nullable (`BoardGridView | null`); the create and transition `seed` fields document what they control
+- [x] Existing tests, BDD and lint baselines are no worse
