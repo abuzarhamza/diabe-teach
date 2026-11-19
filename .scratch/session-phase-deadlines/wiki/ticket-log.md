@@ -31,3 +31,15 @@
 - **2026-11-18:** That second agent also stopped before committing: HEAD is still `4ed4042`, and ticket 02's work is still uncommitted. A third session checked the working tree against `4ed4042`: typecheck passes and vitest gives 365/365 (29 files, including untracked tests from other sessions). It started a background agent to check ticket 02's criteria, run BDD and commit, then cherry-pick ticket 01 (`5948759`).
 - **2026-11-18:** At the user's request, the write-integrity ticket 05 worktree (`agent-a66f60d7f9688f94a`) and its branch were removed. It was clean, and `f687bc5` had already been merged as `5e8c4e2`.
 - **2026-11-19:** A fourth session ran every check itself, one at a time and with no agents, because the user reported that parallel runs were crashing the machine. Board ticket 02 is committed as `5964cdb`. Ticket 01 is cherry-picked as `9d54a47` with no conflicts. On the combined tree: typecheck passes; vitest (`--no-file-parallelism`) gives 374/374; each of the 4 BDD features, run separately against `npm run dev:local`, passes (33 scenarios in total); lint shows 118 errors and boundaries 6, the same as HEAD for the touched files. Ticket 03 is now unblocked.
+- **2026-11-19:** A screen-by-screen API review of `claudPoc/concept-chain/` led to a grilling session on teacher login, and then to the [teacher-login spec](../../teacher-login/spec.md) (status ready-for-agent). The spec covers our own email and password Instructor Accounts and an Account Token, used only to start classroom games and to work with packs; a shared pack library where nothing is deleted (archive, or release a new version); and Pack Version pinning on Game Sessions. Agreed seams: handlers, an Instructor Account repository contract suite, and one BDD journey. No tickets yet.
+- **2026-11-19:** At the user's request, `npm run test:bdd` (and `test:bdd:mongodb`) now run each feature file in its own cucumber process, one after another (`scripts/run-bdd-sequential.ts`; `tests/cucumber.mjs` sets `parallel: 0` and has a `single` profile). Verified against `npm run dev:local`: 4/4 features pass. Not yet committed.
+- **2026-11-19:** The user approved 7 [teacher-login tickets](../../teacher-login/issues/) as proposed:
+  - 01: sign up and sign in
+  - 02: sign-in lock
+  - 03: Pack Version pinning (independent)
+  - 04: classroom start needs sign-in
+  - 05: shared pack library with the Account Token
+  - 06: pack list authors and archived packs
+  - 07: prototype screens
+
+  Edges: 02, 04 and 05 are blocked by 01; 06 by 04 and 05; 07 by 02, 04 and 06. The frontier is 01 and 03.
