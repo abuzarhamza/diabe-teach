@@ -19,6 +19,7 @@ Sources: [spec](../spec.md), [tickets](../issues/). Later efforts that reuse thi
 ## Environment
 - [Environment improvement backlog](environment-backlog.md): pit-of-success fixes found along the way.
 - [Credential in ADR-0003 working copy](incident-adr-0003-credentials.md): excluded from commits, awaiting the user.
+- [API key in the test config](incident-api-key-in-test-config.md): the real API key has been in a public repo since `3e37faf`; rotation recommended (2026-11-19).
 
 ## Progress
 - [Ticket log](ticket-log.md): status of tickets across efforts (phase deadlines, server-owned board, teacher login), with commits.
