@@ -60,3 +60,4 @@
   - the archive and unarchive operations in OpenAPI, which were missing.
 
   Claude checked: no dev server left running; 4 pack test files pass 27/27; all six pack functions declare a `config.path`.
+- **2026-11-19:** Teacher-login ticket 06 committed as `46402b3`. The agent reported vitest 466/466, BDD 5/5 (`assessment-journey` failed on the first run because the dev server was still cold, then passed alone), lint 100 and boundaries 6. `GET /api/v1/packs` items carry `authorHandle` (null when `createdBy` is not an account) and `isArchived`; `?includeArchived=true` also lists archived packs. A new OpenAPI schema, `CurriculumPackListItem`, was added because the register response's `CurriculumPackSummary` already doesn't match that response. Claude checked: 9/9 list tests pass, and `AppRuntime` wires the Mongo account store in production. Tickets 01-06 are done; 07 (prototype screens) is waiting for the user to decide how `claudPoc/` gets committed.
