@@ -9,7 +9,8 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Atkinson+Hyperlegible:wght@400;700&family=IBM+Plex+Mono:wght@500&display=swap">
 <link rel="stylesheet" href="shared.css">
 <script src="shared.js"></script>
-<script>CC.requireTeacher();</script>
+<script src="account-api.js"></script>
+<script>CCApi.requireTeacher();</script>
 <style>
 .rule{display:grid;grid-template-columns:1fr auto;gap:6px;align-items:start;border-top:1px dashed var(--line);padding-top:8px}
 .rule textarea{grid-column:1/-1;min-height:48px}
@@ -100,7 +101,7 @@
 const $ = (id) => document.getElementById(id);
 let filter = "pending-review", selected = null;
 const drafts = {}; // chainId -> { feedback, score }
-const teacher = CC.teacher(); // null while CC.requireTeacher() redirects to Teacher login
+const teacher = CCApi.account(); // null while CCApi.requireTeacher() redirects to Teacher login
 
 function toast(msg, kind = "ok") { const t = $("toast"); t.textContent = msg; t.className = `toast ${kind}`; clearTimeout(toast.t); toast.t = setTimeout(() => { t.textContent = ""; }, 4000); }
 function act(fn, ok) { try { fn(); if (ok) toast(ok); } catch (e) { toast(e.message, "err"); } }
@@ -118,7 +119,7 @@ function render(s = CC.get()) { keepFocus(() => {
   const set = CC.settingsOf(s);
   const pack = CC.packOf(s);
   const packName = pack?.name ?? set.packId;
-  $("packName").textContent = packName; // same name as on Game setup
+  $("packName").textContent = pack?.version ? `${packName} v${pack.version}` : packName; // same name and Pack Version as on Game setup
   $("objective").hidden = !(pack?.objective || pack?.level);
   $("objective").innerHTML = [pack?.level && `Learner level: <b>${CC.esc(pack.level)}</b>`, pack?.objective && `Objective: <b>${CC.esc(pack.objective)}</b>`].filter(Boolean).join(" · ");
   const time = (sec) => sec == null ? "no timer" : CC.timerLabel(sec); // same wording as Game setup's summary
@@ -218,8 +219,8 @@ $("resetTop").onclick = () => armReset($("resetTop"));
 // Live API overlay samples: the ruling drafts (feedback and score) typed into each chain card.
 CCOverlay.setContext(() => ({ rulings: drafts }));
 if (teacher) {
-  $("who").textContent = teacher.name;
-  $("signOut").addEventListener("click", () => CC.signOut());
+  $("who").textContent = teacher.email;
+  $("signOut").addEventListener("click", () => CCApi.signOut());
   CC.subscribe(render);
   window.addEventListener("resize", () => render());
   setInterval(() => tick(), 1000);

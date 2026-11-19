@@ -56,8 +56,19 @@ export class AppRuntime {
         env.ACCOUNT_TOKEN_SECRET,
         resolvedYaml.accountTokenSecret,
       ),
-      apiKey: AppRuntime.#trimOrFallback(env.API_KEY, resolvedYaml.apiKey),
+      apiKey: AppRuntime.#apiKeyDisabledForDev(env)
+        ? undefined
+        : AppRuntime.#trimOrFallback(env.API_KEY, resolvedYaml.apiKey),
     };
+  }
+
+  /**
+   * `npm run dev:prototype` turns the x-api-key check off so the Concept
+   * Chain prototype pages never hold the key. Honoured only under
+   * `netlify dev` (which sets NETLIFY_DEV=true), never in a deployed function.
+   */
+  static #apiKeyDisabledForDev(env: NodeJS.ProcessEnv): boolean {
+    return env.DEV_DISABLE_API_KEY === "true" && env.NETLIFY_DEV === "true";
   }
 
   static #trimOrFallback(

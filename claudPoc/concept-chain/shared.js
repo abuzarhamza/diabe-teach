@@ -130,9 +130,10 @@ const CC = (() => {
 
   // Checks and fills in settings shaped like CreateSessionRequest (+ prototype-only boardSize, minChainLength).
   // Throws INVALID_REQUEST_BODY / PACK_NOT_FOUND with a message a teacher can read.
-  function normalizeSettings(input = {}) {
+  // `given` is the pack to play when it doesn't come from this browser's list (Game setup passes the real API's pack).
+  function normalizeSettings(input = {}, given = null) {
     const bad = (msg) => { throw apiError("INVALID_REQUEST_BODY", msg); };
-    const packId = input.packId ?? DEFAULT_PACK_ID, pack = getPack(packId);
+    const packId = given?.packId ?? input.packId ?? DEFAULT_PACK_ID, pack = given ?? getPack(packId);
     if (!pack) throw apiError("PACK_NOT_FOUND", `No Curriculum Pack "${packId}".`);
     const tc = input.timerConfig ?? {};
     if (typeof tc !== "object" || Array.isArray(tc)) bad("timerConfig must be an object.");
@@ -160,16 +161,16 @@ const CC = (() => {
   // The pack a session plays: the copy taken at creation (so deleting a saved pack doesn't break a running game).
   const packOf = (s) => s.pack ?? getPack(settingsOf(s).packId);
 
-  function fresh(input) {
-    const settings = normalizeSettings(input);
+  function fresh(input, given = null) {
+    const settings = normalizeSettings(input, given);
     const roomCode = Array.from({ length: 6 }, () => "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"[Math.floor(Math.random() * 32)]).join("");
     const s = {
       session: { sessionId: uid("ses"), roomCode, packId: settings.packId, mode: settings.mode, adjudicationMode: settings.adjudicationMode,
         currentPhase: "pretest", activeRoundNumber: null, phaseStartedAt: new Date().toISOString(), phaseEndsAt: null, activeBoard: null, participantCount: 0 },
       settings, participants: [], chains: [],
     };
-    const p = getPack(settings.packId);
-    s.pack = { packId: p.packId, name: p.name, level: p.level ?? "", objective: p.objective ?? "", keywords: p.keywords.slice(), builtIn: !!p.builtIn };
+    const p = given ?? getPack(settings.packId);
+    s.pack = { packId: p.packId, name: p.name, version: p.version ?? null, level: p.level ?? "", objective: p.objective ?? "", keywords: p.keywords.slice(), builtIn: !!p.builtIn };
     s.session.phaseEndsAt = phaseEnd(settings, "pretest");
     return s;
   }
@@ -189,22 +190,10 @@ const CC = (() => {
 
   const timerLabel = (sec) => sec == null ? "Teacher-paced" : sec < 60 ? `${sec} s` : sec % 60 ? `${Math.floor(sec / 60)} min ${sec % 60} s` : `${sec / 60} min`;
 
-  // Demo teacher sign-in: name + email remembered in this browser. No password, nothing secret (not a real account).
-  const TEACHER_KEY = "cc-demo-teacher-v1";
-  function teacher() { try { const t = JSON.parse(localStorage.getItem(TEACHER_KEY)); return t && t.name && t.email ? t : null; } catch { return null; } }
-  function signIn(name, email) {
-    const n = String(name ?? "").trim(), e = String(email ?? "").trim();
-    if (!n) throw apiError("INVALID_REQUEST_BODY", "Enter your name.");
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) throw apiError("INVALID_REQUEST_BODY", "Enter a valid email address, like name@school.org.");
-    const t = { name: n.slice(0, 60), email: e, signedInAt: new Date().toISOString() };
-    localStorage.setItem(TEACHER_KEY, JSON.stringify(t)); return t;
-  }
-  function signOut() { localStorage.removeItem(TEACHER_KEY); }
-  // Guard for teacher pages: returns the signed-in teacher, or hides the page and sends the browser to Teacher login.
-  function requireTeacher(loginUrl = "login.html") {
-    const t = teacher(); if (t) return t;
-    document.documentElement.style.visibility = "hidden"; location.replace(loginUrl); return null;
-  }
+  // Teacher sign-in is real now: see account-api.js (CCApi). Game setup's "name shown to your class" is remembered here.
+  const CLASS_NAME_KEY = "cc-demo-class-name-v1";
+  const className = () => localStorage.getItem(CLASS_NAME_KEY) ?? "";
+  function rememberClassName(name) { localStorage.setItem(CLASS_NAME_KEY, String(name ?? "").trim().slice(0, 60)); }
 
   function load() { try { return JSON.parse(localStorage.getItem(KEY)) || null; } catch { return null; } }
   function get() { let s = load(); if (!s) { s = fresh(); localStorage.setItem(KEY, JSON.stringify(s)); } return s; }
@@ -215,7 +204,8 @@ const CC = (() => {
   function subscribe(fn) { listeners.push(fn); window.addEventListener("storage", (e) => { if (e.key === KEY) fn(get()); }); }
   function reset() { const s = fresh(); save(s); return s; }
   // Creates a new demo Game Session from CreateSessionRequest-shaped settings, replacing the stored one (like reset()).
-  function createSession(settings) { const s = fresh(settings); save(s); return s; }
+  // `pack` (optional) is the pack to play, e.g. the real API's pack converted by CCApi.toGamePack.
+  function createSession(settings, pack = null) { const s = fresh(settings, pack); save(s); return s; }
 
   function enterPhase(s, phase) {
     const ss = s.session;
@@ -383,7 +373,7 @@ const CC = (() => {
 
   return { PHASES, PHASE_LABEL, DEFAULT_PACK_ID, DEFAULT_TIMER_CONFIG, TIMER_FIELDS, TIMER_MIN_SEC, TIMER_MAX_SEC, MIN_BOARD_SIZE,
     MIN_PACK_KEYWORDS, listPacks, getPack, cleanKeywords, savePack, deletePack, lastSetup, rememberSetup, packOf, dealBoard, newSeed, normalizeSettings, settingsOf, createSession, timerFromMinutes, timerLabel, TIMER_MAX_MIN,
-    teacher, signIn, signOut, requireTeacher,
+    className, rememberClassName,
     get, peek, subscribe, reset, advance, extend, join, submitChain, vote, rule, standings, seedSampleLearners,
     topologyError, submissionsOpen, adjacent, clock, nextPhaseLabel, renderBoard, statusBadge, chainText, esc };
 })();

@@ -12,8 +12,7 @@
 .login{max-width:440px;width:100%;margin:8vh auto 0}
 .field{display:flex;flex-direction:column;gap:4px}
 .field label{font-size:12px;font-weight:700;color:var(--muted)}
-.demo{border:1px dashed var(--warn);border-radius:8px;padding:8px 10px;font-size:13px;color:var(--ink);background:color-mix(in srgb,var(--warn) 10%,transparent)}
-.demo b{color:var(--warn)}
+#why{border:1px solid var(--warn);border-radius:8px;padding:8px 10px;color:var(--ink);background:color-mix(in srgb,var(--warn) 10%,transparent)}
 .foot{font-size:13px;color:var(--muted)}
 .foot a{color:var(--accent)}
 .login-tools{display:flex;justify-content:flex-end;gap:8px}
@@ -25,20 +24,23 @@
   <section class="panel login">
     <div class="login-tools" data-api-toggle></div>
     <div class="brand"><h1>Concept <span>Chain</span></h1><p>Teacher login</p></div>
-    <p class="demo"><b>Demo sign-in.</b> There is no password and no account: your name and email are only remembered in this browser so the prototype knows who is running the class.</p>
+    <p class="note" id="why" role="alert" hidden></p>
 
-    <div class="col" id="signedIn" data-api="gap.signIn" data-api-io="read" hidden>
-      <p>Signed in as <b id="who"></b> <span class="note" id="whoEmail"></span></p>
+    <div class="col" id="signedIn" data-api="L.me" data-api-io="read" hidden>
+      <p>Signed in as <b id="who"></b></p>
       <div class="row">
         <a class="btn primary" href="setup.html" id="continue">Continue to Game setup →</a>
         <button class="btn sm" type="button" id="signOut">Sign out</button>
       </div>
     </div>
 
-    <form id="loginForm" class="col" data-api="gap.signIn" data-api-io="write" novalidate hidden>
-      <div class="field"><label for="name">Your name</label><input type="text" id="name" maxlength="60" autocomplete="name" required placeholder="Shown to your class, e.g. Ms Rahman"></div>
-      <div class="field"><label for="email">Email</label><input type="email" id="email" maxlength="120" autocomplete="email" required placeholder="name@school.org"></div>
-      <button class="btn primary" type="submit">Sign in</button>
+    <form id="loginForm" class="col" data-api="L" data-api-io="write" novalidate hidden>
+      <div class="field"><label for="email">Email</label><input type="email" id="email" maxlength="254" autocomplete="username" required placeholder="name@school.org"></div>
+      <div class="field"><label for="password">Password</label><input type="password" id="password" maxlength="1024" autocomplete="current-password" required aria-describedby="pwNote"><span class="note" id="pwNote">At least 10 characters.</span></div>
+      <div class="row">
+        <button class="btn primary" type="submit" id="signInBtn" data-api="L.signIn" data-api-io="write">Sign in</button>
+        <button class="btn" type="button" id="signUpBtn" data-api="L.signUp" data-api-io="write">Create account</button>
+      </div>
       <div class="toast" id="msg" role="status" aria-live="polite"></div>
     </form>
     <p class="foot">Learners don't sign in: they join with the room code on the <a href="participant.html">learner screen</a>.</p>
@@ -46,21 +48,39 @@
 </div>
 
 <script src="shared.js"></script>
+<script src="account-api.js"></script>
 <script src="api-catalog.js"></script>
 <script src="api-overlay.js"></script>
 <script>
 const $ = (id) => document.getElementById(id);
 function render() {
-  const t = CC.teacher();
-  $("signedIn").hidden = !t; $("loginForm").hidden = !!t;
-  if (t) { $("who").textContent = t.name; $("whoEmail").textContent = `(${t.email})`; }
+  const a = CCApi.account();
+  $("signedIn").hidden = !a; $("loginForm").hidden = !!a;
+  if (a) $("who").textContent = a.email;
 }
-$("loginForm").addEventListener("submit", (e) => {
-  e.preventDefault();
-  try { CC.signIn($("name").value, $("email").value); location.assign("setup.html"); }
-  catch (err) { $("msg").textContent = err.message; $("msg").className = "toast err"; (/email/i.test(err.message) ? $("email") : $("name")).focus(); }
-});
-$("signOut").onclick = () => { CC.signOut(); render(); $("name").focus(); };
+function showError(text, field) {
+  $("msg").textContent = text; $("msg").className = "toast err";
+  if (field) $(field).focus();
+}
+async function submit(kind) {
+  const email = $("email").value, password = $("password").value;
+  $("msg").textContent = ""; $("msg").className = "toast";
+  for (const b of [$("signInBtn"), $("signUpBtn")]) b.disabled = true;
+  try {
+    await (kind === "up" ? CCApi.signUp(email, password) : CCApi.signIn(email, password));
+    location.assign("setup.html");
+  }
+  catch (e) {
+    const field = e.details?.field === "email" ? "email" : e.code === "EMAIL_ALREADY_REGISTERED" ? "email" : "password";
+    showError(CCApi.loginErrorText(e), field);
+  }
+  finally { for (const b of [$("signInBtn"), $("signUpBtn")]) b.disabled = false; }
+}
+$("loginForm").addEventListener("submit", (e) => { e.preventDefault(); submit("in"); });
+$("signUpBtn").addEventListener("click", () => submit("up"));
+$("signOut").onclick = () => { CCApi.signOut(); render(); $("email").focus(); };
+const why = CCApi.takeLoginMessage();
+if (why) { $("why").textContent = why; $("why").hidden = false; }
 window.addEventListener("storage", render);
 render();
 </script>

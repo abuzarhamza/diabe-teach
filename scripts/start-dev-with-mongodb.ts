@@ -16,6 +16,11 @@
  *   npx tsx scripts/start-dev-with-mongodb.ts
  *   # or via npm script:
  *   npm run dev:local
+ *
+ * `--no-api-key` (`npm run dev:prototype`) starts the same server with the
+ * x-api-key check turned off, so the Concept Chain prototype pages at
+ * http://localhost:8888/claudPoc/concept-chain/login.html can call the API
+ * without ever holding the key. BDD needs `npm run dev:local`, which keeps it.
  */
 
 import type { ChildProcess } from "node:child_process";
@@ -38,6 +43,8 @@ const READY_PROBE_PATH = "/api/v1/packs";
 const READY_TIMEOUT_MS = 180_000;
 const STOP_GRACE_MS = 5_000;
 const FUNCTIONS_DIR = "netlify/functions";
+const NO_API_KEY = process.argv.includes("--no-api-key");
+const PROTOTYPE_URL = `${DEV_URL}/claudPoc/concept-chain/login.html`;
 // eslint-disable-next-line no-control-regex
 const ANSI = /\x1B\[[0-9;]*m/g;
 
@@ -146,6 +153,10 @@ function startNetlifyDev(mongoUri: string): void {
       MONGODB_DB_NAME: "diabe_teach_test",
       // Disable reading from .env.dev.yaml for MongoDB settings
       USE_ENV_MONGODB: "true",
+      // AppRuntime ignores the API key when this is set under netlify dev.
+      ...(NO_API_KEY
+        ? { DEV_DISABLE_API_KEY: "true" }
+        : {}),
     },
   });
   forwardOutput(netlifyProcess.stdout, process.stdout);
@@ -184,6 +195,9 @@ async function waitUntilReady(): Promise<void> {
       const status = await probeStatus();
       if (status !== null && status !== 404) {
         console.log(`DEV READY ${DEV_URL}`);
+        if (NO_API_KEY) {
+          console.log(`PROTOTYPE ${PROTOTYPE_URL} (x-api-key check off)`);
+        }
         return;
       }
     }

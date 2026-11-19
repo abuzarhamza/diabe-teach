@@ -7,6 +7,7 @@
     "dev": "netlify dev",
     "dev:debug": "DEBUG=* netlify dev",
     "dev:local": "node --import tsx scripts/start-dev-with-mongodb.ts",
+    "dev:prototype": "node --import tsx scripts/start-dev-with-mongodb.ts --no-api-key",
     "dev:local:stop": "node --import tsx scripts/stop-dev-local.ts",
     "test": "vitest run",
     "test:watch": "vitest",

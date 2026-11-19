@@ -9,7 +9,8 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Atkinson+Hyperlegible:wght@400;700&family=IBM+Plex+Mono:wght@500&display=swap">
 <link rel="stylesheet" href="shared.css">
 <script src="shared.js"></script>
-<script>CC.requireTeacher();</script>
+<script src="account-api.js"></script>
+<script>CCApi.requireTeacher();</script>
 <style>
 .who{display:flex;flex-direction:column;align-items:flex-end;gap:2px;font-size:14px}
 .who a{color:var(--muted);font-size:13px}
@@ -52,7 +53,10 @@ details[open]>summary{margin-bottom:8px}
 .tag{background:var(--sunk);border-radius:999px;padding:1px 8px;font-size:12px;font-weight:700;margin-left:6px;color:var(--muted)}
 .packitem{display:flex;flex-direction:column;gap:4px}
 .packitem .pack{flex:1}
-.packitem .del{align-self:flex-end}
+.packitem .acts{display:flex;gap:6px;justify-content:flex-end}
+.pack .by{display:block;font-size:12px;color:var(--muted)}
+.pack.archived{opacity:.7;border-style:dashed;cursor:default}
+.archtoggle{display:inline-flex;gap:6px;align-items:center;font-size:14px;align-self:flex-start}
 .editor{display:flex;flex-direction:column;gap:10px}
 .editor .field{display:flex;flex-direction:column;gap:4px}
 .editor .field>label,.editor .lbl{font-weight:700;font-size:14px}
@@ -75,18 +79,19 @@ label.btn{cursor:pointer}
 <div class="wrap">
   <header class="top">
     <div class="brand"><h1>Concept <span>Chain</span></h1><p>Game setup · three steps and your class is playing</p></div>
-    <div class="who" data-api="gap.signIn" data-api-io="read"><span>Signed in as <b id="who"></b></span><a href="login.html" id="signOut">Sign out</a></div>
+    <div class="who" data-api="L.me" data-api-io="read"><span>Signed in as <b id="who"></b></span><a href="login.html" id="signOut">Sign out</a></div>
   </header>
 
   <div class="main">
     <div class="col">
       <section class="panel" aria-labelledby="packH">
         <h2 id="packH"><span class="step" aria-hidden="true">1</span>Pick a topic</h2>
-        <div class="packs" id="packs" role="radiogroup" aria-labelledby="packH" data-api="P.list" data-api-io="read"></div>
+        <label class="archtoggle" data-api="P.showArchived" data-api-io="read"><input type="checkbox" id="showArchived"> Show archived</label>
+        <div class="packs" id="packs" role="radiogroup" aria-labelledby="packH" data-api="P.list" data-api-io="read"><p class="note">Loading the pack library…</p></div>
         <p class="note" id="packMsg" role="status" aria-live="polite"></p>
       </section>
       <section class="panel" id="editor" aria-labelledby="edH" data-api="P.create" data-api-io="write" hidden>
-        <div class="row between"><h2 id="edH">New pack</h2><span class="eyebrow">Saved in this browser</span></div>
+        <div class="row between"><h2 id="edH">New pack</h2><span class="eyebrow">Saved to the shared pack library</span></div>
         <div class="editor">
           <div class="field">
             <span class="lbl" id="fromLbl">Start from an existing pack</span>
@@ -138,6 +143,7 @@ label.btn{cursor:pointer}
 
       <section class="panel startp" aria-labelledby="sumH">
         <h2 id="sumH"><span class="step" aria-hidden="true">3</span>Start</h2>
+        <div class="field" data-api="A.creatorDisplayName" data-api-io="write"><label for="className">Name shown to your class <span class="opt">(optional)</span></label><input type="text" id="className" maxlength="60" autocomplete="off" placeholder="e.g. Ms Rahman"></div>
         <p class="sum" id="summary"></p>
         <button class="btn primary" id="start" type="button" data-api="A" data-api-io="write">Start game →</button>
         <p class="err" id="startErr" role="status" aria-live="polite"></p>
@@ -151,20 +157,26 @@ label.btn{cursor:pointer}
 <script src="api-overlay.js"></script>
 <script>
 const $ = (id) => document.getElementById(id);
-const teacher = CC.teacher();
+const teacher = CCApi.account(); // null while CCApi.requireTeacher() redirects to Teacher login
 const defaults = CC.DEFAULT_TIMER_CONFIG;
 const TIMER_MINUTES = [3, 4, 5, 8, 10, 15]; // the timer dropdowns' choices; a remembered off-list value is added
 const MIN_CHAIN_CHOICES = [2, 3, 4, 5, 6];
 const PACED = "paced"; // dropdown value for "No timer – I'll move them on" (timerConfig null)
 const TIMERS = [["map", "roundMappingSec"], ["rev", "roundAdjudicationSec"]];
 let packId = CC.DEFAULT_PACK_ID;
+let items = []; // listCurriculumPacks: the latest Pack Version of each pack (archived ones too while "Show archived" is on)
+let current = null; // the chosen pack as the browser game plays it (CCApi.toGamePack), from getCurriculumPackById
+const fullPacks = new Map(); // "id@version" -> PublicCurriculumPack
+let editing = null; // "Edit → save as new version": { item, full } of the pack being versioned; null for a new pack
 let seed = CC.newSeed(); // the board preview's seed; Shuffle replaces it, Start game sends it as CreateSessionRequest.seed
 let shuffles = 0;
 let wantSize = 7; // the teacher's chosen board size; capped by what the chosen pack can fill
 const draft = { keywords: [], duplicates: 0, empty: 0 };
 const sizeOf = (pack) => Math.min(10, Math.floor(Math.sqrt(pack.keywords.length)));
-const boardSize = () => { const p = CC.getPack(packId); return p ? Math.max(3, Math.min(wantSize, sizeOf(p))) : wantSize; };
+const boardSize = () => current ? Math.max(3, Math.min(wantSize, sizeOf(current))) : wantSize;
 const plural = (n, one, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
+const itemOf = (id) => items.find((p) => p.id === id) ?? null;
+const playable = () => items.filter((p) => !p.isArchived);
 
 // A timer dropdown's value as timerConfig seconds (null = no timer).
 const timerSec = (key) => $(`${key}Sel`).value === PACED ? null : Number($(`${key}Sel`).value);
@@ -183,28 +195,58 @@ function fillMinChain(n) {
 
 // Reads the form; returns { settings } when valid, else { error } naming what to fix. Settings mirror CreateSessionRequest (+ boardSize, minChainLength).
 function readForm() {
-  if (!CC.getPack(packId)) return { error: "Choose a topic first." };
+  if (!current || current.packId !== packId) return { error: "Choose a topic first." };
   const timerConfig = Object.fromEntries(TIMERS.map(([key, field]) => [field, timerSec(key)]));
   const size = boardSize(), minChain = Number($("minChain").value);
   if (minChain > size * size) return { error: `Chains of ${minChain} words don't fit a ${size} × ${size} board. Pick a shorter chain under Board & chain length.` };
-  const settings = { packId, mode: "classroom", adjudicationMode: "peer-instructor", creatorDisplayName: teacher.name, timerConfig, seed, boardSize: size, minChainLength: minChain };
-  try { CC.normalizeSettings(settings); } catch (e) { return { error: e.message }; }
+  const settings = { packId, mode: "classroom", adjudicationMode: "peer-instructor", creatorDisplayName: $("className").value.trim() || null, timerConfig, seed, boardSize: size, minChainLength: minChain };
+  try { CC.normalizeSettings(settings, current); } catch (e) { return { error: e.message }; }
   return { settings };
 }
 
 function renderPacks() {
-  const packs = CC.listPacks();
-  let html = "", group = null;
-  for (const p of packs) {
-    if (p.group !== group) { group = p.group; html += `<span class="eyebrow group">${CC.esc(group)}</span>`; }
-    const label = `<label class="pack" title="${CC.esc(`${p.keywords.length} words · ${p.description}`)}"><input type="radio" name="pack" value="${CC.esc(p.packId)}" ${p.packId === packId ? "checked" : ""}>
-      <span class="nm">${CC.esc(p.name)}${p.builtIn ? "" : `<span class="tag">Yours</span>`}</span></label>`;
-    html += p.builtIn ? label : `<div class="packitem">${label}<button class="btn sm bad del" type="button" data-del="${CC.esc(p.packId)}" data-api="gap.deletePack" data-api-io="write" aria-label="Delete pack ${CC.esc(p.name)}">Delete</button></div>`;
+  let html = "";
+  for (const p of items) {
+    const label = `<label class="pack${p.isArchived ? " archived" : ""}" title="${CC.esc(`${plural(p.cardCount, "word")} · ${p.subjectDomain}`)}"><input type="radio" name="pack" value="${CC.esc(p.id)}" ${p.id === packId && !p.isArchived ? "checked" : ""} ${p.isArchived ? "disabled" : ""}>
+      <span><span class="nm">${CC.esc(p.title)}${p.isArchived ? `<span class="tag">Archived</span>` : ""}</span><span class="by" data-api="P.byline" data-api-io="read">${CC.esc(CCApi.byline(p))}</span></span></label>`;
+    const acts = p.isArchived
+      ? `<button class="btn sm" type="button" data-unarchive="${CC.esc(p.id)}" data-api="P.unarchive" data-api-io="write" aria-label="Unarchive pack ${CC.esc(p.title)}">Unarchive</button>`
+      : `<button class="btn sm" type="button" data-edit="${CC.esc(p.id)}" data-api="P.version" data-api-io="write" aria-label="Edit pack ${CC.esc(p.title)} and save as a new version">Edit</button>`
+        + `<button class="btn sm bad" type="button" data-archive="${CC.esc(p.id)}" data-api="P.archive" data-api-io="write" aria-label="Archive pack ${CC.esc(p.title)}">Archive</button>`;
+    html += `<div class="packitem">${label}<div class="acts">${acts}</div></div>`;
   }
-  html += `<button class="pack newcard" id="newPack" type="button" aria-expanded="${String(!$("editor").hidden)}" aria-controls="editor">+ New pack</button>`;
+  if (!items.length) html += `<p class="empty">No packs yet. Make one.</p>`;
+  html += `<button class="pack newcard" id="newPack" type="button" aria-expanded="${String(!$("editor").hidden && !editing)}" aria-controls="editor">+ New pack</button>`;
   $("packs").innerHTML = html;
-  $("from").innerHTML = packs.map((p) => `<option value="${CC.esc(p.packId)}">${CC.esc(p.name)} (${p.keywords.length})</option>`).join("");
+  $("from").innerHTML = playable().map((p) => `<option value="${CC.esc(p.id)}">${CC.esc(p.title)} (${p.cardCount})</option>`).join("");
   $("from").value = packId;
+}
+
+// The full pack (getCurriculumPackById), cached per Pack Version.
+async function fullPack(item) {
+  const key = `${item.id}@${item.version}`;
+  if (!fullPacks.has(key)) fullPacks.set(key, await CCApi.getPack(item.id));
+  return fullPacks.get(key);
+}
+
+// Chooses a pack: loads its keywords for the board preview and the game.
+async function choosePack(id) {
+  packId = id; current = null; render();
+  const item = itemOf(id); if (!item) return;
+  try {
+    const full = await fullPack(item);
+    if (packId === id) { current = CCApi.toGamePack(full, item); render(); }
+  }
+  catch (e) { $("packMsg").textContent = CCApi.packErrorText(e); }
+}
+
+// Loads the pack library (listCurriculumPacks), keeps the choice when it is still playable, and renders.
+async function loadPacks() {
+  try { items = await CCApi.listPacks({ includeArchived: $("showArchived").checked }); }
+  catch (e) { $("packs").innerHTML = `<p class="err">${CC.esc(CCApi.packErrorText(e))}</p>`; return; }
+  if (!playable().some((p) => p.id === packId)) packId = (playable().find((p) => p.id === CC.DEFAULT_PACK_ID) ?? playable()[0])?.id ?? null;
+  renderPacks();
+  await choosePack(packId);
 }
 
 function renderEditor(added) {
@@ -231,15 +273,21 @@ function addKeywords(input) {
   renderEditor(added);
 }
 
-function openEditor(open) {
-  $("editor").hidden = !open; $("newPack").setAttribute("aria-expanded", String(open));
-  if (open) { renderEditor(); $("editor").scrollIntoView({ block: "nearest", behavior: "smooth" }); $("paste").focus({ preventScroll: true }); }
-  else { Object.assign(draft, { keywords: [], duplicates: 0, empty: 0 }); for (const id of ["paste", "pkName", "pkLevel", "pkObj"]) $(id).value = ""; $("edErr").textContent = ""; $("edAdded").textContent = ""; }
+// Opens the editor for a new pack, or (with `version` = { item, full }) for "Edit → save as new version".
+function openEditor(open, version = null) {
+  $("editor").hidden = !open; $("newPack")?.setAttribute("aria-expanded", String(open && !version));
+  Object.assign(draft, { keywords: [], duplicates: 0, empty: 0 }); for (const id of ["paste", "pkName", "pkLevel", "pkObj"]) $(id).value = ""; $("edErr").textContent = ""; $("edAdded").textContent = "";
+  editing = open ? version : null;
+  $("edH").textContent = editing ? `Edit “${editing.item.title}” → save as v${CCApi.nextVersion(editing.item.version)}` : "New pack";
+  $("savePack").textContent = editing ? `Save as new version (v${CCApi.nextVersion(editing.item.version)})` : "Save pack";
+  $("savePack").dataset.api = editing ? "P.version" : "P.create";
+  if (editing) { draft.keywords = CCApi.toGamePack(editing.full).keywords; $("pkName").value = editing.full.title; }
+  if (open) { renderEditor(); $("editor").scrollIntoView({ block: "nearest", behavior: "smooth" }); (editing ? $("pkName") : $("paste")).focus({ preventScroll: true }); }
 }
 
 function render() {
-  const pack = CC.getPack(packId);
-  $("packInfo").textContent = pack ? `${pack.name} · ${plural(pack.keywords.length, "word")} · ${pack.builtIn ? pack.group : pack.description}` : "";
+  const pack = current, item = itemOf(packId);
+  $("packInfo").textContent = pack ? `${pack.name} · ${plural(pack.keywords.length, "word")} · ${CCApi.byline(item ?? pack)}` : item ? `Loading ${item.title}…` : "";
   $("kwSum").textContent = pack ? `See all ${plural(pack.keywords.length, "word")}` : "See all words";
   $("keywords").innerHTML = pack ? pack.keywords.map((k) => `<span>${CC.esc(k)}</span>`).join("") : `<p class="empty">Choose a topic to see its words.</p>`;
 
@@ -252,7 +300,7 @@ function render() {
   $("startErr").textContent = error ?? "";
   const time = (key) => { const sec = timerSec(key); return sec == null ? "no timer" : CC.timerLabel(sec); };
   $("summary").innerHTML = pack
-    ? `<b>${CC.esc(pack.name)}</b><br>Building chains: ${time("map")} · Reviewing: ${time("rev")}<br>${size} × ${size} board · chains of ${CC.esc($("minChain").value)}+ words · 2 rounds, each with a new board`
+    ? `<b>${CC.esc(pack.name)}</b> v${CC.esc(pack.version)}<br>Building chains: ${time("map")} · Reviewing: ${time("rev")}<br>${size} × ${size} board · chains of ${CC.esc($("minChain").value)}+ words · 2 rounds, each with a new board`
     : "Pick a topic in step 1.";
   $("moreVal").textContent = `${size} × ${size} board · chains of ${$("minChain").value}+ words`;
   $("start").disabled = !settings;
@@ -271,42 +319,68 @@ function renderPreview(pack, size) {
 // Pre-fills from the last visit (CC.lastSetup), else the demo defaults.
 function prefill() {
   const last = CC.lastSetup() ?? {}, tc = { ...defaults, ...(last.timerConfig ?? {}) };
-  if (last.packId && CC.getPack(last.packId)) packId = last.packId;
+  if (last.packId) packId = last.packId;
   if (Number.isInteger(last.boardSize)) wantSize = last.boardSize;
   for (const [key, field] of TIMERS) fillTimer(key, tc[field]);
   fillMinChain(Number.isInteger(last.minChainLength) && last.minChainLength >= 2 ? last.minChainLength : 2);
+  $("className").value = CC.className();
+}
+
+// Two-click confirm (like the old Delete): the first click arms the button for 6 s.
+function armed(b, confirmLabel) {
+  if (b.dataset.armed === "1") return true;
+  const label = b.textContent; b.dataset.armed = "1"; b.textContent = confirmLabel;
+  setTimeout(() => { if (b.isConnected) { b.dataset.armed = ""; b.textContent = label; } }, 6000);
+  return false;
+}
+
+// A pack id for a new pack: its name as a slug, made unique against every pack (archived ones included).
+async function newPackId(name) {
+  const all = new Set((await CCApi.listPacks({ includeArchived: true })).map((p) => p.id));
+  const base = CCApi.slug(name).replace(/^[^a-z]+/, "") || "pack";
+  let id = base, n = 2; while (all.has(id) || id.length < 2) id = `${base}-${n++}`;
+  return id;
 }
 
 if (teacher) {
-  $("who").textContent = teacher.name;
+  $("who").textContent = teacher.email;
+  CCApi.me().then((a) => { if (a?.email) $("who").textContent = a.email; }).catch(() => {}); // a rejected token sends the teacher to Teacher login
   prefill();
-  renderPacks();
-  $("packs").addEventListener("change", (e) => { if (e.target.name === "pack") { packId = e.target.value; render(); } });
-  $("packs").addEventListener("click", (e) => {
-    if (e.target.closest("#newPack")) { openEditor($("editor").hidden); return; }
-    const b = e.target.closest("[data-del]"); if (!b) return;
-    if (b.dataset.armed !== "1") { b.dataset.armed = "1"; b.textContent = "Confirm delete"; setTimeout(() => { if (b.isConnected) { b.dataset.armed = ""; b.textContent = "Delete"; } }, 6000); return; }
-    const p = CC.getPack(b.dataset.del);
-    try { CC.deletePack(b.dataset.del); } catch (err) { $("packMsg").textContent = err.message; return; }
-    if (packId === b.dataset.del) packId = CC.DEFAULT_PACK_ID;
-    renderPacks(); render();
-    $("packMsg").textContent = `Deleted “${p?.name ?? "pack"}”.`;
-    document.querySelector('#packs input[name="pack"]:checked')?.focus();
+  $("packs").addEventListener("change", (e) => { if (e.target.name === "pack") choosePack(e.target.value); });
+  $("showArchived").addEventListener("change", () => loadPacks());
+  $("packs").addEventListener("click", async (e) => {
+    if (e.target.closest("#newPack")) { openEditor($("editor").hidden || !!editing); return; }
+    const arch = e.target.closest("[data-archive]"), unarch = e.target.closest("[data-unarchive]"), edit = e.target.closest("[data-edit]");
+    if (edit) {
+      const item = itemOf(edit.dataset.edit); if (!item) return;
+      try { openEditor(true, { item, full: await fullPack(item) }); } catch (err) { $("packMsg").textContent = CCApi.packErrorText(err); }
+      return;
+    }
+    const b = arch ?? unarch; if (!b) return;
+    const id = b.dataset.archive ?? b.dataset.unarchive, item = itemOf(id);
+    if (arch && !armed(b, "Confirm archive")) return;
+    b.disabled = true;
+    try {
+      await (arch ? CCApi.archivePack(id) : CCApi.unarchivePack(id));
+      $("packMsg").textContent = arch ? `Archived “${item?.title ?? id}”. Turn on “Show archived” to unarchive it.` : `Unarchived “${item?.title ?? id}”.`;
+      await loadPacks();
+    }
+    catch (err) { $("packMsg").textContent = CCApi.packErrorText(err); b.disabled = false; }
   });
   for (const id of ["mapSel", "revSel", "minChain"]) $(id).addEventListener("change", render);
+  $("className").addEventListener("input", () => CC.rememberClassName($("className").value));
   $("more").addEventListener("toggle", () => { $("moreChg").textContent = $("more").open ? "Done" : "Change"; });
   $("size").addEventListener("change", () => { wantSize = Number($("size").value); render(); });
-  $("signOut").addEventListener("click", () => CC.signOut());
+  $("signOut").addEventListener("click", () => CCApi.signOut());
   $("shuffle").onclick = () => { seed = CC.newSeed(); shuffles++; render(); };
-  window.addEventListener("resize", () => renderPreview(CC.getPack(packId), boardSize()));
+  window.addEventListener("resize", () => renderPreview(current, boardSize()));
 
   $("cancelPack").onclick = () => { openEditor(false); $("newPack").focus(); };
-  $("fromAdd").onclick = () => {
-    const p = CC.getPack($("from").value); if (!p) return;
+  $("fromAdd").onclick = async () => {
+    const item = itemOf($("from").value); if (!item) return;
+    let p; try { p = CCApi.toGamePack(await fullPack(item), item); } catch (err) { $("edErr").textContent = CCApi.packErrorText(err); return; }
     addKeywords(p.keywords);
     if (!$("pkName").value.trim()) $("pkName").value = `${p.name} (my copy)`;
-    if (!$("pkLevel").value.trim() && p.level) $("pkLevel").value = p.level;
-    if (!$("pkObj").value.trim() && p.objective) $("pkObj").value = p.objective;
   };
   $("pasteAdd").onclick = () => { addKeywords($("paste").value); $("paste").value = ""; };
   $("paste").addEventListener("keydown", (e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) $("pasteAdd").click(); });
@@ -323,36 +397,52 @@ if (teacher) {
     ($("edChips").querySelectorAll("[data-rm]")[Math.min(i, draft.keywords.length - 1)] ?? $("paste")).focus();
   });
   $("clearKw").onclick = () => { Object.assign(draft, { keywords: [], duplicates: 0, empty: 0 }); renderEditor(); };
-  $("savePack").onclick = () => {
+  // Save pack → registerCurriculumPack (a new pack, v1.0.0); Edit → save as new version → registerCurriculumPack with the same id and the next version.
+  $("savePack").onclick = async () => {
+    const name = $("pkName").value.trim().replace(/\s+/g, " ");
+    if (!name) { $("edErr").textContent = "Give the pack a name."; $("pkName").focus(); return; }
+    if (draft.keywords.length < CC.MIN_PACK_KEYWORDS) { $("edErr").textContent = `A pack needs at least ${CC.MIN_PACK_KEYWORDS} different keywords (a 3×3 board); this one has ${draft.keywords.length}.`; return; }
+    const long = draft.keywords.find((k) => k.length > 60);
+    if (long) { $("edErr").textContent = `Keep each keyword to 60 characters or fewer (“${long.slice(0, 30)}…”).`; return; }
+    $("savePack").disabled = true; $("edErr").textContent = "";
     try {
-      const p = CC.savePack({ name: $("pkName").value, level: $("pkLevel").value, objective: $("pkObj").value, keywords: draft.keywords });
-      packId = p.packId; openEditor(false); renderPacks(); render();
-      $("packMsg").textContent = `Saved “${p.name}” (${plural(p.keywords.length, "word")}) and chose it.`;
+      const fields = { name, level: $("pkLevel").value, objective: $("pkObj").value, keywords: draft.keywords };
+      const input = editing ? CCApi.packInput({ ...fields, base: editing.full }) : CCApi.packInput({ ...fields, packId: await newPackId(name) });
+      await CCApi.registerPack(input);
+      const released = editing; packId = input.id; openEditor(false);
+      $("packMsg").textContent = released ? `Released v${input.version} of “${input.title}” and chose it.` : `Saved “${input.title}” (${plural(input.cards.length, "word")}) to the shared library and chose it.`;
+      await loadPacks();
       $("newPack").focus();
-    } catch (e) { $("edErr").textContent = e.message; }
+    }
+    catch (e) {
+      const issues = e.details?.errors ?? [];
+      $("edErr").textContent = CCApi.packErrorText(e) + (issues.length ? ` ${issues.map((x) => x.message).join(" ")}` : "");
+    }
+    finally { $("savePack").disabled = false; }
   };
 
   // Live API overlay samples: the form as it stands (Start game's createGameSession body), the pack list,
   // the chosen pack and the create-pack editor. Plain data, cheap to build. Timer fields keep the
   // minutes/paced shape the catalog's sample builder reads.
   const minutesOf = (key, field) => String((timerSec(key) ?? defaults[field] ?? 300) / 60);
-  CCOverlay.setContext(() => {
-    const pack = CC.getPack(packId);
-    return {
-      setup: { packId, creatorDisplayName: teacher.name, mappingMinutes: minutesOf("map", "roundMappingSec"), mappingPaced: timerSec("map") == null,
-        adjudicationMinutes: minutesOf("rev", "roundAdjudicationSec"), adjudicationPaced: timerSec("rev") == null, seed, boardSize: boardSize(), minChainLength: $("minChain").value },
-      packs: CC.listPacks().map((p) => ({ packId: p.packId, name: p.name, group: p.group, description: p.description, keywordCount: p.keywords.length, maxBoardSize: sizeOf(p) })),
-      pack: pack ? { packId: pack.packId, name: pack.name, group: pack.group, description: pack.description, keywords: pack.keywords, maxBoardSize: sizeOf(pack) } : null,
-      newPack: $("editor").hidden ? null : { name: $("pkName").value, level: $("pkLevel").value, objective: $("pkObj").value, keywords: draft.keywords },
-    };
-  });
+  CCOverlay.setContext(() => ({
+    setup: { packId, creatorDisplayName: $("className").value.trim() || null, mappingMinutes: minutesOf("map", "roundMappingSec"), mappingPaced: timerSec("map") == null,
+      adjudicationMinutes: minutesOf("rev", "roundAdjudicationSec"), adjudicationPaced: timerSec("rev") == null, seed, boardSize: boardSize(), minChainLength: $("minChain").value },
+    packs: items.map((p) => ({ packId: p.id, name: p.title, group: p.subjectDomain, description: CCApi.byline(p), keywordCount: p.cardCount, maxBoardSize: p.boardConfig?.rows ?? 7,
+      version: p.version, authorHandle: p.authorHandle, isArchived: p.isArchived })),
+    pack: current ? { packId: current.packId, name: current.name, group: itemOf(current.packId)?.subjectDomain, description: current.description, keywords: current.keywords, maxBoardSize: sizeOf(current), version: current.version } : null,
+    newPack: $("editor").hidden ? null : { name: $("pkName").value, level: $("pkLevel").value, objective: $("pkObj").value, keywords: draft.keywords,
+      version: editing ? CCApi.nextVersion(editing.item.version) : undefined, packId: editing ? editing.item.id : undefined },
+  }));
 
+  // Start game stays in the browser (decision of 2026-11-19): the game plays the chosen Pack Version's keywords.
   $("start").onclick = () => {
     const { settings, error } = readForm(); if (!settings) { $("startErr").textContent = error; return; }
-    try { CC.createSession(settings); CC.rememberSetup(settings); location.assign("teacher.html"); }
+    try { CC.createSession(settings, current); CC.rememberSetup(settings); CC.rememberClassName($("className").value); location.assign("teacher.html"); }
     catch (e) { $("startErr").textContent = e.message; }
   };
   render();
+  loadPacks();
 }
 </script>
 </body>

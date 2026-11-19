@@ -40,7 +40,7 @@ interface DemoMock {
   dealBoard: (args: { packId?: string; boardSize?: number; seed: string }) => Board;
   newSeed: () => string;
   nextPhaseLabel: (phase: string) => string | null;
-  createSession: (settings?: Record<string, unknown>) => DemoState;
+  createSession: (settings?: Record<string, unknown>, pack?: Record<string, unknown>) => DemoState;
   reset: () => DemoState;
   get: () => DemoState;
   settingsOf: (s: DemoState) => Settings;
@@ -50,9 +50,8 @@ interface DemoMock {
   submitChain: (participantId: string, path: GridCoord[], story: string, rationales: unknown[]) => unknown;
   timerFromMinutes: (minutes: number | string, teacherPaced?: boolean) => number | null;
   timerLabel: (sec: number | null) => string;
-  teacher: () => { name: string; email: string; signedInAt: string } | null;
-  signIn: (name: string, email: string) => { name: string; email: string; signedInAt: string };
-  signOut: () => void;
+  className: () => string;
+  rememberClassName: (name: string) => void;
 }
 
 const root = resolve(import.meta.dirname, "..");
@@ -275,24 +274,33 @@ describe("shared demo mock: Game setup times", () => {
   });
 });
 
-describe("shared demo mock: demo teacher sign-in", () => {
-  it("remembers the teacher until sign-out", () => {
-    expect(cc.teacher()).toBeNull();
-    const t = cc.signIn("  Ms Rahman ", "rahman@school.org");
-    expect(t).toMatchObject({
-      name: "Ms Rahman",
-      email: "rahman@school.org",
-      signedInAt: expect.any(String),
-    });
-    expect(cc.teacher()).toEqual(t);
-    cc.signOut();
-    expect(cc.teacher()).toBeNull();
+describe("shared demo mock: the real API's pack and the class name", () => {
+  it("has no demo sign-in any more: Teacher login uses the real accounts (account-api.js)", () => {
+    expect((cc as unknown as Record<string, unknown>).signIn).toBeUndefined();
+    expect((cc as unknown as Record<string, unknown>).requireTeacher).toBeUndefined();
   });
 
-  it("rejects a missing name or a malformed email", () => {
-    expect(() => cc.signIn(" ", "a@b.org")).toThrow("Enter your name.");
-    expect(() => cc.signIn("Ms Rahman", "rahman@school")).toThrow(/valid email/);
-    expect(cc.teacher()).toBeNull();
+  it("remembers the name shown to the class across reloads", () => {
+    const store = new Map<string, string>();
+    expect(loadMock(store).className()).toBe("");
+    loadMock(store).rememberClassName("  Ms Rahman ");
+    expect(loadMock(store).className()).toBe("Ms Rahman");
+  });
+
+  it("plays a pack given by Game setup (the real API's pack) that this browser's list doesn't know", () => {
+    const pack = {
+      packId: "probe-pack",
+      name: "Probe pack",
+      version: "1.1.0",
+      keywords: Array.from({ length: 10 }, (_, i) => `Probe ${i + 1}`),
+      builtIn: false,
+    };
+    const s = cc.createSession({ packId: "probe-pack", boardSize: 3, seed: "s1" }, pack);
+    expect(s.session.packId).toBe("probe-pack");
+    expect(cc.packOf(cc.get())).toMatchObject({ packId: "probe-pack", name: "Probe pack", version: "1.1.0" });
+    expect(() => cc.createSession({ packId: "probe-pack", boardSize: 4 }, pack)).toThrow(/too few|Board size/);
+    const r1 = advanceTo(cc, "round-1:chain-mapping");
+    expect(r1.session.activeBoard?.cells.flat().every(cell => cell.label.startsWith("Probe"))).toBe(true);
   });
 });
 

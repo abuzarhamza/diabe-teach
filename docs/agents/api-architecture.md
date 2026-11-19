@@ -139,6 +139,7 @@ Every `/api/v1` route uses this one middy chain. `before` steps run in this orde
 
 - `npm run dev:local`: Netlify dev with an in-memory MongoDB. **Wait for the line `DEV READY http://localhost:8888`** before sending requests or running BDD; port 8888 can answer 404 before the functions have loaded.
 - `npm run test:bdd`: runs the features one at a time, each in its own cucumber process, against the running dev server. It waits up to 60s for the server. Run a single feature with `npm run test:bdd -- tests/integration/features/<name>.feature`. `npm run test:bdd:mongodb` is the same with `BDD_USE_MONGODB=true`.
+- `npm run dev:prototype`: the same server with the x-api-key check off (`DEV_DISABLE_API_KEY=true`, honoured by `AppRuntime.loadEnvConfig` only when `NETLIFY_DEV=true`). It serves the Concept Chain prototype from the repo root on the same origin: http://localhost:8888/claudPoc/concept-chain/login.html. Its pages call the account and pack routes and never hold the API key. Don't run BDD against it; stop it with `npm run dev:local:stop`.
 - `npm run dev:local:stop`: stops the whole dev process tree and checks that port 8888 is free. Always run it when you are done; `pkill -f "netlify dev"` leaves processes behind.
 - `npx vitest run --no-file-parallelism`: unit, handler and contract tests, one file at a time (parallel runs have exhausted memory on dev machines).
 - `npm run typecheck`, `npm run lint` (baseline 96 errors as of `484cbab`), `npm run lint:boundaries` (baseline 6).

@@ -1,5 +1,7 @@
 // Tiny static server for the Concept Chain prototype. Node built-ins only.
 // Run: node claudPoc/concept-chain/server.mjs   (PORT=9000 to change the port)
+// It serves the pages only: Teacher login and Game setup's pack library call the real API on the same origin,
+// so use `npm run dev:prototype` and http://localhost:8888/claudPoc/concept-chain/login.html for them.
 import { readFile } from "node:fs/promises";
 import { createServer } from "node:http";
 import { extname, join, normalize } from "node:path";

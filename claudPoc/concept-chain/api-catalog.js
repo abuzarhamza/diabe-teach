@@ -3,7 +3,8 @@
 // and evaluated by tests/claudpoc-api-catalog-drift.test.ts against docs/api/openapi.yaml.
 //
 // Contracts are hand-written from docs/api/openapi.yaml with $refs resolved.
-// Statuses and deviations were checked against src/ and netlify/functions/ on 2026-11-17.
+// Statuses and deviations were checked against src/ and netlify/functions/ on 2026-11-17; the account and pack
+// library operations (teacher-login tickets 01-07) were re-checked over HTTP against `npm run dev:prototype` on 2026-11-19.
 // When a backend gap closes, update `status` and `deviations` here.
 //
 // Shape (see .scratch/concept-chain-screens-api-overlay/spec.md):
@@ -124,7 +125,8 @@
     },
 
     authLabels: {
-      apiKey: "x-api-key header (only when the server has API_KEY set)",
+      apiKey: "x-api-key header (only when the server has API_KEY set; `npm run dev:prototype` turns it off, so the pages never hold the key)",
+      account: "Authorization: Bearer <Account Token> (from sign-up or sign-in; 12 hours)",
       instructor: "Authorization: Bearer <instructor Capability Token>",
       participant: "Authorization: Bearer <participant Capability Token>",
     },
@@ -146,11 +148,19 @@
     ],
 
     steps: {
+      // L comes first: the teacher signs in (or creates an account) on Teacher login. The Account Token it returns is
+      // kept in localStorage under its own key and sent on the pack library's write calls.
+      L: {
+        title: "Teacher sign-in",
+        actor: "teacher",
+        ops: ["signInInstructor", "signUpInstructor", "getCurrentInstructorAccount"],
+        screens: ["login", "setup"],
+      },
       // P comes before A: the teacher picks or makes a Curriculum Pack on Game setup, then starts the game.
       P: {
         title: "Choose a Curriculum Pack",
         actor: "teacher",
-        ops: ["listCurriculumPacks", "getCurriculumPackById", "validateCurriculumPack", "registerCurriculumPack"],
+        ops: ["listCurriculumPacks", "getCurriculumPackById", "registerCurriculumPack", "archiveCurriculumPack", "unarchiveCurriculumPack"],
         screens: ["setup"],
       },
       A: {
@@ -206,24 +216,81 @@
     },
 
     operations: {
+      signUpInstructor: {
+        method: "POST",
+        path: "/api/v1/accounts/sign-up",
+        pathParams: {},
+        auth: ["apiKey"],
+        request: { email: "rahman.s@aku.edu", password: "<at least 10 characters>" },
+        response: { status: 201, body: { accountId: "<accountId>", email: "rahman.s@aku.edu", accountToken: "<accountToken>", expiresAt: "<issued + 12 h>" } },
+        errors: [
+          { status: 400, code: "INVALID_REQUEST_BODY" },
+          { status: 401, code: "UNAUTHORIZED_TOKEN" },
+          { status: 409, code: "EMAIL_ALREADY_REGISTERED" },
+        ],
+        status: "implemented",
+        notes: [
+          "\"Create account\" on Teacher login. Signs the new account in: keep `accountToken` (the prototype stores it in localStorage under `cc-account-token-v1`; Sign out removes it).",
+          "The email is trimmed and lower-cased. A password under 10 characters gets 400 INVALID_REQUEST_BODY with `details.field: \"password\"` (\"password too short\"); an email that already has an account gets 409 EMAIL_ALREADY_REGISTERED (\"already registered\").",
+        ],
+        deviations: [],
+      },
+
+      signInInstructor: {
+        method: "POST",
+        path: "/api/v1/accounts/sign-in",
+        pathParams: {},
+        auth: ["apiKey"],
+        request: { email: "rahman.s@aku.edu", password: "<password>" },
+        response: { status: 200, body: { accountId: "<accountId>", email: "rahman.s@aku.edu", accountToken: "<accountToken>", expiresAt: "<issued + 12 h>" } },
+        errors: [
+          { status: 400, code: "INVALID_REQUEST_BODY" },
+          { status: 401, code: "INVALID_CREDENTIALS" },
+          { status: 423, code: "ACCOUNT_TEMPORARILY_LOCKED" },
+        ],
+        status: "implemented",
+        notes: [
+          "\"Sign in\" on Teacher login. An unknown email and a wrong password get the same 401 INVALID_CREDENTIALS (\"wrong email or password\").",
+          "Five wrong passwords in a row lock the account for 15 minutes: 423 ACCOUNT_TEMPORARILY_LOCKED with `details.lockedUntil` (\"temporarily locked\"), even with the right password.",
+          "There is no server-side sign-out: the token works until `expiresAt`. Game setup and the teacher screen send the teacher back to Teacher login when it is missing or expired.",
+        ],
+        deviations: [],
+      },
+
+      getCurrentInstructorAccount: {
+        method: "GET",
+        path: "/api/v1/accounts/me",
+        pathParams: {},
+        auth: ["apiKey", "account"],
+        request: null,
+        response: { status: 200, body: { accountId: "<accountId>", email: "rahman.s@aku.edu", createdAt: "<createdAt>" } },
+        errors: [
+          { status: 401, code: "UNAUTHORIZED_TOKEN" },
+        ],
+        status: "implemented",
+        notes: [
+          "Game setup calls it on load to check the stored Account Token and show the signed-in email. A rejected token (401) sends the teacher back to Teacher login with a message.",
+        ],
+        deviations: [],
+      },
+
       listCurriculumPacks: {
         method: "GET",
         path: "/api/v1/packs",
         pathParams: {},
-        auth: ["apiKey"],
+        auth: [],
         request: null,
-        response: { status: 200, body: { packs: [samplePackSummary] } },
+        response: { status: 200, body: { packs: [{ ...samplePackSummary, authorHandle: null, isArchived: false }] } },
         errors: [],
         status: "implemented",
         notes: [
-          "No Capability Token is needed, so Game setup can list packs before any Game Session exists.",
-          "A CurriculumPackSummary has no `description` and no keywords: the keyword count is `cardCount`, and the description and keywords need getCurriculumPackById.",
-          "There is no grouping field (the prototype's \"Clinical medicine\", \"Your packs\" headings) and no \"made by me\" flag.",
+          "No token is needed. Game setup lists the shared library with it: each pack shows \"by <authorHandle> · v<version>\" (\"by unknown\" when `authorHandle` is null: System Packs and packs released before accounts).",
+          "\"Show archived\" adds `?includeArchived=true`: archived packs come back with `isArchived: true`, listed with Unarchive and not playable.",
+          "A list item has no `description` and no keywords: the keyword count is `cardCount`; the keywords need getCurriculumPackById.",
         ],
         deviations: [
-          "Only `diabe-teach` ships with the backend; the prototype's other 14 built-in topics exist only in the browser.",
-          "Archived packs are left out (archiving is not in the spec).",
-          "x-api-key is checked when the server has API_KEY set (401 UNAUTHORIZED_TOKEN), but the spec declares no security or 401 here.",
+          "Only `diabe-teach` ships with the backend; the earlier prototype's other built-in topics are gone from Game setup.",
+          "There is no `isSystemPack` flag, so Game setup offers Archive and Edit on System Packs too and shows the server's refusal.",
         ],
       },
 
@@ -240,12 +307,14 @@
         ],
         status: "implemented",
         notes: [
+          "Game setup calls it when a pack is chosen (board preview, \"See all words\", the game's keywords) and for \"Edit → save as new version\". It sends no Authorization header: a bearer token here is read as an instructor Capability Token, so an Account Token gets 401.",
           "No Capability Token is needed. With the instructor token (Authorization: Bearer) the assessment questions also carry `correctIndex` and `explanation`; an invalid token gets 401.",
           "The keyword list is `pack.cards[].displayLabel`; the board size and shortest chain are `pack.boardConfig`.",
           "The live sample shows only the first 3 Keyword Cards of the pack.",
         ],
         deviations: [
           "A pack id that isn't a slug (letters, digits, dashes) gets 404 PACK_NOT_FOUND rather than 400.",
+          "Without the instructor token the assessment questions have no `correctIndex`, so \"Edit → save as new version\" of a pack with an assessment can't send it back unchanged and the release may be refused.",
         ],
       },
 
@@ -253,21 +322,21 @@
         method: "POST",
         path: "/api/v1/packs/validate",
         pathParams: {},
-        auth: ["apiKey", "instructor"],
+        auth: ["apiKey", "account"],
         request: samplePackInput,
         response: {
           status: 200,
           body: { valid: false, issues: [{ jsonPointer: "/adjudicationRubric/chainContinuityCriteria", rule: "minItems", message: "At least one chain continuity criterion is required." }] },
         },
-        errors: [],
+        errors: [
+          { status: 401, code: "UNAUTHORIZED_TOKEN" },
+        ],
         status: "partial",
         notes: [
-          "Checks a draft CurriculumPackInput without saving it. Call it before registerCurriculumPack to show the teacher what is missing.",
-          "A real pack needs more than the prototype collects: Keyword Cards with ids, aliases, a Semantic Domain and a summary each; the Semantic Domains; an adjudication rubric (evaluator persona, subject domain, chain continuity criteria, calibration examples); and a semver `version`. Game setup only has keywords, a name, a learner level and an objective.",
+          "Checks a draft CurriculumPackInput without saving it, with the teacher's Account Token. Game setup doesn't call it: registerCurriculumPack runs the same checks and returns them as 422.",
           "Learner level and learning objective have no field: the closest is the pack `description`.",
         ],
         deviations: [
-          "Needs the instructor Capability Token (403 FORBIDDEN_ROLE without one), which only createGameSession issues; the spec declares no security and no 403 here.",
           "Returns `{ valid, errors, warnings }` with `{ path, code, message }` items, not the spec's `{ valid, issues }` with `{ jsonPointer, rule, message }`.",
         ],
       },
@@ -276,26 +345,70 @@
         method: "POST",
         path: "/api/v1/packs",
         pathParams: {},
-        auth: ["apiKey", "instructor"],
+        auth: ["apiKey", "account"],
         request: samplePackInput,
         response: { status: 201, body: { pack: { ...samplePackSummary, id: "my-endocrine-review", title: "Endocrine review", subjectDomain: "Endocrinology", cardCount: 49 } } },
         errors: [
+          { status: 400, code: "INVALID_REQUEST_BODY" },
+          { status: 401, code: "UNAUTHORIZED_TOKEN" },
+          { status: 403, code: "PACK_IS_SYSTEM_PACK" },
           { status: 409, code: "PACK_ALREADY_EXISTS" },
           { status: 422, code: "PACK_VALIDATION_FAILED" },
         ],
-        status: "partial",
+        status: "implemented",
         notes: [
-          "Validates and saves the pack (same checks as validateCurriculumPack); it can then be used as `packId` in createGameSession.",
-          "A real pack needs Keyword Card ids, Semantic Domains and an adjudication rubric that the prototype doesn't collect, so a pack made on Game setup can't be registered as it is.",
-          "409 PACK_ALREADY_EXISTS: the same `id` and `version` is already registered (a new `version` of the same id is accepted).",
+          "Needs the teacher's Account Token; no Game Session is needed. Each Pack Version records the releasing account, shown as the author handle in the list.",
+          "\"Save pack\" on Game setup registers a new pack (v1.0.0) built from its keyword list: one Semantic Domain, one Keyword Card per keyword, a one-line rubric, no assessment or survey.",
+          "\"Edit → save as new version\" registers the same `id` with the next `version` (1.0.0 → 1.1.0), keeping the pack's domains, rubric and the cards of keywords it still has. A new version always starts unarchived.",
+          "409 PACK_ALREADY_EXISTS: that `id` and `version` is already registered (by anyone). 403: System Packs refuse new versions.",
         ],
         deviations: [
-          "Needs the instructor Capability Token (403 FORBIDDEN_ROLE without one), and only createGameSession issues one: a teacher has to start a Game Session before they can register the pack they want to play. The spec declares no security, 401 or 403 here.",
           "Returns 201 `{ packId, version, warnings }`, not `{ pack: CurriculumPackSummary }`.",
           "409 and 422 bodies are `{ error: { code, ... } }` (422 carries `errors` and `warnings`, no `message`), not ApiErrorResponse.",
-          "netlify.toml force-redirects `/api/v1/packs` (any method) to the list function and `/api/v1/packs/register` (not in the spec) to register, so a POST to the spec path may never reach it. Not checked at runtime.",
-          "Packs live in MongoDB when MONGODB_URI is set; the in-memory store loses them between function instances.",
-          "Deleting a pack is not in the spec; the backend has an undocumented POST /api/v1/packs/{packId}/archive (instructor token).",
+        ],
+      },
+
+      archiveCurriculumPack: {
+        method: "POST",
+        path: "/api/v1/packs/{packId}/archive",
+        pathParams: { packId: "Curriculum Pack id (from listCurriculumPacks)" },
+        auth: ["apiKey", "account"],
+        request: null,
+        response: { status: 200, body: { packId: "my-endocrine-review", isArchived: true, archivedAt: "<archivedAt>", archivedBy: "<accountId>" } },
+        errors: [
+          { status: 401, code: "UNAUTHORIZED_TOKEN" },
+          { status: 403, code: "PACK_IS_SYSTEM_PACK" },
+          { status: 404, code: "PACK_NOT_FOUND" },
+          { status: 409, code: "PACK_ALREADY_ARCHIVED" },
+        ],
+        status: "implemented",
+        notes: [
+          "\"Archive\" on Game setup (it replaces Delete: nothing is ever deleted). Any signed-in teacher may archive any pack except a System Pack; the pack leaves the list until \"Show archived\" is on.",
+          "Game Sessions already using the pack keep working.",
+        ],
+        deviations: [
+          "Under `netlify dev`, a refusal (System Pack 403, unknown pack 404) comes back as 400 `{ error: { code: \"MISSING_PACK_ID\" } }`: netlify dev retries the POST as `/archive.html` without the path parameter. Seen on 2026-11-19 with `diabe-teach`.",
+        ],
+      },
+
+      unarchiveCurriculumPack: {
+        method: "POST",
+        path: "/api/v1/packs/{packId}/unarchive",
+        pathParams: { packId: "Curriculum Pack id (from listCurriculumPacks with includeArchived=true)" },
+        auth: ["apiKey", "account"],
+        request: null,
+        response: { status: 200, body: { packId: "my-endocrine-review", isArchived: false, unarchivedAt: "<unarchivedAt>", unarchivedBy: "<accountId>" } },
+        errors: [
+          { status: 401, code: "UNAUTHORIZED_TOKEN" },
+          { status: 404, code: "PACK_NOT_FOUND" },
+          { status: 409, code: "PACK_NOT_ARCHIVED" },
+        ],
+        status: "implemented",
+        notes: [
+          "\"Unarchive\" next to an archived pack while \"Show archived\" is on. Records the acting account; the last archive stays on record.",
+        ],
+        deviations: [
+          "Under `netlify dev`, an unknown pack (404) comes back as 400 MISSING_PACK_ID, like archiveCurriculumPack.",
         ],
       },
 
@@ -303,7 +416,7 @@
         method: "POST",
         path: "/api/v1/sessions",
         pathParams: {},
-        auth: ["apiKey"],
+        auth: ["apiKey", "account"],
         request: {
           packId: "diabe-teach",
           mode: "classroom",
@@ -325,11 +438,15 @@
         },
         errors: [
           { status: 400, code: "INVALID_REQUEST_BODY" },
+          { status: 401, code: "UNAUTHORIZED_TOKEN" },
           { status: 404, code: "PACK_NOT_FOUND" },
+          { status: 422, code: "PACK_VALIDATION_FAILED" },
         ],
         status: "partial",
         notes: [
-          "No Capability Token is needed: this call issues the instructor token. Keep `instructorToken` for every teacher call (D, G, and the reads in C and H).",
+          "Not called by the prototype: \"Start game\" and every in-game screen stay faked in the browser (decision of 2026-11-19), playing the chosen pack's real keywords.",
+          "A classroom start needs the teacher's Account Token (401 UNAUTHORIZED_TOKEN without one); a solo start needs none. The session records the account as its owner and pins the Pack Version it started with.",
+          "This call issues the per-session instructor Capability Token, which every in-game call uses, so the Account Token expiring never breaks a running game. Keep `instructorToken` for every teacher call (D, G, and the reads in C and H).",
           "Share `roomCode` with learners; they join with it (step B).",
           "`timerConfig` durations are whole seconds 1-86400; `null` makes that phase teacher-paced (no deadline). Omitted fields use the API defaults (15 min pretest, trial, post-test and survey; 20 min mapping; 10 min peer review), so Game setup sends all six: its chain-building and peer-review minutes × 60 (or `null` when teacher-paced), and `null` for the phases the prototype keeps teacher-paced.",
           "`seed` is the board preview's seed, so Round 1 would be dealt exactly as previewed (see the deviation: the backend ignores it today).",
@@ -339,9 +456,8 @@
         deviations: [
           "Every session starts in `pretest`, including solo mode (the spec summary says solo auto-starts Round 1; it only auto-joins the creator).",
           "`state` has no `activeBoard` key and no board is dealt; `seed` is ignored, so the previewed board can't be reproduced server-side.",
-          "`creatorDisplayName` is only used in solo mode (as the auto-joined learner's name); in classroom mode it is dropped and the teacher's name is stored nowhere.",
-          "Only `diabe-teach` ships with the backend: the prototype's other built-in topics and teacher-made packs get 404 PACK_NOT_FOUND unless they were registered first (step P).",
-          "`mode` and `adjudicationMode` are not validated; only `timerConfig` is (400 INVALID_REQUEST_BODY).",
+          "`creatorDisplayName` (Game setup's \"name shown to your class\") is only used in solo mode (as the auto-joined learner's name); in classroom mode it is dropped.",
+          "`mode` and `adjudicationMode` are not validated; only `timerConfig` is (400 INVALID_REQUEST_BODY). A missing `adjudicationMode` gets 500 from the Mongo store.",
         ],
       },
 
@@ -695,10 +811,6 @@
     },
 
     gaps: {
-      signIn: {
-        title: "Teacher sign-in",
-        note: "No teacher sign-in endpoint: the API has no teacher accounts, passwords or sign-in. A teacher's only credential is the instructor Capability Token that createGameSession returns, which is tied to one Game Session. The demo keeps the name and email in this browser only (no password), and the email is sent nowhere; the name could go in createGameSession's `creatorDisplayName`.",
-      },
       packMeta: {
         title: "Learner level and learning objective",
         note: "No API field for either, on a Curriculum Pack or a Game Session. The closest is the pack's `description` (the demo stores \"level · objective\" there).",
@@ -714,10 +826,6 @@
       boardPreview: {
         title: "Board preview",
         note: "Dealt in the browser from the pack, board size and preview seed. No API deals or returns a board yet: `state.activeBoard` is in the spec but never returned, and createGameSession ignores `seed`.",
-      },
-      deletePack: {
-        title: "Delete a pack",
-        note: "Not in the spec. The backend has an undocumented POST /api/v1/packs/{packId}/archive (instructor token; 403 for built-in system packs), which hides a pack from listCurriculumPacks rather than deleting it. The demo deletes from this browser only.",
       },
       extend: {
         title: "Extend the phase (+1 min)",
@@ -744,17 +852,52 @@
 
     // Finer keys for data-api="<letter>.<detail>". Keys not listed here fall back to the step letter.
     targets: {
+      "L.signIn": {
+        ops: ["signInInstructor"],
+        note: "Sign in sends `{ email, password }` and keeps the returned Account Token in this browser. Errors shown: wrong email or password (401), temporarily locked (423).",
+      },
+      "L.signUp": {
+        ops: ["signUpInstructor"],
+        note: "Create account sends `{ email, password }` and signs the new account in. Errors shown: password too short (400), already registered (409).",
+      },
+      "L.me": {
+        ops: ["getCurrentInstructorAccount"],
+        note: "\"Signed in as <email>\": the email returned at sign-in, checked against getCurrentInstructorAccount on Game setup. Sign out removes the Account Token from this browser (there is no server-side sign-out).",
+      },
       "P.list": {
         ops: ["listCurriculumPacks"],
-        note: "The pack list is listCurriculumPacks: name = `title`, keyword count = `cardCount`. The description needs getCurriculumPackById, and grouping and \"your packs\" have no API field.",
+        note: "The pack list is listCurriculumPacks: name = `title`, keyword count = `cardCount`, and \"by <authorHandle> · v<version>\" under each name.",
+      },
+      "P.byline": {
+        ops: ["listCurriculumPacks"],
+        note: "\"by <authorHandle> · v<version>\" from the list item; \"by unknown\" when `authorHandle` is null.",
+      },
+      "P.showArchived": {
+        ops: ["listCurriculumPacks"],
+        note: "\"Show archived\" lists with `?includeArchived=true`; archived packs show Unarchive and can't be played.",
+      },
+      "P.archive": {
+        ops: ["archiveCurriculumPack"],
+        note: "Archive (two clicks) sends the Account Token. Nothing is deleted; the pack can be unarchived.",
+      },
+      "P.unarchive": {
+        ops: ["unarchiveCurriculumPack"],
+        note: "Unarchive sends the Account Token and lists the pack again.",
+      },
+      "P.version": {
+        ops: ["getCurriculumPackById", "registerCurriculumPack"],
+        note: "Edit loads the pack (getCurriculumPackById) into the editor; \"Save as new version\" registers the same id with the next version and the Account Token.",
       },
       "P.keywords": {
         ops: ["getCurriculumPackById"],
         note: "The chosen pack's keywords are `pack.cards[].displayLabel` from getCurriculumPackById.",
       },
       "P.create": {
-        ops: ["validateCurriculumPack", "registerCurriculumPack"],
-        note: "Saving a new pack would call validateCurriculumPack, then registerCurriculumPack. A real pack needs Keyword Card ids, Semantic Domains and an adjudication rubric that this form doesn't collect, and both calls need an instructor token that only createGameSession issues. The demo saves the keyword list in this browser.",
+        ops: ["registerCurriculumPack", "validateCurriculumPack"],
+        note: "Save pack registers a new pack (v1.0.0) with the Account Token: the keyword list becomes Keyword Cards in one Semantic Domain, with a one-line rubric. registerCurriculumPack validates it too (422 lists what is wrong), so validateCurriculumPack is not called.",
+      },
+      "A.creatorDisplayName": {
+        note: "\"Name shown to your class\" is a per-game choice, sent as createGameSession's `creatorDisplayName` (accounts have no display name). The prototype keeps it in the browser game.",
       },
       "A.timerConfig": {
         note: "Chain-building and peer-review minutes become createGameSession's `timerConfig.roundMappingSec` / `roundAdjudicationSec` (minutes × 60, 1-86400 s); teacher-paced sends `null` (no deadline). Both Gameplay Rounds use them.",
@@ -817,7 +960,8 @@
 
     globalNotes: [
       "Paths use the /api/v1 base path.",
-      "When the server has API_KEY set, every route checks the x-api-key header.",
+      "When the server has API_KEY set, every route checks the x-api-key header. The prototype runs against `npm run dev:prototype`, which turns that check off, so no page holds the key.",
+      "Real API: Teacher login (sign-up, sign-in), the signed-in check, and Game setup's pack library (list, keywords, save, new version, archive, unarchive). Faked in the browser: Start game and everything in a running game.",
     ],
   };
 
@@ -883,13 +1027,14 @@
   const boardConfigOf = (size, minChain) => ({ rows: size ?? 7, cols: size ?? 7, minChainLength: minChain ?? 4, adjacencyRule: "chebyshev-8" });
   const cardsOf = (keywords) => (keywords ?? []).slice(0, 3).map((k) => ({ id: slug(k) || "<cardId>", verbatimLabel: k, displayLabel: k, aliases: [], domainId: "<domainId>", summary: "<summary>" }));
   function packSummary(p) {
-    return { id: p.packId, title: p.name, version: "1.0.0", subjectDomain: p.group ?? "<subjectDomain>", boardConfig: boardConfigOf(p.maxBoardSize, 4),
-      cardCount: p.keywordCount ?? p.keywords?.length ?? 0, domainCount: "<domainCount>", hasAssessmentInstrument: false, hasPerceptionSurvey: false };
+    return { id: p.packId, title: p.name, version: p.version ?? "1.0.0", subjectDomain: p.group ?? "<subjectDomain>", boardConfig: boardConfigOf(p.maxBoardSize, 4),
+      cardCount: p.keywordCount ?? p.keywords?.length ?? 0, domainCount: "<domainCount>", hasAssessmentInstrument: false, hasPerceptionSurvey: false,
+      authorHandle: p.authorHandle ?? null, isArchived: !!p.isArchived };
   }
   function newPackInput(np, setup) {
     const size = Number(setup?.boardSize) || 7, minChain = Number(setup?.minChainLength) || 4;
     return {
-      id: slug(np.name) || "<pack-id>", title: String(np.name ?? "").trim() || "<pack name>", version: "1.0.0",
+      id: np.packId ?? (slug(np.name) || "<pack-id>"), title: String(np.name ?? "").trim() || "<pack name>", version: np.version ?? "1.0.0",
       description: [np.level, np.objective].map((x) => String(x ?? "").trim()).filter(Boolean).join(" · ") || "<description>",
       boardConfig: boardConfigOf(size, minChain),
       domains: [{ id: "<domainId>", label: "<Semantic Domain (not collected)>", description: "<not collected>" }],
@@ -985,7 +1130,7 @@
     return {
       path: fillPath(ops.getCurriculumPackById.path, { packId: p.packId }),
       response: { status: 200, body: { pack: {
-        id: p.packId, title: p.name, version: "1.0.0", description: p.description || "<description>", boardConfig: boardConfigOf(p.maxBoardSize, 4),
+        id: p.packId, title: p.name, version: p.version ?? "1.0.0", description: p.description || "<description>", boardConfig: boardConfigOf(p.maxBoardSize, 4),
         domains: [{ id: "<domainId>", label: "<Semantic Domain>", description: "<description>" }],
         cards: cardsOf(p.keywords), adjudicationRubric: { ...sampleRubric, evaluatorPersona: "<evaluatorPersona>", subjectDomain: p.group ?? p.name },
         assessmentInstrument: null, perceptionSurvey: null,
@@ -1002,6 +1147,17 @@
       id: request.id, title: request.title, version: request.version, subjectDomain: request.adjudicationRubric.subjectDomain, boardConfig: request.boardConfig,
       cardCount: (ctx.newPack.keywords ?? []).length, domainCount: request.domains.length, hasAssessmentInstrument: false, hasPerceptionSurvey: false,
     } } } };
+  };
+
+  ops.archiveCurriculumPack.sample = (state, ctx = {}) => (ctx.pack
+    ? { path: fillPath(ops.archiveCurriculumPack.path, { packId: ctx.pack.packId }),
+        response: { status: 200, body: { packId: ctx.pack.packId, isArchived: true, archivedAt: "<archivedAt>", archivedBy: "<accountId>" } } }
+    : {});
+
+  ops.unarchiveCurriculumPack.sample = (state, ctx = {}) => {
+    const p = (ctx.packs ?? []).find((x) => x.isArchived); if (!p) return {};
+    return { path: fillPath(ops.unarchiveCurriculumPack.path, { packId: p.packId }),
+      response: { status: 200, body: { packId: p.packId, isArchived: false, unarchivedAt: "<unarchivedAt>", unarchivedBy: "<accountId>" } } };
   };
 
   ops.joinGameSession.sample = (state, ctx = {}) => {
