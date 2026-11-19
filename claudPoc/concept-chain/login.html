@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Concept Chain · Teacher login</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Atkinson+Hyperlegible:wght@400;700&family=IBM+Plex+Mono:wght@500&display=swap">
+<link rel="stylesheet" href="shared.css">
+<style>
+.login{max-width:440px;width:100%;margin:8vh auto 0}
+.field{display:flex;flex-direction:column;gap:4px}
+.field label{font-size:12px;font-weight:700;color:var(--muted)}
+.demo{border:1px dashed var(--warn);border-radius:8px;padding:8px 10px;font-size:13px;color:var(--ink);background:color-mix(in srgb,var(--warn) 10%,transparent)}
+.demo b{color:var(--warn)}
+.foot{font-size:13px;color:var(--muted)}
+.foot a{color:var(--accent)}
+.login-tools{display:flex;justify-content:flex-end;gap:8px}
+[hidden]{display:none !important} /* .panel/.col set display:flex, which would override the hidden attribute */
+</style>
+</head>
+<body>
+<div class="wrap">
+  <section class="panel login">
+    <div class="login-tools" data-api-toggle></div>
+    <div class="brand"><h1>Concept <span>Chain</span></h1><p>Teacher login</p></div>
+    <p class="demo"><b>Demo sign-in.</b> There is no password and no account: your name and email are only remembered in this browser so the prototype knows who is running the class.</p>
+
+    <div class="col" id="signedIn" data-api="gap.signIn" data-api-io="read" hidden>
+      <p>Signed in as <b id="who"></b> <span class="note" id="whoEmail"></span></p>
+      <div class="row">
+        <a class="btn primary" href="setup.html" id="continue">Continue to Game setup →</a>
+        <button class="btn sm" type="button" id="signOut">Sign out</button>
+      </div>
+    </div>
+
+    <form id="loginForm" class="col" data-api="gap.signIn" data-api-io="write" novalidate hidden>
+      <div class="field"><label for="name">Your name</label><input type="text" id="name" maxlength="60" autocomplete="name" required placeholder="Shown to your class, e.g. Ms Rahman"></div>
+      <div class="field"><label for="email">Email</label><input type="email" id="email" maxlength="120" autocomplete="email" required placeholder="name@school.org"></div>
+      <button class="btn primary" type="submit">Sign in</button>
+      <div class="toast" id="msg" role="status" aria-live="polite"></div>
+    </form>
+    <p class="foot">Learners don't sign in: they join with the room code on the <a href="participant.html">learner screen</a>.</p>
+  </section>
+</div>
+
+<script src="shared.js"></script>
+<script src="api-catalog.js"></script>
+<script src="api-overlay.js"></script>
+<script>
+const $ = (id) => document.getElementById(id);
+function render() {
+  const t = CC.teacher();
+  $("signedIn").hidden = !t; $("loginForm").hidden = !!t;
+  if (t) { $("who").textContent = t.name; $("whoEmail").textContent = `(${t.email})`; }
+}
+$("loginForm").addEventListener("submit", (e) => {
+  e.preventDefault();
+  try { CC.signIn($("name").value, $("email").value); location.assign("setup.html"); }
+  catch (err) { $("msg").textContent = err.message; $("msg").className = "toast err"; (/email/i.test(err.message) ? $("email") : $("name")).focus(); }
+});
+$("signOut").onclick = () => { CC.signOut(); render(); $("name").focus(); };
+window.addEventListener("storage", render);
+render();
+</script>
+</body>
+</html>

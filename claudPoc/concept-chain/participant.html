@@ -1,0 +1,282 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Concept Chain · Learner view</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Atkinson+Hyperlegible:wght@400;700&family=IBM+Plex+Mono:wght@500&display=swap">
+<link rel="stylesheet" href="shared.css">
+<style>
+.join{max-width:420px;margin:8vh auto 0}
+.join input{font-family:var(--font-mono);letter-spacing:.12em;text-transform:uppercase}
+.join input#name{font-family:var(--font-body);letter-spacing:0;text-transform:none}
+.field{display:flex;flex-direction:column;gap:4px}
+.field label{font-size:12px;font-weight:700;color:var(--muted)}
+.builder{display:flex;flex-direction:column;gap:6px}
+.kw{display:inline-block;font-weight:700;background:var(--pick);color:var(--pick-ink);border-radius:6px;padding:3px 8px;align-self:flex-start}
+.link{padding-left:12px;border-left:2px dashed var(--line);margin-left:10px}
+.link input{font-size:14px;padding:6px 8px}
+.vote{display:flex;flex-direction:column;gap:6px;border-top:1px dashed var(--line);padding-top:8px}
+.vote button[aria-pressed=true].good{background:var(--good);color:var(--accent-ink)}
+.vote button[aria-pressed=true].bad{background:var(--bad);color:var(--accent-ink)}
+.waiting{text-align:center;padding:28px 16px}
+.waiting h2{font-size:22px}
+.rules{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:4px}
+.join-tools{display:flex;justify-content:flex-end}
+[hidden]{display:none !important} /* .panel/.col set display:flex, which would override the hidden attribute */
+</style>
+</head>
+<body>
+<div class="wrap">
+  <!-- Join -->
+  <section class="panel join" id="joinView" hidden>
+    <div class="join-tools" data-api-toggle></div>
+    <div class="brand"><h1>Concept <span>Chain</span></h1><p>Join your class session</p></div>
+    <form id="joinForm" class="col" data-api="B" data-api-io="write">
+      <div class="field"><label for="code">Room code</label><input type="text" id="code" maxlength="6" autocomplete="off" required placeholder="e.g. K7Q2MX"></div>
+      <div class="field"><label for="name">Your name</label><input type="text" id="name" maxlength="40" autocomplete="nickname" required placeholder="Shown to your class"></div>
+      <button class="btn primary" type="submit">Join</button>
+      <div class="toast" id="joinMsg" role="status" aria-live="polite"></div>
+      <p class="note">Your teacher shows the room code on their screen.</p>
+    </form>
+  </section>
+
+  <!-- Game -->
+  <div id="gameView" hidden class="col">
+    <header class="top">
+      <div class="brand"><h1>Concept <span>Chain</span></h1><p>Playing as <b id="me"></b> · room <span id="room"></span></p></div>
+      <div class="row">
+        <span class="phase-pill" id="phase" data-api="C.phase" data-api-io="read"></span>
+        <div class="timer" data-api="C.timer" data-api-io="read"><span class="clock" id="clock">—:—</span><span class="note" id="clockNote"></span></div>
+      </div>
+    </header>
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+    <div class="main" id="playArea">
+      <div class="col">
+        <div class="row between"><span class="eyebrow" id="boardHint"></span><span class="note" id="boardNote"></span></div>
+        <div class="board-shell" id="board" data-api="C.board" data-api-io="read"></div>
+      </div>
+      <aside class="col" id="side"></aside>
+    </div>
+    <section class="panel waiting" id="waiting" hidden></section>
+  </div>
+</div>
+
+<script src="shared.js"></script>
+<script src="api-catalog.js"></script>
+<script src="api-overlay.js"></script>
+<script>
+const $ = (id) => document.getElementById(id);
+const ME_KEY = "cc-demo-me";
+let draft = { seed: null, path: [], links: [], story: "" };
+const voteNotes = {}; // chainId -> comment draft
+let selected = null;
+
+function me(s) { try { const m = JSON.parse(sessionStorage.getItem(ME_KEY)); return m && m.sessionId === s.session.sessionId && s.participants.find((p) => p.participantId === m.participantId); } catch { return null; } }
+function toast(msg, kind = "ok") { const t = $("toast"); t.textContent = msg; t.className = `toast ${kind}`; clearTimeout(toast.t); toast.t = setTimeout(() => { t.textContent = ""; }, 4000); }
+const name = (s, id) => s.participants.find((p) => p.participantId === id)?.displayName ?? "Classmate";
+
+function keepFocus(fn) {
+  const a = document.activeElement, id = a?.id, sel = a && "selectionStart" in a ? [a.selectionStart, a.selectionEnd] : null;
+  fn();
+  const b = id && $(id); if (b && b !== a) { b.focus({ preventScroll: true }); if (sel) try { b.setSelectionRange(...sel); } catch {} }
+}
+
+$("joinForm").addEventListener("submit", (e) => {
+  e.preventDefault();
+  try {
+    const p = CC.join($("code").value, $("name").value);
+    sessionStorage.setItem(ME_KEY, JSON.stringify({ sessionId: CC.get().session.sessionId, participantId: p.participantId }));
+    render(); // goes to the lobby unless a round is already running
+  } catch (err) { $("joinMsg").textContent = err.message; $("joinMsg").className = "toast err"; }
+});
+
+const WAIT = {
+  "pretest": ["Pre-test", "Your teacher will start a short quiz before the game. Hang tight."],
+  "posttest": ["Post-test", "Round play is over. Your teacher will start the closing quiz."],
+  "feedback-survey": ["Feedback survey", "Tell your teacher how the game went."],
+  "completed": ["That's a wrap", "Thanks for playing. Your teacher has closed the session."],
+};
+
+function render() { keepFocus(() => {
+  const s = CC.get(), p = me(s);
+  $("joinView").hidden = !!p; $("gameView").hidden = !p;
+  if (!p) return;
+  const ss = s.session, phase = ss.currentPhase, round = ss.activeRoundNumber;
+  if (phase === "pretest" || phase === "trial-orientation") { location.replace("lobby.html"); return; }
+  $("me").textContent = p.displayName; $("room").textContent = ss.roomCode;
+  $("phase").textContent = CC.PHASE_LABEL[phase];
+
+  // Start a fresh draft whenever a new board is dealt.
+  if (ss.activeBoard && draft.seed !== ss.activeBoard.seed) draft = { seed: ss.activeBoard.seed, path: [], links: [], story: "" };
+
+  const inRound = !!round, mapping = phase.endsWith(":chain-mapping"), review = phase.endsWith(":peer-adjudication"), summary = phase.endsWith(":round-summary");
+  $("playArea").hidden = !(inRound || phase === "trial-orientation");
+  $("waiting").hidden = !$("playArea").hidden;
+  if (!$("waiting").hidden) { const [h, t] = WAIT[phase]; $("waiting").innerHTML = `<h2>${h}</h2><p class="note">${t}</p>`; tick(s); return; }
+
+  const roundChains = s.chains.filter((c) => c.roundNumber === round);
+  const mine = roundChains.filter((c) => c.participantId === p.participantId);
+  const others = roundChains.filter((c) => c.participantId !== p.participantId);
+  const sel = roundChains.find((c) => c.chainId === selected); if (!sel) selected = null;
+
+  // Board
+  const board = $("board");
+  if (phase === "trial-orientation") { CC.renderBoard(board, null); $("boardHint").textContent = ""; $("boardNote").textContent = ""; }
+  else if (mapping) {
+    board.classList.remove("board-readonly");
+    const open = CC.submissionsOpen(s);
+    CC.renderBoard(board, ss.activeBoard, { path: draft.path, tappable: open, onTap: open ? tap : null });
+    $("boardHint").textContent = open ? "Tap touching keywords to build a chain" : "Time's up";
+    $("boardNote").textContent = draft.path.length ? `${draft.path.length} in chain` : "";
+  } else {
+    board.classList.add("board-readonly");
+    CC.renderBoard(board, ss.activeBoard, { path: sel?.path ?? [], color: "var(--accent)" });
+    $("boardHint").textContent = sel ? `${sel.participantId === p.participantId ? "Your" : `${name(s, sel.participantId)}'s`} chain` : "Pick a chain to see it on the board";
+    $("boardNote").textContent = "";
+  }
+
+  // Side column
+  let html = "";
+  if (phase === "trial-orientation") html = `<div class="panel"><h2>How to play</h2><ol class="rules">
+      <li>Tap keywords that <b>touch</b> each other — sideways, up/down or diagonally.</li>
+      <li>Explain each link in your own words, then tell the story of the whole chain.</li>
+      <li>Longer chains score higher, but only if your class and teacher approve them.</li>
+      <li>In peer review, vote on classmates' chains. Your teacher has the final say.</li></ol>
+      <p class="note">Round 1 starts when your teacher is ready.</p></div>`;
+  if (mapping) html += builderPanel(s);
+  if (review) html += `<div class="panel"><div class="row between"><h2>Review classmates</h2><span class="eyebrow">${others.length} chains</span></div>
+      <p class="note">Approve chains whose story holds up at every link. Challenge any weak step and say why.</p>
+      <div class="chains" data-api="C.classChains" data-api-io="read">${others.length ? others.map((c) => reviewCard(s, p, c)).join("") : `<p class="empty">No classmate chains this round.</p>`}</div></div>`;
+  if (summary) {
+    const rows = CC.standings(s, round);
+    html += `<div class="panel"><div class="row between"><h2>Round ${round} results</h2></div>
+      <table class="lb" data-api="H" data-api-io="read"><thead><tr><th>#</th><th>Learner</th><th class="n">Longest</th><th class="n">Approved</th></tr></thead><tbody>
+      ${rows.map((r) => `<tr class="${r.participantId === p.participantId ? "me" : ""}"><td>${r.rank}</td><td>${CC.esc(r.displayName)}${r.participantId === p.participantId ? " (you)" : ""}</td><td class="n">${r.longestValidChainLength}</td><td class="n">${r.totalValidChainsCount}</td></tr>`).join("")}
+      </tbody></table></div>`;
+  }
+  if (inRound) html += `<div class="panel"><div class="row between"><h2>My chains</h2><span class="eyebrow">Round ${round}</span></div>
+      <div class="chains" data-api="C.myChains" data-api-io="read">${mine.length ? mine.map((c) => myCard(s, c)).join("") : `<p class="empty">${mapping ? "Chains you submit appear here." : "You didn't submit a chain this round."}</p>`}</div></div>`;
+  $("side").innerHTML = html;
+  tick(s);
+}); }
+
+function builderPanel(s) {
+  const b = s.session.activeBoard, open = CC.submissionsOpen(s), path = draft.path;
+  const label = (c) => CC.esc(b.cells[c.row][c.col].label);
+  let steps = "";
+  path.forEach((c, i) => {
+    steps += `<span class="kw">${i + 1}. ${label(c)}</span>`;
+    if (i < path.length - 1) steps += `<div class="link"><label class="visually-hidden" for="link-${i}">Why ${label(c)} leads to ${label(path[i + 1])}</label><input type="text" id="link-${i}" data-link="${i}" value="${CC.esc(draft.links[i] ?? "")}" placeholder="How does ${label(c)} lead to ${label(path[i + 1])}?" ${open ? "" : "disabled"}></div>`;
+  });
+  const min = CC.settingsOf(s).minChainLength, ready = path.length >= min && draft.story.trim();
+  return `<div class="panel" data-api="E.builder" data-api-io="write"><div class="row between"><h2>Build a chain</h2><span class="eyebrow">${path.length} keywords</span></div>
+    ${!open ? `<p class="toast err">Time's up. Wait for your teacher to start peer review.</p>` : ""}
+    <div class="builder">${steps || `<p class="empty">Tap any keyword on the board to start.</p>`}</div>
+    <div class="field"><label for="story">The story of your chain</label>
+      <textarea id="story" placeholder="Explain how the whole chain fits together" ${open ? "" : "disabled"}>${CC.esc(draft.story)}</textarea></div>
+    <div class="row">
+      <button class="btn primary" id="submit" data-api="E" data-api-io="write" ${open && ready ? "" : "disabled"}>Submit chain</button>
+      <button class="btn sm" id="undo" ${open && path.length ? "" : "disabled"}>Undo</button>
+      <button class="btn sm" id="clear" ${open && path.length ? "" : "disabled"}>Clear</button>
+    </div>
+    ${open && !ready ? `<p class="note">${path.length < min ? `Pick at least ${min === 2 ? "two" : min} touching keywords.` : "Add the story to submit."}</p>` : ""}</div>`;
+}
+
+function myCard(s, c) {
+  const cls = { "pending-review": "pending", approved: "valid", rejected: "invalid" }[c.status];
+  const up = c.peerVotes.filter((v) => v.decision === "approve").length, down = c.peerVotes.length - up;
+  const notes = c.peerVotes.filter((v) => v.comment).map((v) => `<li>${v.decision === "approve" ? "👍" : "✋"} ${CC.esc(v.comment)}</li>`).join("");
+  return `<article class="chain ${cls}${c.chainId === selected ? " sel" : ""}" data-api-chain="${c.chainId}">
+    <div class="row between"><span class="by">${c.path.length} keywords</span>${CC.statusBadge(c)}</div>
+    <div class="text">${CC.chainText(c)}</div>
+    ${c.peerVotes.length ? `<div class="tally">Class votes: 👍 ${up} · ✋ ${down}</div>` : ""}
+    ${notes ? `<ul class="steps-r">${notes}</ul>` : ""}
+    ${c.verdict?.adjudicatorType === "instructor-final" ? `<div class="feedback" data-api="G.verdict" data-api-io="read"><b>Teacher (${c.verdict.qualityScore}/10):</b> ${CC.esc(c.verdict.overallFeedback)}</div>` : ""}
+    ${!CC.get().session.currentPhase.endsWith(":chain-mapping") ? `<div class="row"><button class="btn sm" data-trace="${c.chainId}">${c.chainId === selected ? "Hide on board" : "Show on board"}</button></div>` : ""}
+  </article>`;
+}
+
+function reviewCard(s, p, c) {
+  const cls = { "pending-review": "pending", approved: "valid", rejected: "invalid" }[c.status];
+  const myVote = c.peerVotes.find((v) => v.voterParticipantId === p.participantId)?.decision;
+  const locked = c.verdict?.isLocked;
+  return `<article class="chain ${cls}${c.chainId === selected ? " sel" : ""}" data-api-chain="${c.chainId}">
+    <div class="row between"><span class="by">${CC.esc(name(s, c.participantId))} · ${c.path.length} keywords</span>${CC.statusBadge(c)}</div>
+    <div class="text">${CC.chainText(c)}</div>
+    <p class="story">${CC.esc(c.narrativeExplanation)}</p>
+    ${c.stepRationales?.some((r) => r.rationale) ? `<ol class="steps-r">${c.stepRationales.map((r, i) => `<li>${CC.esc(c.labels[i])} → ${CC.esc(c.labels[i + 1])}: ${CC.esc(r.rationale || "—")}</li>`).join("")}</ol>` : ""}
+    <div class="row"><button class="btn sm" data-trace="${c.chainId}">${c.chainId === selected ? "Hide on board" : "Show on board"}</button></div>
+    ${locked ? `<div class="feedback" data-api="G.verdict" data-api-io="read"><b>Teacher ruled:</b> ${CC.esc(c.verdict.overallFeedback)}</div>` : `
+    <div class="vote">
+      <label class="visually-hidden" for="note-${c.chainId}">Comment</label>
+      <input type="text" id="note-${c.chainId}" data-note="${c.chainId}" value="${CC.esc(voteNotes[c.chainId] ?? "")}" placeholder="Optional comment (say which link is weak)">
+      <div class="row">
+        <button class="btn sm good" data-vote="${c.chainId}" data-d="approve" data-api="F.approve" data-api-io="write" aria-pressed="${myVote === "approve"}">👍 Approve</button>
+        <button class="btn sm bad" data-vote="${c.chainId}" data-d="challenge" data-api="F.challenge" data-api-io="write" aria-pressed="${myVote === "challenge"}">✋ Challenge</button>
+      </div>
+    </div>`}
+  </article>`;
+}
+
+function tap(coord, el) {
+  const path = draft.path, i = path.findIndex((c) => c.row === coord.row && c.col === coord.col);
+  const nope = (msg) => { el.classList.remove("shake"); void el.offsetWidth; el.classList.add("shake"); toast(msg, "err"); };
+  if (i === path.length - 1 && i >= 0) { path.pop(); draft.links.length = Math.max(0, path.length - 1); }
+  else if (i >= 0) return nope("That keyword is already in your chain.");
+  else if (path.length && !CC.adjacent(path.at(-1), coord)) return nope("Pick a keyword touching your last one (highlighted).");
+  else path.push(coord);
+  render();
+}
+
+function submit() {
+  const s = CC.get(), p = me(s);
+  const stepRationales = draft.path.slice(1).map((c, i) => ({ fromCoord: draft.path[i], toCoord: c, rationale: (draft.links[i] ?? "").trim() }));
+  try {
+    CC.submitChain(p.participantId, draft.path, draft.story, stepRationales);
+    draft = { seed: draft.seed, path: [], links: [], story: "" };
+    toast("Chain submitted. Build another!"); render();
+  } catch (e) { toast(e.message, "err"); }
+}
+
+$("side").addEventListener("input", (e) => {
+  const t = e.target;
+  if (t.id === "story") { draft.story = t.value; const s = CC.get(), btn = $("submit"); if (btn) btn.disabled = !(draft.path.length >= CC.settingsOf(s).minChainLength && draft.story.trim() && CC.submissionsOpen(s)); }
+  else if (t.dataset.link) draft.links[+t.dataset.link] = t.value;
+  else if (t.dataset.note) voteNotes[t.dataset.note] = t.value;
+});
+$("side").addEventListener("click", (e) => {
+  const t = e.target.closest("button"); if (!t) return;
+  if (t.id === "submit") return submit();
+  if (t.id === "undo") { draft.path.pop(); draft.links.length = Math.max(0, draft.path.length - 1); return render(); }
+  if (t.id === "clear") { draft.path = []; draft.links = []; return render(); }
+  if (t.dataset.trace) { selected = selected === t.dataset.trace ? null : t.dataset.trace; return render(); }
+  if (t.dataset.vote) {
+    const s = CC.get();
+    try { CC.vote(t.dataset.vote, me(s).participantId, t.dataset.d, voteNotes[t.dataset.vote]); toast(t.dataset.d === "approve" ? "Vote recorded: approve." : "Vote recorded: challenge."); }
+    catch (err) { toast(err.message, "err"); }
+  }
+});
+
+let wasOpen = null;
+function tick(s = CC.get()) {
+  const k = CC.clock(s);
+  $("clock").textContent = k.text; $("clock").className = `clock${k.over ? " over" : k.low ? " low" : ""}`;
+  $("clockNote").textContent = k.note;
+  const open = CC.submissionsOpen(s);
+  if (wasOpen !== null && wasOpen !== open) { wasOpen = open; render(); return; } // lock the builder when time runs out
+  wasOpen = open;
+}
+
+// Live API overlay samples: who this tab is, the draft chain being built and vote comments.
+CCOverlay.setContext(() => ({ participantId: me(CC.get())?.participantId ?? null, draft, voteNotes }));
+CC.subscribe(() => render());
+window.addEventListener("resize", () => render());
+setInterval(() => { if (!$("gameView").hidden) tick(); }, 1000);
+render();
+</script>
+</body>
+</html>
