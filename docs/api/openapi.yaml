@@ -118,6 +118,24 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiErrorResponse"
+        "423":
+          description: >-
+            ACCOUNT_TEMPORARILY_LOCKED. Five wrong passwords in a row lock the
+            Instructor Account for 15 minutes; the fifth wrong password itself
+            gets this response. While locked, every sign-in attempt gets it,
+            even with the right password, and does not extend the lock.
+            `details.lockedUntil` is the ISO 8601 time the lock ends. A
+            successful sign-in resets the wrong-password count. Unknown emails
+            are never locked; they always get 401.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+              example:
+                code: ACCOUNT_TEMPORARILY_LOCKED
+                message: Too many wrong passwords. Sign-in is temporarily locked; try again later.
+                details:
+                  lockedUntil: "2026-11-19T08:15:00.000Z"
 
   /api/v1/accounts/me:
     get:
@@ -782,6 +800,7 @@ components:
         - SURVEY_ALREADY_SUBMITTED
         - EMAIL_ALREADY_REGISTERED
         - INVALID_CREDENTIALS
+        - ACCOUNT_TEMPORARILY_LOCKED
 
     ApiErrorResponse:
       type: object

@@ -9,7 +9,12 @@ import { AccountEmail } from "./account-email.js";
  * hash). Aggregate Root for sign-up and sign-in.
  */
 export class InstructorAccount {
-  readonly #props: InstructorAccountProps;
+  /** Wrong passwords in a row that lock the account. */
+  public static readonly MAX_FAILED_SIGN_INS = 5;
+  /** How long a lock lasts. */
+  public static readonly LOCK_DURATION_MS = 15 * 60 * 1000;
+
+  #props: InstructorAccountProps;
 
   private constructor(props: InstructorAccountProps) {
     this.#props = { ...props };
@@ -54,6 +59,53 @@ export class InstructorAccount {
 
   public get createdAt(): Date {
     return this.#props.createdAt;
+  }
+
+  /** True while a lock is in force at `now`; sign-in must be refused. */
+  public isLockedAt(now: Date): boolean {
+    return this.activeLockEnd(now) !== null;
+  }
+
+  /** When the lock in force at `now` ends, or null when sign-in is allowed. */
+  public activeLockEnd(now: Date): Date | null {
+    const { lockedUntil } = this.#props;
+    return lockedUntil !== null && lockedUntil.getTime() > now.getTime()
+      ? lockedUntil
+      : null;
+  }
+
+  /**
+   * Records a wrong password at `now`. The fifth in a row locks the account
+   * for 15 minutes and starts the count again, so another lock needs five
+   * more wrong passwords after this one ends.
+   */
+  public recordFailedSignIn(now: Date): void {
+    const failedSignInCount = this.#props.failedSignInCount + 1;
+    if (failedSignInCount >= InstructorAccount.MAX_FAILED_SIGN_INS) {
+      this.#props = {
+        ...this.#props,
+        failedSignInCount: 0,
+        lockedUntil: new Date(now.getTime() + InstructorAccount.LOCK_DURATION_MS),
+      };
+      return;
+    }
+    this.#props = {
+      ...this.#props,
+      failedSignInCount,
+      lockedUntil: this.isLockedAt(now)
+        ? this.#props.lockedUntil
+        : null,
+    };
+  }
+
+  /** A successful sign-in clears the wrong-password count and any ended lock. */
+  public recordSuccessfulSignIn(): void {
+    this.#props = { ...this.#props, failedSignInCount: 0, lockedUntil: null };
+  }
+
+  /** True when the sign-in counters differ from a fresh, unlocked account's. */
+  public get hasSignInHistory(): boolean {
+    return this.#props.failedSignInCount !== 0 || this.#props.lockedUntil !== null;
   }
 
   public toProps(): InstructorAccountProps {

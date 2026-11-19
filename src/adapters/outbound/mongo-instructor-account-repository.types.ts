@@ -13,6 +13,10 @@ export interface InstructorAccountCollectionLike {
   ) => Promise<InstructorAccountDocument | null>;
   /** Throws a MongoDB duplicate-key error (code 11000) for a taken email. */
   create: (doc: InstructorAccountDocument) => Promise<void>;
+  updateSignInCounters: (
+    accountId: string,
+    counters: Pick<InstructorAccountDocument, "failedSignInCount" | "lockedUntil">,
+  ) => Promise<void>;
 }
 
 export interface MongoInstructorAccountRepositoryOptions {

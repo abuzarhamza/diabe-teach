@@ -8,13 +8,18 @@ import type {
   SignInInstructorResult,
   SignInInstructorUseCasePort,
 } from "../ports/sign-in-instructor.port.js";
-import { InvalidCredentialsError } from "../../domain/errors/domain-errors.js";
+import { AccountTemporarilyLockedError, InvalidCredentialsError } from "../../domain/errors/domain-errors.js";
 import { AccountEmail } from "../../domain/instructor-account/account-email.js";
 
 /**
  * Signs a teacher in with an email and a password. An unknown email and a
  * wrong password both get InvalidCredentialsError, and both cost one hash
  * check, so neither the response nor its timing reveals which emails exist.
+ *
+ * Five wrong passwords in a row lock the account for 15 minutes (the
+ * aggregate decides, using the clock port). While locked, every attempt gets
+ * AccountTemporarilyLockedError, even with the right password. Unknown emails
+ * never create records or counters.
  */
 export class SignInInstructorUseCase implements SignInInstructorUseCasePort {
   /** Any password: its hash is checked when the email is unknown. */
@@ -44,13 +49,29 @@ export class SignInInstructorUseCase implements SignInInstructorUseCasePort {
       await this.#passwordHasher.verify(await this.#getDecoyHash(), password);
       throw new InvalidCredentialsError();
     }
+
+    const now = this.#clock.now();
+    const lockEnd = account.activeLockEnd(now);
+    if (lockEnd) {
+      throw new AccountTemporarilyLockedError(lockEnd);
+    }
     if (!(await this.#passwordHasher.verify(account.passwordHash, password))) {
+      account.recordFailedSignIn(now);
+      await this.#accountRepo.saveSignInCounters(account);
+      const newLockEnd = account.activeLockEnd(now);
+      if (newLockEnd) {
+        throw new AccountTemporarilyLockedError(newLockEnd);
+      }
       throw new InvalidCredentialsError();
+    }
+    if (account.hasSignInHistory) {
+      account.recordSuccessfulSignIn();
+      await this.#accountRepo.saveSignInCounters(account);
     }
 
     const issued = await this.#accountTokenSigner.signAccountToken(
       { accountId: account.accountId, email: account.email },
-      this.#clock.now(),
+      now,
     );
     return {
       accountId: account.accountId,

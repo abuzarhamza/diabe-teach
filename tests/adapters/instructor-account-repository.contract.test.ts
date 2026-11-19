@@ -72,6 +72,35 @@ function defineInstructorAccountRepositoryContract(
       expect(await harness.repo.findById(second.accountId)).toBeNull();
     });
 
+    it("round-trips the failed sign-in count and lock-until time", async () => {
+      const account = await newAccount(`counters-${name}@aku.edu`);
+      await harness.repo.create(account);
+      const now = new Date("2026-11-19T09:00:00.000Z");
+
+      for (let attempt = 0; attempt < 3; attempt++) {
+        account.recordFailedSignIn(now);
+      }
+      await harness.repo.saveSignInCounters(account);
+      const counted = await harness.repo.findById(account.accountId);
+      expect(counted?.failedSignInCount).toBe(3);
+      expect(counted?.lockedUntil).toBeNull();
+
+      account.recordFailedSignIn(now);
+      account.recordFailedSignIn(now);
+      await harness.repo.saveSignInCounters(account);
+      const locked = await harness.repo.findByEmail(account.email);
+      expect(locked?.lockedUntil?.toISOString()).toBe("2026-11-19T09:15:00.000Z");
+      expect(locked?.isLockedAt(now)).toBe(true);
+      expect(locked?.toProps()).toEqual(account.toProps());
+
+      account.recordSuccessfulSignIn();
+      await harness.repo.saveSignInCounters(account);
+      const cleared = await harness.repo.findById(account.accountId);
+      expect(cleared?.failedSignInCount).toBe(0);
+      expect(cleared?.lockedUntil).toBeNull();
+      expect(cleared?.toProps()).toEqual(account.toProps());
+    });
+
     it("never stores the plain password", async () => {
       const account = await newAccount(`no-plain-${name}@aku.edu`);
 

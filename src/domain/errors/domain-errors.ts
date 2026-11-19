@@ -380,3 +380,21 @@ export class InvalidCredentialsError extends DomainError {
     super("Email or password is incorrect.");
   }
 }
+
+/**
+ * Sign-in to an Instructor Account that is locked after too many wrong
+ * passwords in a row. Refused even with the right password until the lock
+ * ends; distinct from INVALID_CREDENTIALS so the teacher knows to wait.
+ */
+export class AccountTemporarilyLockedError extends DomainError {
+  public readonly code = "ACCOUNT_TEMPORARILY_LOCKED" as const;
+
+  public constructor(lockedUntil: Date) {
+    super(
+      "Too many wrong passwords. Sign-in is temporarily locked; try again later.",
+      {
+        lockedUntil: lockedUntil.toISOString(),
+      },
+    );
+  }
+}

@@ -64,6 +64,9 @@ export class MongoInstructorAccountRepository implements InstructorAccountReposi
           create: async (doc) => {
             await model.create(doc);
           },
+          updateSignInCounters: async (accountId, counters) => {
+            await model.updateOne({ _id: accountId }, { $set: counters }).exec();
+          },
         };
       },
     });
@@ -104,6 +107,14 @@ export class MongoInstructorAccountRepository implements InstructorAccountReposi
     return doc
       ? MongoInstructorAccountRepository.#toDomain(doc)
       : null;
+  }
+
+  public async saveSignInCounters(account: InstructorAccount): Promise<void> {
+    const collection = await this.#getCollection();
+    await collection.updateSignInCounters(account.accountId, {
+      failedSignInCount: account.failedSignInCount,
+      lockedUntil: account.lockedUntil,
+    });
   }
 
   static #isDuplicateEmail(error: unknown): boolean {

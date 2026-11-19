@@ -1,5 +1,6 @@
 import type { MiddlewareObj } from "@middy/core";
 import {
+  AccountTemporarilyLockedError,
   AdjudicationLockedError,
   AssessmentAlreadySubmittedError,
   AssessmentIncompleteError,
@@ -82,6 +83,9 @@ export function domainErrorMiddleware(): MiddlewareObj<any, any> {
           || error instanceof PackIsSystemPackError
         ) {
           statusCode = 403;
+        }
+        else if (error instanceof AccountTemporarilyLockedError) {
+          statusCode = 423;
         }
         else if (error instanceof ChainNotFoundError) {
           statusCode = 404;

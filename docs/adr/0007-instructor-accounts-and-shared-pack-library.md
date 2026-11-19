@@ -18,7 +18,8 @@ Teachers get an **Instructor Account**: an email and a password, nothing else (n
 - The email is trimmed and lower-cased before it is stored or looked up, and is unique (a unique index on `instructor_accounts.email`).
 - Passwords are at least 10 characters, with no other complexity rules. They are hashed with argon2id through `@node-rs/argon2` (prebuilt binaries, per ADR-0005), and the plain password is never stored or logged.
 - An unknown email and a wrong password get the same 401 `INVALID_CREDENTIALS` body, and both cost one hash check, so neither the body nor the timing reveals which emails have accounts.
-- Routes: `POST /api/v1/accounts/sign-up` (201, or 400 `INVALID_REQUEST_BODY`, 409 `EMAIL_ALREADY_REGISTERED`), `POST /api/v1/accounts/sign-in` (200, or 401 `INVALID_CREDENTIALS`), and `GET /api/v1/accounts/me`.
+- Five wrong passwords in a row lock the account for 15 minutes (the domain decides, using the clock port). While locked, every attempt, even with the right password, gets 423 `ACCOUNT_TEMPORARILY_LOCKED` with `details.lockedUntil`; the fifth wrong password itself gets it too. The count and lock-until time live on the account record; a successful sign-in resets them. Unknown emails never get records or counters.
+- Routes: `POST /api/v1/accounts/sign-up` (201, or 400 `INVALID_REQUEST_BODY`, 409 `EMAIL_ALREADY_REGISTERED`), `POST /api/v1/accounts/sign-in` (200, or 401 `INVALID_CREDENTIALS`, or 423 `ACCOUNT_TEMPORARILY_LOCKED`), and `GET /api/v1/accounts/me`.
 
 We considered a hosted identity provider. Auth0 (free up to 25,000 monthly active users) and Clerk (free up to 50,000 retained users per app) would both cover the PoC, and either remains an option later. We chose our own accounts because the PoC needs no social login, no MFA and no email sending, and keeping identity in our own MongoDB avoids a third-party dependency in tests and local development.
 

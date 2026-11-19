@@ -29,6 +29,22 @@ export class InMemoryInstructorAccountRepository implements InstructorAccountRep
       : this.findById(accountId);
   }
 
+  public async saveSignInCounters(account: InstructorAccount): Promise<void> {
+    const stored = this.#accountsById.get(account.accountId);
+    if (!stored) {
+      return;
+    }
+    const { failedSignInCount, lockedUntil } = account.toProps();
+    this.#accountsById.set(
+      account.accountId,
+      InstructorAccount.rehydrate({
+        ...stored.toProps(),
+        failedSignInCount,
+        lockedUntil,
+      }),
+    );
+  }
+
   /** Every stored record, as plain props: for tests that inspect storage. */
   public storedRecords(): ReadonlyArray<Readonly<Record<string, unknown>>> {
     return [

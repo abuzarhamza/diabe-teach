@@ -9,4 +9,9 @@ export interface InstructorAccountRepositoryPort {
   findById: (accountId: string) => Promise<InstructorAccount | null>;
   /** Looks up by an already-normalised (trimmed, lower-cased) email. */
   findByEmail: (email: string) => Promise<InstructorAccount | null>;
+  /**
+   * Stores an existing account's sign-in counters (failed sign-in count and
+   * lock-until time). Nothing else about the account changes.
+   */
+  saveSignInCounters: (account: InstructorAccount) => Promise<void>;
 }

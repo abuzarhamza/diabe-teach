@@ -257,6 +257,121 @@ describe("post /api/v1/accounts/sign-in", () => {
   });
 });
 
+describe("post /api/v1/accounts/sign-in locks after five wrong passwords", () => {
+  const EMAIL = "rahman.s@aku.edu";
+  const WRONG = "not the password";
+
+  async function registeredWorld() {
+    const world = makeWorld();
+    await call(world.signUp, signUpEvent({ email: EMAIL, password: PASSWORD }));
+    return world;
+  }
+
+  async function signIn(world: ReturnType<typeof makeWorld>, password: string, email = EMAIL) {
+    return call(world.signIn, signInEvent({ email, password }));
+  }
+
+  async function wrongPasswords(world: ReturnType<typeof makeWorld>, times: number) {
+    const responses = [];
+    for (let attempt = 0; attempt < times; attempt++) {
+      responses.push(await signIn(world, WRONG));
+    }
+    return responses;
+  }
+
+  it("signs in after four wrong passwords and resets the count", async () => {
+    const world = await registeredWorld();
+
+    const wrong = await wrongPasswords(world, 4);
+    expect(wrong.map(res => res.status)).toEqual([401, 401, 401, 401]);
+    expect((await world.accountRepo.findByEmail(EMAIL))?.failedSignInCount).toBe(4);
+
+    const res = await signIn(world, PASSWORD);
+
+    expect(res.status).toBe(200);
+    const stored = await world.accountRepo.findByEmail(EMAIL);
+    expect(stored?.failedSignInCount).toBe(0);
+    expect(stored?.lockedUntil).toBeNull();
+    // A fresh run of four wrong passwords after the reset still does not lock.
+    expect((await wrongPasswords(world, 4)).map(r => r.status)).toEqual([401, 401, 401, 401]);
+    expect((await signIn(world, PASSWORD)).status).toBe(200);
+  });
+
+  it("locks the account on the fifth wrong password, and then refuses the right password with 423", async () => {
+    const world = await registeredWorld();
+
+    const wrong = await wrongPasswords(world, 5);
+
+    expect(wrong.slice(0, 4).map(res => res.status)).toEqual([401, 401, 401, 401]);
+    expect(wrong[4]!.status).toBe(423);
+    expect(wrong[4]!.body.code).toBe("ACCOUNT_TEMPORARILY_LOCKED");
+    expect((await world.accountRepo.findByEmail(EMAIL))?.lockedUntil?.toISOString())
+      .toBe("2026-11-19T08:15:00.000Z");
+
+    const right = await signIn(world, PASSWORD);
+
+    expect(right.status).toBe(423);
+    expect(right.body).toEqual({
+      code: "ACCOUNT_TEMPORARILY_LOCKED",
+      message: "Too many wrong passwords. Sign-in is temporarily locked; try again later.",
+      details: { lockedUntil: "2026-11-19T08:15:00.000Z" },
+    });
+    expect(right.body.accountToken).toBeUndefined();
+  });
+
+  it("keeps the lock for the whole 15 minutes, without extending it on further attempts", async () => {
+    const world = await registeredWorld();
+    await wrongPasswords(world, 5);
+
+    world.clock.advanceSeconds(14 * 60 + 59);
+    expect((await signIn(world, WRONG)).status).toBe(423);
+    expect((await signIn(world, PASSWORD)).status).toBe(423);
+    expect((await world.accountRepo.findByEmail(EMAIL))?.lockedUntil?.toISOString())
+      .toBe("2026-11-19T08:15:00.000Z");
+  });
+
+  it("signs in with the right password once the clock passes 15 minutes", async () => {
+    const world = await registeredWorld();
+    await wrongPasswords(world, 5);
+
+    world.clock.advanceSeconds(15 * 60);
+    const res = await signIn(world, PASSWORD);
+
+    expect(res.status).toBe(200);
+    expect(typeof res.body.accountToken).toBe("string");
+    const stored = await world.accountRepo.findByEmail(EMAIL);
+    expect(stored?.failedSignInCount).toBe(0);
+    expect(stored?.lockedUntil).toBeNull();
+  });
+
+  it("needs five fresh wrong passwords to lock again after a lock ends", async () => {
+    const world = await registeredWorld();
+    await wrongPasswords(world, 5);
+    world.clock.advanceSeconds(15 * 60);
+
+    const wrong = await wrongPasswords(world, 5);
+
+    expect(wrong.map(res => res.status)).toEqual([401, 401, 401, 401, 423]);
+  });
+
+  it("gives wrong passwords for an unknown email the generic 401 and creates nothing", async () => {
+    const world = await registeredWorld();
+    const before = world.accountRepo.storedRecords();
+
+    const responses = [];
+    for (let attempt = 0; attempt < 6; attempt++) {
+      responses.push(await signIn(world, WRONG, "nobody@aku.edu"));
+    }
+
+    for (const res of responses) {
+      expect(res.status).toBe(401);
+      expect(res.body).toEqual({ code: "INVALID_CREDENTIALS", message: "Email or password is incorrect." });
+    }
+    expect(world.accountRepo.storedRecords()).toEqual(before);
+    expect(await world.accountRepo.findByEmail("nobody@aku.edu")).toBeNull();
+  });
+});
+
 describe("accountAuth security scheme (GET /api/v1/accounts/me)", () => {
   it("accepts the Account Token returned by sign-up and by sign-in", async () => {
     const world = makeWorld();
