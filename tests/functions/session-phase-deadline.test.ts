@@ -59,6 +59,7 @@ function makeHandlers(clock: FakeClock) {
     get: createGetSessionHandler({ sessionRepo, tokenVerifier: tokenAdapter }),
     transition: createTransitionPhaseHandler({
       sessionRepo,
+      packRepo,
       tokenVerifier: tokenAdapter,
       clock,
     }),

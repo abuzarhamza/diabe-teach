@@ -963,6 +963,13 @@ components:
           $ref: "#/components/schemas/SessionTimerConfig"
         seed:
           type: string
+          minLength: 1
+          description: >
+            Seeds Round 1's board, which the server deals when the session
+            enters `round-1:chain-mapping`. The same Curriculum Pack, board
+            size and seed always give the same board. A `seed` sent with that
+            transition overrides it. Without either, the server generates a
+            random seed. Round 2 never uses this seed.
         creatorDisplayName:
           type: string
 
@@ -1020,10 +1027,15 @@ components:
 
     BoardGridView:
       type: object
+      description: >
+        A Gameplay Round's board, dealt by the server from the session's
+        Curriculum Pack when the round's Chain-Mapping phase starts.
+        `cells[row][col]` holds a copy of the Keyword Card placed there.
       required: [seed, rows, cols, cells]
       properties:
         seed:
           type: string
+          description: The seed this board was dealt with; it reproduces the board.
         rows:
           type: integer
         cols:
@@ -1047,6 +1059,7 @@ components:
         - phaseStartedAt
         - phaseEndsAt
         - participantCount
+        - activeBoard
       properties:
         sessionId:
           type: string
@@ -1073,6 +1086,12 @@ components:
             When the current phase is scheduled to end. `null` when the
             phase is instructor-driven (its timer is set to `null`).
         activeBoard:
+          description: >
+            The board of the active Gameplay Round, the same through its
+            Chain-Mapping, Peer-Adjudication and Round-Summary phases. `null`
+            outside a Gameplay Round (pretest, trial orientation, posttest,
+            feedback survey, completed), and for a round entered before the
+            server dealt boards.
           oneOf:
             - $ref: "#/components/schemas/BoardGridView"
             - type: "null"
@@ -1091,6 +1110,13 @@ components:
           $ref: "#/components/schemas/PhaseIdentifier"
         seed:
           type: string
+          minLength: 1
+          description: >
+            Seeds the board of the round this transition enters
+            (`round-1:chain-mapping` or `round-2:chain-mapping`), overriding
+            the session's creation seed for Round 1. Without it, Round 1 uses
+            the creation seed and otherwise the server generates a random
+            seed. Ignored for transitions that enter no round.
 
     StepRationale:
       type: object

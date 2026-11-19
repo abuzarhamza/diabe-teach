@@ -12,6 +12,7 @@ import type {
   SessionTimerConfig,
   SurveyResponse,
 } from "./game-session.types.js";
+import type { RoundBoard } from "./round-board.types.js";
 import { randomUUID } from "node:crypto";
 import {
   AssessmentAlreadySubmittedError,
@@ -21,9 +22,11 @@ import {
   PhaseClosedForSubmissionsError,
   SurveyAlreadySubmittedError,
 } from "../errors/domain-errors.js";
+import { BoardDealer } from "./board-dealer.js";
 import {
   DEFAULT_TIMER_CONFIG,
   MAX_TIMER_DURATION_SEC,
+  PHASE_GAMEPLAY_ROUND,
   PHASE_TIMER_FIELD,
   PHASE_TRANSITIONS,
   SUBMISSION_GRACE_PERIOD_SEC,
@@ -46,6 +49,9 @@ export class GameSession {
   readonly #assessments: Map<string, Map<AssessmentStage, AssessmentAttempt>>;
   /** Perception survey responses keyed by participant. */
   readonly #surveyResponses: Map<string, SurveyResponse>;
+  readonly #creationSeed: string | null;
+  /** Each Gameplay Round's dealt board, keyed by round number. */
+  readonly #roundBoards: Map<1 | 2, RoundBoard>;
   readonly #version: number;
 
   #currentPhase: PhaseIdentifier;
@@ -76,9 +82,15 @@ export class GameSession {
       : [];
     this.#activeRoundNumber = props.activeRoundNumber ?? null;
     this.#createdAt = props.createdAt ?? new Date();
+    this.#creationSeed = props.creationSeed ?? null;
+    this.#roundBoards = new Map(
+      (props._roundBoards ?? []).map(board => [board.roundNumber, board]),
+    );
     this.#version = props.version ?? 0;
     // Support rehydration from persistence with existing chains
-    this.#chains = props._chains ? [...props._chains] : [];
+    this.#chains = props._chains
+      ? [...props._chains]
+      : [];
     // Support rehydration from persistence with existing assessments
     this.#assessments = new Map();
     for (const attempt of props._assessments ?? []) {
@@ -93,10 +105,12 @@ export class GameSession {
 
   /**
    * Starts a new session at version 0. Rejects an invalid timer config with
-   * InvalidTimerConfigError.
+   * InvalidTimerConfigError, and a creation seed that is not a non-empty
+   * string with InvalidBoardSeedError.
    */
   public static create(props: GameSessionProps): GameSession {
     GameSession.#assertValidTimerConfig(props.timerConfig);
+    BoardDealer.assertValidSeed(props.creationSeed ?? undefined, "seed");
     return new GameSession({ ...props, version: 0 });
   }
 
@@ -170,6 +184,49 @@ export class GameSession {
     return this.#createdAt;
   }
 
+  /** The seed given at creation for Round 1's board, or `null`. */
+  public get creationSeed(): string | null {
+    return this.#creationSeed;
+  }
+
+  /**
+   * The board of the Gameplay Round the current phase belongs to, from its
+   * Chain-Mapping through its Round-Summary. `null` outside the rounds, and
+   * for a round entered before boards were dealt (legacy sessions).
+   */
+  public get activeBoard(): RoundBoard | null {
+    const roundNumber = PHASE_GAMEPLAY_ROUND[this.#currentPhase];
+    return roundNumber === null
+      ? null
+      : this.boardForRound(roundNumber);
+  }
+
+  /** The board dealt for a Gameplay Round, or `null` if none was dealt. */
+  public boardForRound(roundNumber: 1 | 2): RoundBoard | null {
+    return this.#roundBoards.get(roundNumber) ?? null;
+  }
+
+  /** Every dealt round board, in round order, for persistence. */
+  public get roundBoards(): readonly RoundBoard[] {
+    return [
+      ...this.#roundBoards.values(),
+    ].sort((a, b) => a.roundNumber - b.roundNumber);
+  }
+
+  /**
+   * The Gameplay Round whose board must be dealt on entering `phase`: 1 or 2
+   * for a round's Chain-Mapping phase, otherwise `null`.
+   */
+  public static roundEnteredBy(phase: PhaseIdentifier): 1 | 2 | null {
+    if (phase === "round-1:chain-mapping") {
+      return 1;
+    }
+    if (phase === "round-2:chain-mapping") {
+      return 2;
+    }
+    return null;
+  }
+
   /**
    * The stored version this session was loaded at (0 for a new session).
    * A save succeeds only while the stored session is still at this version.
@@ -178,21 +235,34 @@ export class GameSession {
     return this.#version;
   }
 
-  public transitionTo(targetPhase: PhaseIdentifier, now: Date): void {
+  /**
+   * Moves to the next phase. Entering a round's Chain-Mapping phase stores
+   * `board` as that round's board; `board` must be dealt for that round and
+   * is not allowed for any other phase. Entering a round without a board
+   * leaves the round without one, as in sessions stored before boards.
+   */
+  public transitionTo(targetPhase: PhaseIdentifier, now: Date, board?: RoundBoard): void {
     const allowedNext = PHASE_TRANSITIONS.get(this.#currentPhase);
 
     if (allowedNext !== targetPhase) {
       throw new InvalidPhaseTransitionError(this.#currentPhase, targetPhase);
     }
 
+    const enteredRound = GameSession.roundEnteredBy(targetPhase);
+    if (board !== undefined && board.roundNumber !== enteredRound) {
+      throw new Error(
+        `A board for round ${board.roundNumber} cannot be stored on entering phase '${targetPhase}'.`,
+      );
+    }
+
     this.#currentPhase = targetPhase;
     this.#phaseStartedAt = now;
 
-    if (targetPhase === "round-1:chain-mapping") {
-      this.#activeRoundNumber = 1;
-    }
-    else if (targetPhase === "round-2:chain-mapping") {
-      this.#activeRoundNumber = 2;
+    if (enteredRound !== null) {
+      this.#activeRoundNumber = enteredRound;
+      if (board !== undefined) {
+        this.#roundBoards.set(enteredRound, board);
+      }
     }
   }
 

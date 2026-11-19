@@ -256,6 +256,37 @@ export class InvalidTimerConfigError extends DomainError {
   }
 }
 
+export class InvalidBoardSeedError extends DomainError {
+  public readonly code = "INVALID_REQUEST_BODY" as const;
+
+  public constructor(field: string, value: unknown) {
+    super(
+      `Invalid '${field}': a board seed must be a non-empty string.`,
+      { field, value },
+    );
+  }
+}
+
+/**
+ * A round's board cannot be dealt because the Curriculum Pack has fewer
+ * Keyword Cards than the board has cells.
+ */
+export class NotEnoughKeywordCardsError extends DomainError {
+  public readonly code = "PACK_VALIDATION_FAILED" as const;
+
+  public constructor(cardCount: number, rows: number, cols: number) {
+    super(
+      `Cannot deal a ${rows}×${cols} board: the Curriculum Pack has only ${cardCount} Keyword Cards, and ${rows * cols} are needed.`,
+      {
+        cardCount,
+        rows,
+        cols,
+        requiredCardCount: rows * cols,
+      },
+    );
+  }
+}
+
 /**
  * A Game Session save found the stored session at a different version than
  * the one that was loaded (or no stored session at all), so another write got

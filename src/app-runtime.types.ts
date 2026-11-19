@@ -1,3 +1,4 @@
+import type { BoardSeedGeneratorPort, SeededRandomPort } from "./application/ports/board-randomness.port.js";
 import type { CapabilityTokenPort, CapabilityTokenSignerPort } from "./application/ports/capability-token.port.js";
 import type { ClockPort } from "./application/ports/clock.port.js";
 import type { CurriculumPackRepositoryPort } from "./application/ports/curriculum-pack-repository.port.js";
@@ -16,6 +17,8 @@ export interface ProductionDependencies {
   readonly tokenSigner?: CapabilityTokenSignerPort;
   readonly tokenVerifier?: CapabilityTokenPort;
   readonly clock?: ClockPort;
+  readonly seededRandom?: SeededRandomPort;
+  readonly seedGenerator?: BoardSeedGeneratorPort;
   readonly apiKey?: string;
   readonly requireApiKey?: boolean;
 }

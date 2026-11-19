@@ -10,9 +10,11 @@ import type {
   MongoGameSessionConnectionConfig,
   MongoGameSessionRepositoryOptions,
   ParticipantDocument,
+  RoundBoardDocument,
   SurveyResponseDocument,
 } from "./mongo-game-session-repository.types.js";
 import type { AssessmentAttempt, LikertRating, McqAnswerChoice, SurveyResponse } from "../../domain/game-session/game-session.types.js";
+import type { RoundBoard } from "../../domain/game-session/round-board.types.js";
 import { ConcurrentUpdateConflictError } from "../../domain/errors/domain-errors.js";
 import { ConceptChain } from "../../domain/game-session/concept-chain.js";
 import { GameSession } from "../../domain/game-session/game-session.js";
@@ -188,11 +190,31 @@ export class MongoGameSessionRepository implements GameSessionRepositoryPort {
       })),
       activeRoundNumber: doc.activeRoundNumber,
       createdAt: doc.createdAt,
+      creationSeed: doc.creationSeed ?? null,
       version: doc.version ?? 0,
       _chains: chains,
       _assessments: assessments,
       _surveyResponses: surveyResponses,
+      _roundBoards: (doc.roundBoards ?? []).map(MongoGameSessionRepository.#copyRoundBoard),
     });
+  }
+
+  /** Copies a round board card by card; serves both loading and saving. */
+  static #copyRoundBoard(board: RoundBoard): RoundBoardDocument {
+    return {
+      roundNumber: board.roundNumber,
+      seed: board.seed,
+      rows: board.rows,
+      cols: board.cols,
+      cells: board.cells.map(row => row.map(card => ({
+        id: card.id,
+        verbatimLabel: card.verbatimLabel,
+        displayLabel: card.displayLabel,
+        aliases: [...card.aliases],
+        domainId: card.domainId,
+        summary: card.summary,
+      }))),
+    };
   }
 
   static #toDocument(session: GameSession): GameSessionDocument {
@@ -221,6 +243,8 @@ export class MongoGameSessionRepository implements GameSessionRepositoryPort {
       // Clears the legacy single-response field so it cannot diverge from the list.
       surveyResponse: null,
       createdAt: session.createdAt,
+      creationSeed: session.creationSeed,
+      roundBoards: session.roundBoards.map(MongoGameSessionRepository.#copyRoundBoard),
     };
   }
 

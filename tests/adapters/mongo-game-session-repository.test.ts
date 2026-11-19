@@ -194,4 +194,50 @@ describe("mongoGameSessionRepository timer config persistence", () => {
 
     expect(found?.timerConfig.roundMappingSec).toBe(0);
   });
+
+  it("loads a session stored before server-dealt boards with no board and no creation seed", async () => {
+    const connection = await mongoose.createConnection(mongoUri, { dbName: mongoDbName }).asPromise();
+    try {
+      await connection.collection(MongoGameSessionRepository.collectionName).insertOne({
+        _id: "legacy-no-board" as unknown as never,
+        roomCode: "LGBORD",
+        packId: "diabe-teach",
+        mode: "classroom",
+        adjudicationMode: "peer-instructor",
+        timerConfig: {
+          pretestSec: 900,
+          trialOrientationSec: 900,
+          roundMappingSec: 1200,
+          roundAdjudicationSec: 600,
+          posttestSec: 900,
+          feedbackSurveySec: 900,
+        },
+        currentPhase: "round-1:chain-mapping",
+        phaseStartedAt: new Date("2026-03-01T09:00:00.000Z"),
+        participants: [],
+        activeRoundNumber: 1,
+        chains: [],
+        assessments: [],
+        surveyResponses: [],
+        createdAt: new Date("2026-03-01T09:00:00.000Z"),
+        version: 3,
+      });
+    }
+    finally {
+      await connection.close();
+    }
+
+    const found = await repo.findById(SessionId.from("legacy-no-board"));
+
+    expect(found?.currentPhase).toBe("round-1:chain-mapping");
+    expect(found?.activeBoard).toBeNull();
+    expect(found?.boardForRound(1)).toBeNull();
+    expect(found?.creationSeed).toBeNull();
+
+    found!.transitionTo("round-1:peer-adjudication", new Date("2026-03-01T09:20:00.000Z"));
+    await repo.update(found!);
+    const reloaded = await repo.findById(SessionId.from("legacy-no-board"));
+    expect(reloaded?.currentPhase).toBe("round-1:peer-adjudication");
+    expect(reloaded?.activeBoard).toBeNull();
+  });
 });

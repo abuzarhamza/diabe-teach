@@ -9,9 +9,11 @@ import {
   ConcurrentUpdateConflictError,
   DomainError,
   ForbiddenRoleError,
+  InvalidBoardSeedError,
   InvalidPhaseTransitionError,
   InvalidSurveyResponseError,
   InvalidTimerConfigError,
+  NotEnoughKeywordCardsError,
   PackAlreadyArchivedError,
   PackAlreadyExistsError,
   PackIsSystemPackError,
@@ -35,7 +37,10 @@ export function domainErrorMiddleware(): MiddlewareObj<any, any> {
         if (error instanceof UnauthorizedTokenError) {
           statusCode = 401;
         }
-        else if (error instanceof InvalidTimerConfigError) {
+        else if (
+          error instanceof InvalidTimerConfigError
+          || error instanceof InvalidBoardSeedError
+        ) {
           statusCode = 400;
         }
         else if (
@@ -73,6 +78,7 @@ export function domainErrorMiddleware(): MiddlewareObj<any, any> {
           || error instanceof AssessmentIncompleteError
           || error instanceof SurveyCommentsTooLongError
           || error instanceof InvalidSurveyResponseError
+          || error instanceof NotEnoughKeywordCardsError
         ) {
           statusCode = 422;
         }

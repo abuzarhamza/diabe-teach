@@ -2,6 +2,7 @@ import type { APIGatewayProxyEvent } from "aws-lambda";
 import { describe, expect, it } from "vitest";
 import { createTransitionPhaseHandler } from "../../netlify/functions/sessions/transition-phase.js";
 import { FakeCapabilityTokenAdapter } from "../../src/adapters/outbound/fake-capability-token-adapter.js";
+import { InMemoryCurriculumPackRepository } from "../../src/adapters/outbound/in-memory-curriculum-pack-repository.js";
 import { InMemoryGameSessionRepository } from "../../src/adapters/outbound/in-memory-game-session-repository.js";
 import { GameSession } from "../../src/domain/game-session/game-session.js";
 
@@ -46,6 +47,7 @@ describe("post /api/v1/sessions/{sessionId}/phase", () => {
 
     const handler = createTransitionPhaseHandler({
       sessionRepo,
+      packRepo: new InMemoryCurriculumPackRepository(),
       tokenVerifier: tokenAdapter,
     });
 
@@ -74,6 +76,7 @@ describe("post /api/v1/sessions/{sessionId}/phase", () => {
 
     const handler = createTransitionPhaseHandler({
       sessionRepo,
+      packRepo: new InMemoryCurriculumPackRepository(),
       tokenVerifier: tokenAdapter,
     });
 
@@ -111,6 +114,7 @@ describe("post /api/v1/sessions/{sessionId}/phase", () => {
 
     const handler = createTransitionPhaseHandler({
       sessionRepo,
+      packRepo: new InMemoryCurriculumPackRepository(),
       tokenVerifier: tokenAdapter,
     });
 
@@ -140,6 +144,7 @@ describe("post /api/v1/sessions/{sessionId}/phase", () => {
 
     const handler = createTransitionPhaseHandler({
       sessionRepo,
+      packRepo: new InMemoryCurriculumPackRepository(),
       tokenVerifier: tokenAdapter,
     });
 
@@ -167,6 +172,7 @@ describe("post /api/v1/sessions/{sessionId}/phase", () => {
 
     const handler = createTransitionPhaseHandler({
       sessionRepo,
+      packRepo: new InMemoryCurriculumPackRepository(),
       tokenVerifier: tokenAdapter,
     });
 

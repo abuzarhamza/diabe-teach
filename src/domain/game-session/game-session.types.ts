@@ -1,4 +1,5 @@
 import type { RoomCode } from "./room-code.js";
+import type { RoundBoard } from "./round-board.types.js";
 import type { SessionId } from "./session-id.js";
 
 export type SessionMode = "solo" | "classroom" | "study-rct";
@@ -71,6 +72,11 @@ export interface GameSessionProps {
   readonly activeRoundNumber?: 1 | 2 | null;
   readonly createdAt?: Date;
   /**
+   * The seed given at session creation for Round 1's board, or `null` when
+   * none was given (sessions stored before boards have none either).
+   */
+  readonly creationSeed?: string | null;
+  /**
    * Stored version for optimistic concurrency. New sessions start at 0;
    * sessions stored before versioning have none and load as 0.
    */
@@ -81,6 +87,8 @@ export interface GameSessionProps {
   readonly _assessments?: readonly AssessmentAttempt[];
   /** Used for rehydration from persistence - bypasses phase validation */
   readonly _surveyResponses?: readonly SurveyResponse[];
+  /** Each Gameplay Round's dealt board; sessions stored before boards have none. */
+  readonly _roundBoards?: readonly RoundBoard[];
 }
 
 /**
@@ -130,6 +138,24 @@ export const PHASE_TIMER_FIELD: Readonly<Record<PhaseIdentifier, keyof SessionTi
   "round-2:round-summary": null,
   "posttest": "posttestSec",
   "feedback-survey": "feedbackSurveySec",
+  "completed": null,
+};
+
+/**
+ * The Gameplay Round each phase belongs to, or `null` outside the rounds.
+ * Typed as a full Record so adding a phase forces a decision here.
+ */
+export const PHASE_GAMEPLAY_ROUND: Readonly<Record<PhaseIdentifier, 1 | 2 | null>> = {
+  "pretest": null,
+  "trial-orientation": null,
+  "round-1:chain-mapping": 1,
+  "round-1:peer-adjudication": 1,
+  "round-1:round-summary": 1,
+  "round-2:chain-mapping": 2,
+  "round-2:peer-adjudication": 2,
+  "round-2:round-summary": 2,
+  "posttest": null,
+  "feedback-survey": null,
   "completed": null,
 };
 

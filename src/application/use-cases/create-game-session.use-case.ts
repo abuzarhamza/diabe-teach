@@ -42,6 +42,7 @@ export class CreateGameSessionUseCase implements CreateGameSessionUseCasePort {
       mode: command.mode,
       adjudicationMode: command.adjudicationMode,
       timerConfig: command.timerConfig,
+      creationSeed: command.seed ?? null,
       phaseStartedAt: now,
       createdAt: now,
     });

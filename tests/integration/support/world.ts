@@ -32,6 +32,9 @@ export class TestWorld extends World {
 
   public lastChainId: string | null = null;
 
+  /** A round's board noted from one response, to compare with later ones. */
+  public notedBoard: unknown = null;
+
   public reset(): void {
     this.clock = new FakeClock();
     this.currentSessionId = null;
@@ -42,6 +45,7 @@ export class TestWorld extends World {
     this.lastResponse = null;
     this.lastResponseBody = null;
     this.lastChainId = null;
+    this.notedBoard = null;
   }
 
   public parseLastResponse(): void {

@@ -2,6 +2,7 @@ import type {
   ProductionDependencies,
   RuntimeEnvConfig,
 } from "./app-runtime.types.js";
+import { CryptoBoardSeedGenerator } from "./adapters/outbound/crypto-board-seed-generator.js";
 import { EnvYamlConfigLoader } from "./adapters/outbound/env-yaml-config-loader.js";
 import { FakeCapabilityTokenAdapter } from "./adapters/outbound/fake-capability-token-adapter.js";
 import { HmacCapabilityTokenAdapter } from "./adapters/outbound/hmac-capability-token-adapter.js";
@@ -10,6 +11,7 @@ import {
   MongoCurriculumPackRepository,
 } from "./adapters/outbound/mongo-curriculum-pack-repository.js";
 import { MongoGameSessionRepository } from "./adapters/outbound/mongo-game-session-repository.js";
+import { SeedrandomSeededRandom } from "./adapters/outbound/seedrandom-seeded-random.js";
 import { SystemClock } from "./adapters/outbound/system-clock.js";
 
 export interface LoadEnvConfigOptions {
@@ -76,6 +78,8 @@ export class AppRuntime {
       tokenSigner: tokenAdapter,
       tokenVerifier: tokenAdapter,
       clock: new SystemClock(),
+      seededRandom: new SeedrandomSeededRandom(),
+      seedGenerator: new CryptoBoardSeedGenerator(),
       apiKey: config.apiKey,
       requireApiKey: Boolean(config.apiKey),
     };

@@ -115,6 +115,20 @@ Feature: Classroom Game Session Journey
     Then the response status should be 409
     And the response error code should be "PHASE_CLOSED_FOR_SUBMISSIONS"
 
+  @board @shared-board
+  Scenario: Instructor and participant see the same server-dealt round 1 board
+    When the instructor creates a classroom session with pack "diabe-teach"
+    And participant "Alice" joins using the room code
+    Then the session should have no active board
+    When the instructor advances the phase 2 times
+    Then the session phase should be "round-1:chain-mapping"
+    And the active board should be a 7 by 7 grid of distinct Keyword Cards
+    When the instructor notes the active board
+    And the instructor retrieves the session state
+    Then the active board should be the noted board
+    When participant "Alice" retrieves the session state
+    Then the active board should be the noted board
+
   @session-state @instructor
   Scenario: Instructor retrieves session state
     When the instructor creates a classroom session with pack "diabe-teach"

@@ -1,6 +1,8 @@
 import type { APIGatewayProxyEvent, APIGatewayProxyResult } from "aws-lambda";
+import type { BoardSeedGeneratorPort, SeededRandomPort } from "../../../src/application/ports/board-randomness.port.js";
 import type { CapabilityTokenPort, VerifiedCapability } from "../../../src/application/ports/capability-token.port.js";
 import type { ClockPort } from "../../../src/application/ports/clock.port.js";
+import type { CurriculumPackRepositoryPort } from "../../../src/application/ports/curriculum-pack-repository.port.js";
 import type { GameSessionRepositoryPort } from "../../../src/application/ports/game-session-repository.port.js";
 import type { TransitionSessionPhaseCommand } from "../../../src/application/ports/transition-session-phase.port.js";
 import middy from "@middy/core";
@@ -13,8 +15,12 @@ import { ForbiddenRoleError, UnauthorizedTokenError } from "../../../src/domain/
 
 export interface TransitionPhaseHandlerDependencies {
   readonly sessionRepo: GameSessionRepositoryPort;
+  /** Supplies the session's Curriculum Pack when a round's board is dealt. */
+  readonly packRepo: CurriculumPackRepositoryPort;
   readonly tokenVerifier: CapabilityTokenPort;
   readonly clock?: ClockPort;
+  readonly seededRandom?: SeededRandomPort;
+  readonly seedGenerator?: BoardSeedGeneratorPort;
   readonly apiKey?: string;
   readonly requireApiKey?: boolean;
 }
@@ -25,6 +31,7 @@ export function createTransitionPhaseHandler(
   const prodDeps = AppRuntime.getProductionDependencies();
   const deps: TransitionPhaseHandlerDependencies = dependencies ?? {
     sessionRepo: prodDeps.sessionRepo!,
+    packRepo: prodDeps.packRepo,
     tokenVerifier: prodDeps.tokenVerifier!,
     apiKey: prodDeps.apiKey,
     requireApiKey: prodDeps.requireApiKey,
@@ -33,7 +40,10 @@ export function createTransitionPhaseHandler(
 
   const useCase = new TransitionSessionPhaseUseCase({
     sessionRepo: deps.sessionRepo,
+    packRepo: deps.packRepo,
     clock,
+    seededRandom: deps.seededRandom ?? prodDeps.seededRandom!,
+    seedGenerator: deps.seedGenerator ?? prodDeps.seedGenerator!,
   });
 
   const rawHandler = async (

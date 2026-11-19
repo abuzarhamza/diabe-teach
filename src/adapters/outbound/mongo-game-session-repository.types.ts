@@ -48,6 +48,24 @@ export interface ConceptChainDocument {
   submittedAt: Date;
 }
 
+export interface KeywordCardSnapshotDocument {
+  id: string;
+  verbatimLabel: string;
+  displayLabel: string;
+  aliases: string[];
+  domainId: string;
+  summary: string;
+}
+
+/** One Gameplay Round's dealt board; `cells[row][col]` is a card snapshot. */
+export interface RoundBoardDocument {
+  roundNumber: 1 | 2;
+  seed: string;
+  rows: number;
+  cols: number;
+  cells: KeywordCardSnapshotDocument[][];
+}
+
 export interface GameSessionDocument {
   _id: string;
   roomCode: string;
@@ -66,6 +84,10 @@ export interface GameSessionDocument {
   /** Legacy single survey response, read only when `surveyResponses` is absent. Always written as null. */
   surveyResponse?: SurveyResponseDocument | null;
   createdAt: Date;
+  /** Round 1's board seed given at creation. Absent on sessions stored before boards. */
+  creationSeed?: string | null;
+  /** Each Gameplay Round's dealt board. Absent on sessions stored before boards. */
+  roundBoards?: RoundBoardDocument[];
   /** Optimistic-concurrency version. Absent on sessions stored before versioning (read as 0). */
   version?: number;
 }
