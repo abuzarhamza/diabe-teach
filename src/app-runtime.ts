@@ -2,15 +2,20 @@ import type {
   ProductionDependencies,
   RuntimeEnvConfig,
 } from "./app-runtime.types.js";
+import { Argon2PasswordHasher } from "./adapters/outbound/argon2-password-hasher.js";
 import { CryptoBoardSeedGenerator } from "./adapters/outbound/crypto-board-seed-generator.js";
+import { CryptoIdGenerator } from "./adapters/outbound/crypto-id-generator.js";
 import { EnvYamlConfigLoader } from "./adapters/outbound/env-yaml-config-loader.js";
+import { FakeAccountTokenAdapter } from "./adapters/outbound/fake-account-token-adapter.js";
 import { FakeCapabilityTokenAdapter } from "./adapters/outbound/fake-capability-token-adapter.js";
+import { HmacAccountTokenAdapter } from "./adapters/outbound/hmac-account-token-adapter.js";
 import { HmacCapabilityTokenAdapter } from "./adapters/outbound/hmac-capability-token-adapter.js";
 import {
   DEFAULT_MONGODB_DB_NAME,
   MongoCurriculumPackRepository,
 } from "./adapters/outbound/mongo-curriculum-pack-repository.js";
 import { MongoGameSessionRepository } from "./adapters/outbound/mongo-game-session-repository.js";
+import { MongoInstructorAccountRepository } from "./adapters/outbound/mongo-instructor-account-repository.js";
 import { SeedrandomSeededRandom } from "./adapters/outbound/seedrandom-seeded-random.js";
 import { SystemClock } from "./adapters/outbound/system-clock.js";
 
@@ -47,6 +52,10 @@ export class AppRuntime {
         env.CAPABILITY_TOKEN_SECRET,
         resolvedYaml.capabilityTokenSecret,
       ),
+      accountTokenSecret: AppRuntime.#trimOrFallback(
+        env.ACCOUNT_TOKEN_SECRET,
+        resolvedYaml.accountTokenSecret,
+      ),
       apiKey: AppRuntime.#trimOrFallback(env.API_KEY, resolvedYaml.apiKey),
     };
   }
@@ -72,6 +81,12 @@ export class AppRuntime {
       config.capabilityTokenSecret,
     ) ?? new FakeCapabilityTokenAdapter();
 
+    // Account Tokens have their own secret. Without one (local development),
+    // tokens live only in this process's memory, like the capability fallback.
+    const accountTokenAdapter = HmacAccountTokenAdapter.fromSecret(
+      config.accountTokenSecret,
+    ) ?? new FakeAccountTokenAdapter();
+
     return {
       packRepo: MongoCurriculumPackRepository.fromConfig(config),
       sessionRepo: MongoGameSessionRepository.fromConfig(config),
@@ -80,6 +95,11 @@ export class AppRuntime {
       clock: new SystemClock(),
       seededRandom: new SeedrandomSeededRandom(),
       seedGenerator: new CryptoBoardSeedGenerator(),
+      accountRepo: MongoInstructorAccountRepository.fromConfig(config),
+      passwordHasher: new Argon2PasswordHasher(),
+      accountTokenSigner: accountTokenAdapter,
+      accountTokenVerifier: accountTokenAdapter,
+      idGenerator: new CryptoIdGenerator(),
       apiKey: config.apiKey,
       requireApiKey: Boolean(config.apiKey),
     };

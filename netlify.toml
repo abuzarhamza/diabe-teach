@@ -4,7 +4,7 @@
 [functions]
   directory = "netlify/functions"
   node_bundler = "esbuild"
-  external_node_modules = ["mongoose", "mongodb"]
+  external_node_modules = ["mongoose", "mongodb", "@node-rs/argon2"]
 
 [dev]
   port = 8888
@@ -104,5 +104,23 @@
 [[redirects]]
   from = "/api/v1/packs/:packId/unarchive"
   to = "/.netlify/functions/unarchive-pack"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/v1/accounts/sign-up"
+  to = "/.netlify/functions/sign-up"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/v1/accounts/sign-in"
+  to = "/.netlify/functions/sign-in"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/v1/accounts/me"
+  to = "/.netlify/functions/get-current-account"
   status = 200
   force = true

@@ -8,11 +8,16 @@ import {
   ChainTopologyInvalidError,
   ConcurrentUpdateConflictError,
   DomainError,
+  EmailAlreadyRegisteredError,
   ForbiddenRoleError,
+  InvalidAccountEmailError,
+  InvalidAccountPasswordError,
   InvalidBoardSeedError,
+  InvalidCredentialsError,
   InvalidPhaseTransitionError,
   InvalidSurveyResponseError,
   InvalidTimerConfigError,
+  MalformedRequestBodyError,
   NotEnoughKeywordCardsError,
   PackAlreadyArchivedError,
   PackAlreadyExistsError,
@@ -35,12 +40,18 @@ export function domainErrorMiddleware(): MiddlewareObj<any, any> {
 
       if (error instanceof DomainError) {
         let statusCode = 500;
-        if (error instanceof UnauthorizedTokenError) {
+        if (
+          error instanceof UnauthorizedTokenError
+          || error instanceof InvalidCredentialsError
+        ) {
           statusCode = 401;
         }
         else if (
           error instanceof InvalidTimerConfigError
           || error instanceof InvalidBoardSeedError
+          || error instanceof MalformedRequestBodyError
+          || error instanceof InvalidAccountEmailError
+          || error instanceof InvalidAccountPasswordError
         ) {
           statusCode = 400;
         }
@@ -62,6 +73,7 @@ export function domainErrorMiddleware(): MiddlewareObj<any, any> {
           || error instanceof SurveyAlreadySubmittedError
           || error instanceof ConcurrentUpdateConflictError
           || error instanceof ChainAlreadySubmittedError
+          || error instanceof EmailAlreadyRegisteredError
         ) {
           statusCode = 409;
         }

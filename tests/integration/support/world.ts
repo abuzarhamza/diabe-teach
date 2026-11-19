@@ -35,6 +35,11 @@ export class TestWorld extends World {
   /** A round's board noted from one response, to compare with later ones. */
   public notedBoard: unknown = null;
 
+  /** The teacher's email for this scenario, unique per run. */
+  public teacherEmail: string | null = null;
+  /** The Instructor Account id returned by sign-up. */
+  public signedUpAccountId: string | null = null;
+
   public reset(): void {
     this.clock = new FakeClock();
     this.currentSessionId = null;
@@ -46,6 +51,8 @@ export class TestWorld extends World {
     this.lastResponseBody = null;
     this.lastChainId = null;
     this.notedBoard = null;
+    this.teacherEmail = null;
+    this.signedUpAccountId = null;
   }
 
   public parseLastResponse(): void {

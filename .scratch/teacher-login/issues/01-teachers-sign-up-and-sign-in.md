@@ -14,14 +14,16 @@ See spec: `.scratch/teacher-login/spec.md`.
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] Handler test: sign-up with a new email returns 201 with an Account Token and the account's id and email
-- [ ] Handler test: sign-up with an email already registered, in any letter case and with surrounding spaces, returns 409
-- [ ] Handler test: sign-up with a missing or invalid email, or a password under 10 characters, returns 400 and stores nothing
-- [ ] Handler test: sign-in with the right password returns an Account Token; a wrong password and an unknown email return the same 401 body
-- [ ] Handler test: the returned Account Token is accepted by the new security scheme; a Capability Token is rejected by it, and an Account Token is rejected where a Capability Token is required
-- [ ] Repository contract suite (in-memory + Mongo): create and find by email or id round-trip; a duplicate email is refused; the stored record never holds the plain password
-- [ ] Cucumber scenario: a teacher signs up, then signs in with the same email and password
-- [ ] OpenAPI documents both routes and the Account Token security scheme; the glossary and the new ADR are written
-- [ ] Typecheck, vitest, BDD (`npm run test:bdd`, one feature at a time), lint (118) and boundaries (6) are no worse
+- [x] Handler test: sign-up with a new email returns 201 with an Account Token and the account's id and email
+- [x] Handler test: sign-up with an email already registered, in any letter case and with surrounding spaces, returns 409
+- [x] Handler test: sign-up with a missing or invalid email, or a password under 10 characters, returns 400 and stores nothing
+- [x] Handler test: sign-in with the right password returns an Account Token; a wrong password and an unknown email return the same 401 body
+- [x] Handler test: the returned Account Token is accepted by the new security scheme; a Capability Token is rejected by it, and an Account Token is rejected where a Capability Token is required
+- [x] Repository contract suite (in-memory + Mongo): create and find by email or id round-trip; a duplicate email is refused; the stored record never holds the plain password
+- [x] Cucumber scenario: a teacher signs up, then signs in with the same email and password
+- [x] OpenAPI documents both routes and the Account Token security scheme; the glossary and the new ADR are written
+- [x] Typecheck, vitest, BDD (`npm run test:bdd`, one feature at a time), lint (118) and boundaries (6) are no worse
+
+**Resolution (2026-11-19):** Routes `POST /api/v1/accounts/sign-up` (201; 400 `INVALID_REQUEST_BODY`; 409 `EMAIL_ALREADY_REGISTERED`), `POST /api/v1/accounts/sign-in` (200; 401 `INVALID_CREDENTIALS`), and `GET /api/v1/accounts/me` (`AccountAuth`; 401 `UNAUTHORIZED_TOKEN`). `/me` was added so the `AccountAuth` scheme has a route to test against before tickets 04 and 05. The codebase has no `OpenApiHttpApp`; the "central security handler" is `authMiddleware` with `bearerScheme: "AccountAuth"`. Account Tokens use `ACCOUNT_TOKEN_SECRET` / `auth.account_token_secret`, and both token kinds carry a `kind` claim. Decision record: ADR-0007.

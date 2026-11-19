@@ -5,6 +5,7 @@ export interface EnvYamlMongoConfig {
 
 export interface EnvYamlAuthConfig {
   readonly capability_token_secret?: string;
+  readonly account_token_secret?: string;
   readonly api_key?: string;
 }
 
@@ -17,5 +18,6 @@ export interface ResolvedEnvConfig {
   readonly mongoUri?: string;
   readonly mongoDbName: string;
   readonly capabilityTokenSecret?: string;
+  readonly accountTokenSecret?: string;
   readonly apiKey?: string;
 }

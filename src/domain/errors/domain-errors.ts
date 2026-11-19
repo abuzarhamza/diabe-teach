@@ -325,3 +325,58 @@ export class ConcurrentUpdateConflictError extends DomainError {
     );
   }
 }
+
+/**
+ * A request body that could not be read as a JSON object, or that is missing
+ * a required field.
+ */
+export class MalformedRequestBodyError extends DomainError {
+  public readonly code = "INVALID_REQUEST_BODY" as const;
+
+  public constructor(message = "The request body must be a JSON object.", details?: Readonly<Record<string, unknown>>) {
+    super(message, details);
+  }
+}
+
+/** An Instructor Account email that is missing or not shaped like an email. */
+export class InvalidAccountEmailError extends DomainError {
+  public readonly code = "INVALID_REQUEST_BODY" as const;
+
+  public constructor() {
+    super("A valid email address is required.", { field: "email" });
+  }
+}
+
+/** An Instructor Account password that is missing, too short or too long. */
+export class InvalidAccountPasswordError extends DomainError {
+  public readonly code = "INVALID_REQUEST_BODY" as const;
+
+  public constructor(minLength: number, maxLength: number) {
+    super(
+      `A password of at least ${minLength} characters (and at most ${maxLength}) is required.`,
+      { field: "password", minLength, maxLength },
+    );
+  }
+}
+
+/** Sign-up with an email that already belongs to an Instructor Account. */
+export class EmailAlreadyRegisteredError extends DomainError {
+  public readonly code = "EMAIL_ALREADY_REGISTERED" as const;
+
+  public constructor() {
+    super("An Instructor Account with this email already exists.");
+  }
+}
+
+/**
+ * Sign-in with an unknown email or a wrong password. Both get this same
+ * error, with no details, so the response never reveals which emails have
+ * accounts.
+ */
+export class InvalidCredentialsError extends DomainError {
+  public readonly code = "INVALID_CREDENTIALS" as const;
+
+  public constructor() {
+    super("Email or password is incorrect.");
+  }
+}

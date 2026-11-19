@@ -15,6 +15,8 @@ servers:
     description: Local development server
 
 tags:
+  - name: Accounts
+    description: Instructor Account sign-up and sign-in, which issue Account Tokens
   - name: Packs
     description: Curriculum Pack discovery, validation, and registration
   - name: Sessions
@@ -25,6 +27,123 @@ tags:
     description: Pretest/Posttest Assessment Attempts, Likert perception survey, and metacognitive analytics
 
 paths:
+  /api/v1/accounts/sign-up:
+    post:
+      operationId: signUpInstructor
+      tags: [Accounts]
+      summary: Create an Instructor Account with an email and a password, and sign it in
+      description: >-
+        Anyone with an email can sign up: no verification email and no
+        university check in the proof-of-concept phase. The email is trimmed
+        and lower-cased before it is stored, and must be unique. The password
+        must be at least 10 characters; it is stored only as an argon2id hash.
+        Any `Authorization` header is ignored.
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AccountCredentialsRequest"
+      responses:
+        "201":
+          description: Instructor Account created and signed in
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountTokenResponse"
+        "400":
+          description: >-
+            INVALID_REQUEST_BODY. The body is not a JSON object, the email is
+            missing or not shaped like an email, or the password is missing or
+            under 10 characters. `details.field` names the field. Nothing is
+            stored.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "401":
+          description: UNAUTHORIZED_TOKEN. Missing or invalid x-api-key header.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "409":
+          description: >-
+            EMAIL_ALREADY_REGISTERED. An Instructor Account already has this
+            email, compared after trimming and lower-casing.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+
+  /api/v1/accounts/sign-in:
+    post:
+      operationId: signInInstructor
+      tags: [Accounts]
+      summary: Sign in to an Instructor Account and receive a 12-hour Account Token
+      description: >-
+        The email is trimmed and lower-cased before the lookup. Any
+        `Authorization` header is ignored.
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AccountCredentialsRequest"
+      responses:
+        "200":
+          description: Signed in
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountTokenResponse"
+        "400":
+          description: INVALID_REQUEST_BODY. The body is not a JSON object.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "401":
+          description: >-
+            INVALID_CREDENTIALS with the message "Email or password is
+            incorrect." for an unknown email, a wrong password, or a missing
+            field: the same body every time, so the response never reveals
+            which emails have accounts. (UNAUTHORIZED_TOKEN for a missing or
+            invalid x-api-key header.)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+
+  /api/v1/accounts/me:
+    get:
+      operationId: getCurrentInstructorAccount
+      tags: [Accounts]
+      summary: The Instructor Account the Account Token belongs to
+      security:
+        - ApiKeyAuth: []
+          AccountAuth: []
+      responses:
+        "200":
+          description: The signed-in Instructor Account
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InstructorAccountView"
+        "401":
+          description: >-
+            UNAUTHORIZED_TOKEN. No Account Token, or one that is malformed,
+            tampered, expired, or of another kind (a Capability Token is
+            never accepted here).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+
   /api/v1/packs:
     get:
       operationId: listCurriculumPacks
@@ -572,6 +691,19 @@ components:
       description: >
         Pass either an `instructorToken` (returned on session creation) or a
         `participantToken` (returned on session join or solo session creation).
+        These Capability Tokens carry `kind: "capability"`; an Account Token
+        sent here is rejected with 401 UNAUTHORIZED_TOKEN.
+    AccountAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: AccountToken
+      description: >
+        An Account Token, returned by `signUpInstructor` and
+        `signInInstructor`: an HS256 JWT signed with its own secret
+        (`ACCOUNT_TOKEN_SECRET`), carrying `kind: "account"`, the account id
+        as `sub` and the email, and expiring 12 hours after issue. Fails
+        closed: a token that is present but malformed, tampered, expired, or
+        a Capability Token gets 401 UNAUTHORIZED_TOKEN.
 
   parameters:
     SessionIdParam:
@@ -648,6 +780,8 @@ components:
         - CONCURRENT_UPDATE_CONFLICT
         - CHAIN_ALREADY_SUBMITTED
         - SURVEY_ALREADY_SUBMITTED
+        - EMAIL_ALREADY_REGISTERED
+        - INVALID_CREDENTIALS
 
     ApiErrorResponse:
       type: object
@@ -660,6 +794,51 @@ components:
         details:
           type: object
           additionalProperties: true
+
+    AccountCredentialsRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 254
+          example: rahman.s@aku.edu
+        password:
+          type: string
+          minLength: 10
+          maxLength: 1024
+
+    AccountTokenResponse:
+      type: object
+      required: [accountId, email, accountToken, expiresAt]
+      properties:
+        accountId:
+          type: string
+        email:
+          type: string
+          description: The normalised (trimmed, lower-cased) email.
+        accountToken:
+          type: string
+          description: >-
+            Send as `Authorization: Bearer <accountToken>` where `AccountAuth`
+            is required.
+        expiresAt:
+          type: string
+          format: date-time
+          description: 12 hours after issue.
+
+    InstructorAccountView:
+      type: object
+      required: [accountId, email, createdAt]
+      properties:
+        accountId:
+          type: string
+        email:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
 
     BoardConfig:
       type: object

@@ -167,3 +167,23 @@ export async function submitSurvey(
 
   return toApiGatewayResult(res);
 }
+
+export async function signUpInstructor(body: { email?: string; password?: string }) {
+  const res = await request(BASE_URL)
+    .post("/api/v1/accounts/sign-up")
+    .set("Content-Type", "application/json")
+    .set("x-api-key", API_KEY)
+    .send(body);
+
+  return toApiGatewayResult(res);
+}
+
+export async function signInInstructor(body: { email?: string; password?: string }) {
+  const res = await request(BASE_URL)
+    .post("/api/v1/accounts/sign-in")
+    .set("Content-Type", "application/json")
+    .set("x-api-key", API_KEY)
+    .send(body);
+
+  return toApiGatewayResult(res);
+}
