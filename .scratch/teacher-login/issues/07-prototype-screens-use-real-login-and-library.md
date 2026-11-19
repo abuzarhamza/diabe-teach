@@ -26,3 +26,12 @@ See spec: `.scratch/teacher-login/spec.md`.
 - [ ] Checked by hand: archive and unarchive a pack, "Show archived", save a pack as a new version, and see the author handle and version on Game setup
 - [ ] The API overlay no longer shows teacher sign-in or pack deletion as gaps
 - [ ] Typecheck, vitest, BDD (one feature at a time), lint and boundaries are no worse
+
+## Comments
+
+**2026-11-19 (Claude, decisions by the user).** As of `9a29d61`, the prototype calls no API at all. Sign-in, packs and the whole game are faked in `localStorage` (`claudPoc/concept-chain/shared.js`) and served by `claudPoc/concept-chain/server.mjs` on :8000. The user decided:
+1. **Scope: only login and packs use the real API.** Teacher login and sign-up, the Game setup pack list (author handle, version, "Show archived"), Archive and Unarchive, and "Edit → save as new version" call the real routes. "Start game" and every in-game screen stay faked in the browser. Ticket 04's real classroom start is not wired up in this ticket.
+2. **Same origin: serve the prototype through netlify dev,** so pages and API share http://localhost:8888, with no CORS.
+3. **No API key in the browser:** the prototype runs against a dev server that doesn't require `x-api-key`. The key is never put in a page, and there's no on-screen key box.
+
+The acceptance criteria above are read in that light. "Start a classroom game, and a learner joins" stays on the browser fake, and must keep working.
