@@ -169,10 +169,30 @@ paths:
     get:
       operationId: listCurriculumPacks
       tags: [Packs]
-      summary: List all registered Curriculum Packs
+      summary: List the shared library's Curriculum Packs
+      description: >-
+        Lists the latest Pack Version of every pack, with the author handle of
+        the teacher who released that version (the part of their email before
+        the @, worked out when the list is read and never stored) and its
+        version, so Game setup can show "by rahman.s · v1.1.0". Packs whose
+        latest version was not released by an Instructor Account (older packs
+        and System Packs) have a null `authorHandle` ("by unknown"). No full
+        email address appears in the response. Archived packs are hidden
+        unless `includeArchived=true`.
+      parameters:
+        - name: includeArchived
+          in: query
+          required: false
+          description: >-
+            `true` also lists packs whose latest version is archived, marked
+            `isArchived: true`, for Game setup's "Show archived". Any other
+            value, or none, hides them.
+          schema:
+            type: boolean
+            default: false
       responses:
         "200":
-          description: List of registered Curriculum Pack summaries
+          description: The latest Pack Version of each listed pack
           content:
             application/json:
               schema:
@@ -182,7 +202,7 @@ paths:
                   packs:
                     type: array
                     items:
-                      $ref: "#/components/schemas/CurriculumPackSummary"
+                      $ref: "#/components/schemas/CurriculumPackListItem"
     post:
       operationId: registerCurriculumPack
       tags: [Packs]
@@ -1237,6 +1257,26 @@ components:
           type: boolean
         hasPerceptionSurvey:
           type: boolean
+
+    CurriculumPackListItem:
+      description: >-
+        A pack in the pack list: the summary of its latest Pack Version, who
+        released that version, and whether the pack is archived.
+      allOf:
+        - $ref: "#/components/schemas/CurriculumPackSummary"
+        - type: object
+          required: [authorHandle, isArchived]
+          properties:
+            authorHandle:
+              type: [string, "null"]
+              description: >-
+                The releasing account's email before the @ (for example
+                `rahman.s`), or null when `createdBy` is not an Instructor
+                Account. Never a full email address.
+              examples: [rahman.s]
+            isArchived:
+              type: boolean
+              description: True only when listed with `includeArchived=true`.
 
     PublicCurriculumPack:
       type: object

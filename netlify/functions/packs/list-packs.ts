@@ -15,9 +15,12 @@ export function createListPacksHandler(
   const useCase = new ListCurriculumPacksUseCase(deps);
 
   const rawHandler = async (
-    _event: APIGatewayProxyEvent,
+    event: APIGatewayProxyEvent,
   ): Promise<APIGatewayProxyResult> => {
-    const result = await useCase.execute();
+    // `?includeArchived=true` adds archived packs (marked `isArchived`), for
+    // Game setup's "Show archived". By default they stay hidden.
+    const includeArchived = event.queryStringParameters?.includeArchived === "true";
+    const result = await useCase.execute({ includeArchived });
 
     return {
       statusCode: 200,

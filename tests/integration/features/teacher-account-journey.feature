@@ -43,12 +43,15 @@ Feature: Teacher account journey
     And the response error code should be "UNAUTHORIZED_TOKEN"
 
   @packs
-  Scenario: A signed-up teacher registers a pack and starts a classroom game on it
+  Scenario: A signed-up teacher registers a pack, sees it listed with their author handle, and starts a classroom game on it
     Given a teacher with a new email address
     When the teacher signs up with the password "correct horse battery"
     Then the response status should be 201
     When the teacher registers a new pack
     Then the response status should be 201
+    When the teacher lists the packs
+    Then the response status should be 200
+    And the registered pack should be listed with the teacher's author handle and version "1.0.0"
     When the instructor creates a classroom session with the registered pack
     Then the response status should be 201
     And the response should contain a 6-character roomCode

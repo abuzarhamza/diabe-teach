@@ -206,3 +206,16 @@ export async function registerPack(body: Record<string, unknown>, token?: string
 
   return toApiGatewayResult(res);
 }
+
+/** GET /api/v1/packs, optionally with `includeArchived=true`. */
+export async function listPacks(options: { includeArchived?: boolean } = {}) {
+  const req = request(BASE_URL)
+    .get("/api/v1/packs")
+    .set("x-api-key", API_KEY);
+  if (options.includeArchived) {
+    req.query({ includeArchived: "true" });
+  }
+  const res = await req;
+
+  return toApiGatewayResult(res);
+}

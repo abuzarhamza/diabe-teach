@@ -61,6 +61,19 @@ export class InstructorAccount {
     return this.#props.createdAt;
   }
 
+  /**
+   * The name shown as a Pack Version's author: the part of the email before
+   * the @ (`rahman.s` for `rahman.s@aku.edu`). Worked out on every read and
+   * never stored, so it always follows the account's email.
+   */
+  public get authorHandle(): string {
+    const email = this.#props.email;
+    const at = email.lastIndexOf("@");
+    return at > 0
+      ? email.slice(0, at)
+      : email;
+  }
+
   /** True while a lock is in force at `now`; sign-in must be refused. */
   public isLockedAt(now: Date): boolean {
     return this.activeLockEnd(now) !== null;
