@@ -4,6 +4,7 @@ import type {
   ArchiveCurriculumPackResult,
   ArchiveCurriculumPackUseCasePort,
 } from "../ports/archive-curriculum-pack.port.js";
+import type { ClockPort } from "../ports/clock.port.js";
 import type { CurriculumPackRepositoryPort } from "../ports/curriculum-pack-repository.port.js";
 import { PackId } from "../../domain/curriculum-pack/pack-id.js";
 import {
@@ -15,9 +16,13 @@ import {
 export class ArchiveCurriculumPackUseCase
 implements ArchiveCurriculumPackUseCasePort {
   readonly #packRepo: CurriculumPackRepositoryPort;
+  readonly #clock: ClockPort;
 
   public constructor(deps: ArchiveCurriculumPackDependencies) {
     this.#packRepo = deps.packRepo;
+    this.#clock = deps.clock ?? {
+      now: () => new Date(),
+    };
   }
 
   public async execute(
@@ -38,8 +43,10 @@ implements ArchiveCurriculumPackUseCasePort {
       throw new PackAlreadyArchivedError(input.packId);
     }
 
-    const archivedAt = new Date();
-    const archivedPack = pack.archive(archivedAt);
+    // Any signed-in teacher may archive any non-system pack (ADR-0007);
+    // the record says who did it and when.
+    const archivedAt = this.#clock.now();
+    const archivedPack = pack.archive(archivedAt, input.accountId);
 
     await this.#packRepo.update(archivedPack);
 
@@ -47,6 +54,7 @@ implements ArchiveCurriculumPackUseCasePort {
       packId: archivedPack.id.value,
       isArchived: archivedPack.isArchived,
       archivedAt,
+      archivedBy: input.accountId,
     };
   }
 }

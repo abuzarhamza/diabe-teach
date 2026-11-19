@@ -2,6 +2,7 @@ import type { APIGatewayProxyEvent, APIGatewayProxyResult } from "aws-lambda";
 import { describe, expect, it } from "vitest";
 import { createValidatePackHandler } from "../../netlify/functions/packs/validate-pack.js";
 import { FakeCapabilityTokenAdapter } from "../../src/adapters/outbound/fake-capability-token-adapter.js";
+import { SignedInTeachers } from "./support/signed-in-teacher.js";
 
 function createCards(count: number): Array<Record<string, unknown>> {
   return Array.from({ length: count }, (_, index) => ({
@@ -43,20 +44,20 @@ function createMinimalValidPack(): Record<string, unknown> {
 }
 
 interface TestContext {
-  tokenAdapter: FakeCapabilityTokenAdapter;
+  teachers: SignedInTeachers;
   deps: {
-    tokenVerifier: FakeCapabilityTokenAdapter;
+    accountTokenVerifier: SignedInTeachers["verifier"];
     apiKey: string;
     requireApiKey: boolean;
   };
 }
 
 function createTestContext(): TestContext {
-  const tokenAdapter = new FakeCapabilityTokenAdapter();
+  const teachers = new SignedInTeachers();
   return {
-    tokenAdapter,
+    teachers,
     deps: {
-      tokenVerifier: tokenAdapter,
+      accountTokenVerifier: teachers.verifier,
       apiKey: "test-api-key",
       requireApiKey: true,
     },
@@ -92,10 +93,7 @@ describe("pOST /api/v1/packs/validate", () => {
     const ctx = createTestContext();
     const handler = createValidatePackHandler(ctx.deps);
     const pack = createMinimalValidPack();
-    const token = await ctx.tokenAdapter.signToken({
-      sessionId: "instructor-session",
-      role: "instructor",
-    });
+    const token = await ctx.teachers.tokenFor();
 
     const result = (await handler(
       createEvent(pack, token),
@@ -111,10 +109,7 @@ describe("pOST /api/v1/packs/validate", () => {
   it("returns errors for missing required fields", async () => {
     const ctx = createTestContext();
     const handler = createValidatePackHandler(ctx.deps);
-    const token = await ctx.tokenAdapter.signToken({
-      sessionId: "instructor-session",
-      role: "instructor",
-    });
+    const token = await ctx.teachers.tokenFor();
     const pack = {
       id: "",
       title: "",
@@ -137,10 +132,7 @@ describe("pOST /api/v1/packs/validate", () => {
   it("returns errors when card references unknown domain", async () => {
     const ctx = createTestContext();
     const handler = createValidatePackHandler(ctx.deps);
-    const token = await ctx.tokenAdapter.signToken({
-      sessionId: "instructor-session",
-      role: "instructor",
-    });
+    const token = await ctx.teachers.tokenFor();
     const pack = createMinimalValidPack();
     const cards = pack.cards as Array<Record<string, unknown>>;
     if (cards && cards[0]) {
@@ -161,10 +153,7 @@ describe("pOST /api/v1/packs/validate", () => {
   it("returns warnings for optional fields", async () => {
     const ctx = createTestContext();
     const handler = createValidatePackHandler(ctx.deps);
-    const token = await ctx.tokenAdapter.signToken({
-      sessionId: "instructor-session",
-      role: "instructor",
-    });
+    const token = await ctx.teachers.tokenFor();
     const pack = createMinimalValidPack();
     pack.assessmentInstrument = null;
     pack.perceptionSurvey = null;
@@ -181,12 +170,12 @@ describe("pOST /api/v1/packs/validate", () => {
     expect(body.warnings.some((w: { code: string }) => w.code === "OPTIONAL_FIELD_MISSING")).toBe(true);
   });
 
-  it("returns 403 for non-instructor role", async () => {
+  it("returns 401 for an instructor Capability Token instead of an Account Token", async () => {
     const ctx = createTestContext();
     const handler = createValidatePackHandler(ctx.deps);
-    const token = await ctx.tokenAdapter.signToken({
-      sessionId: "participant-session",
-      role: "participant",
+    const token = await new FakeCapabilityTokenAdapter().signToken({
+      sessionId: "instructor-session",
+      role: "instructor",
     });
 
     const result = (await handler(
@@ -194,16 +183,13 @@ describe("pOST /api/v1/packs/validate", () => {
       {} as never,
     )) as APIGatewayProxyResult;
 
-    expect(result.statusCode).toBe(403);
+    expect(result.statusCode).toBe(401);
   });
 
   it("validates packId follows slug pattern", async () => {
     const ctx = createTestContext();
     const handler = createValidatePackHandler(ctx.deps);
-    const token = await ctx.tokenAdapter.signToken({
-      sessionId: "instructor-session",
-      role: "instructor",
-    });
+    const token = await ctx.teachers.tokenFor();
     const pack = createMinimalValidPack();
     pack.id = "Invalid Pack ID!";
 
@@ -221,10 +207,7 @@ describe("pOST /api/v1/packs/validate", () => {
   it("validates version follows semver pattern", async () => {
     const ctx = createTestContext();
     const handler = createValidatePackHandler(ctx.deps);
-    const token = await ctx.tokenAdapter.signToken({
-      sessionId: "instructor-session",
-      role: "instructor",
-    });
+    const token = await ctx.teachers.tokenFor();
     const pack = createMinimalValidPack();
     pack.version = "v1";
 
@@ -243,10 +226,7 @@ describe("pOST /api/v1/packs/validate", () => {
     async function validate(pack: Record<string, unknown>) {
       const ctx = createTestContext();
       const handler = createValidatePackHandler(ctx.deps);
-      const token = await ctx.tokenAdapter.signToken({
-        sessionId: "instructor-session",
-        role: "instructor",
-      });
+      const token = await ctx.teachers.tokenFor();
       const result = (await handler(
         createEvent(pack, token),
         {} as never,

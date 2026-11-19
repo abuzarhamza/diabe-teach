@@ -1,3 +1,4 @@
+import type { ClockPort } from "../ports/clock.port.js";
 import type { CurriculumPackRepositoryPort } from "../ports/curriculum-pack-repository.port.js";
 import type {
   UnarchiveCurriculumPackDependencies,
@@ -14,9 +15,13 @@ import {
 export class UnarchiveCurriculumPackUseCase
 implements UnarchiveCurriculumPackUseCasePort {
   readonly #packRepo: CurriculumPackRepositoryPort;
+  readonly #clock: ClockPort;
 
   public constructor(deps: UnarchiveCurriculumPackDependencies) {
     this.#packRepo = deps.packRepo;
+    this.#clock = deps.clock ?? {
+      now: () => new Date(),
+    };
   }
 
   public async execute(
@@ -33,13 +38,16 @@ implements UnarchiveCurriculumPackUseCasePort {
       throw new PackNotArchivedError(input.packId);
     }
 
-    const unarchivedPack = pack.unarchive();
+    const unarchivedAt = this.#clock.now();
+    const unarchivedPack = pack.unarchive(unarchivedAt, input.accountId);
 
     await this.#packRepo.update(unarchivedPack);
 
     return {
       packId: unarchivedPack.id.value,
       isArchived: unarchivedPack.isArchived,
+      unarchivedAt,
+      unarchivedBy: input.accountId,
     };
   }
 }

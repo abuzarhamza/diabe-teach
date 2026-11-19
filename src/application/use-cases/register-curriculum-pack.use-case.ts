@@ -1,3 +1,4 @@
+import type { ClockPort } from "../ports/clock.port.js";
 import type { CurriculumPackRepositoryPort } from "../ports/curriculum-pack-repository.port.js";
 import type {
   RegisterCurriculumPackDependencies,
@@ -6,20 +7,26 @@ import type {
   RegisterCurriculumPackUseCasePort,
 } from "../ports/register-curriculum-pack.port.js";
 import { CurriculumPack } from "../../domain/curriculum-pack/curriculum-pack.js";
+import { PackId } from "../../domain/curriculum-pack/pack-id.js";
+import { PackIsSystemPackError } from "../../domain/errors/domain-errors.js";
 import { PackValidator } from "../services/pack-validator.js";
 
 export class RegisterCurriculumPackUseCase
 implements RegisterCurriculumPackUseCasePort {
   readonly #packRepo: CurriculumPackRepositoryPort;
+  readonly #clock: ClockPort;
 
   public constructor(deps: RegisterCurriculumPackDependencies) {
     this.#packRepo = deps.packRepo;
+    this.#clock = deps.clock ?? {
+      now: () => new Date(),
+    };
   }
 
   public async execute(
     input: RegisterCurriculumPackInput,
   ): Promise<RegisterCurriculumPackResult> {
-    const { pack, instructorSessionId } = input;
+    const { pack, accountId } = input;
 
     const validation = PackValidator.validate(pack);
 
@@ -46,14 +53,26 @@ implements RegisterCurriculumPackUseCasePort {
       };
     }
 
+    // The library is shared (ADR-0007): any signed-in teacher may release a
+    // new Pack Version of any pack, except a System Pack.
+    const latest = await this.#packRepo.findById(PackId.create(pack.id));
+    if (latest?.isSystemPack) {
+      throw new PackIsSystemPackError(pack.id);
+    }
+
+    // A new version always starts unarchived, so releasing a new version of
+    // an archived pack puts it back in the list.
     const curriculumPack = CurriculumPack.create({
       ...pack,
       isSystemPack: false,
       isArchived: false,
-      createdBy: instructorSessionId,
+      createdBy: accountId,
       authorName: pack.authorName ?? null,
-      createdAt: new Date(),
+      createdAt: this.#clock.now(),
       archivedAt: null,
+      archivedBy: null,
+      unarchivedAt: null,
+      unarchivedBy: null,
     });
 
     await this.#packRepo.create(curriculumPack);

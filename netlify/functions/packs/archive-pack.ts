@@ -7,7 +7,7 @@ import { authMiddleware } from "../../../src/adapters/inbound/http/middy/auth.mi
 import { domainErrorMiddleware } from "../../../src/adapters/inbound/http/middy/domain-error.middleware.js";
 import { AppRuntime } from "../../../src/app-runtime.js";
 import { ArchiveCurriculumPackUseCase } from "../../../src/application/use-cases/archive-curriculum-pack.use-case.js";
-import { ForbiddenRoleError } from "../../../src/domain/errors/domain-errors.js";
+import { UnauthorizedTokenError } from "../../../src/domain/errors/domain-errors.js";
 
 export function createArchivePackHandler(
   dependencies?: Partial<ProductionDependencies>,
@@ -16,15 +16,18 @@ export function createArchivePackHandler(
     ...AppRuntime.getProductionDependencies(),
     ...dependencies,
   };
-  const useCase = new ArchiveCurriculumPackUseCase({ packRepo: deps.packRepo });
+  const useCase = new ArchiveCurriculumPackUseCase({
+    packRepo: deps.packRepo,
+    clock: deps.clock,
+  });
 
   const rawHandler = async (
     event: AuthenticatedEvent,
   ): Promise<APIGatewayProxyResult> => {
-    if (event.auth?.role !== "instructor") {
-      throw new ForbiddenRoleError(
-        "Only instructors can archive curriculum packs.",
-      );
+    // Any signed-in teacher may archive any non-system pack (ADR-0007).
+    const account = event.account;
+    if (!account) {
+      throw new UnauthorizedTokenError("An Account Token is required to archive curriculum packs. Sign in first.");
     }
 
     const packId = event.pathParameters?.packId;
@@ -38,7 +41,7 @@ export function createArchivePackHandler(
       };
     }
 
-    const result = await useCase.execute({ packId });
+    const result = await useCase.execute({ packId, accountId: account.accountId });
 
     return {
       statusCode: 200,
@@ -47,6 +50,7 @@ export function createArchivePackHandler(
         packId: result.packId,
         isArchived: result.isArchived,
         archivedAt: result.archivedAt.toISOString(),
+        archivedBy: result.archivedBy,
       }),
     };
   };
@@ -54,7 +58,8 @@ export function createArchivePackHandler(
   return middy(rawHandler)
     .use(
       authMiddleware({
-        tokenVerifier: deps.tokenVerifier,
+        bearerScheme: "AccountAuth",
+        accountTokenVerifier: deps.accountTokenVerifier,
         apiKey: deps.apiKey,
         requireApiKey: deps.requireApiKey,
       }),

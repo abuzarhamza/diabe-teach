@@ -102,6 +102,36 @@ function defineCurriculumPackRepositoryContract(
       expect((await repo.findByIdAndVersion(PackId.create("archived-pack"), "1.0.0"))?.isArchived).toBe(false);
       expect((await repo.findAllActive()).some(pack => pack.id.value === "archived-pack")).toBe(false);
     });
+
+    it("round-trips createdBy as an account id, and who archived and unarchived the pack and when", async () => {
+      const released = CurriculumPack.create({
+        ...packVersion("authored-pack", "1.0.0"),
+        createdBy: "account-teacher-a",
+      });
+      await repo.create(released);
+
+      const stored = await repo.findByIdAndVersion(PackId.create("authored-pack"), "1.0.0");
+      expect(stored?.createdBy).toBe("account-teacher-a");
+      expect(stored?.archivedBy).toBeNull();
+      expect(stored?.unarchivedAt).toBeNull();
+      expect(stored?.unarchivedBy).toBeNull();
+
+      await repo.update(stored!.archive(new Date("2026-11-19T11:00:00.000Z"), "account-teacher-b"));
+      const archived = await repo.findById(PackId.create("authored-pack"));
+      expect(archived?.isArchived).toBe(true);
+      expect(archived?.archivedBy).toBe("account-teacher-b");
+      expect(archived?.archivedAt?.toISOString()).toBe("2026-11-19T11:00:00.000Z");
+      expect(archived?.createdBy).toBe("account-teacher-a");
+
+      await repo.update(archived!.unarchive(new Date("2026-11-19T11:15:00.000Z"), "account-teacher-c"));
+      const unarchived = await repo.findById(PackId.create("authored-pack"));
+      expect(unarchived?.isArchived).toBe(false);
+      expect(unarchived?.unarchivedBy).toBe("account-teacher-c");
+      expect(unarchived?.unarchivedAt?.toISOString()).toBe("2026-11-19T11:15:00.000Z");
+      expect(unarchived?.archivedBy).toBe("account-teacher-b");
+      expect(unarchived?.archivedAt?.toISOString()).toBe("2026-11-19T11:00:00.000Z");
+      expect(unarchived?.createdBy).toBe("account-teacher-a");
+    });
   });
 }
 
@@ -167,5 +197,10 @@ describe("mongoCurriculumPackRepository with documents stored before version loo
     expect(v1?.title).toBe("Legacy");
     expect(v1?.id.value).toBe("legacy-pack");
     expect((await repo.findAll()).filter(pack => pack.id.value === "legacy-pack")).toHaveLength(1);
+    // A Pack Version stored before ADR-0007 keeps its old createdBy (an
+    // instructor session id) and has no archive actor fields.
+    expect(v1?.createdBy).toBe("author-session");
+    expect(v1?.archivedBy).toBeNull();
+    expect(v1?.unarchivedBy).toBeNull();
   });
 });

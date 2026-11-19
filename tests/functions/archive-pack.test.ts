@@ -4,6 +4,7 @@ import { createArchivePackHandler } from "../../netlify/functions/packs/archive-
 import { FakeCapabilityTokenAdapter } from "../../src/adapters/outbound/fake-capability-token-adapter.js";
 import { InMemoryCurriculumPackRepository } from "../../src/adapters/outbound/in-memory-curriculum-pack-repository.js";
 import { CurriculumPack } from "../../src/domain/curriculum-pack/curriculum-pack.js";
+import { SignedInTeachers } from "./support/signed-in-teacher.js";
 
 function createTestPack(overrides: Partial<{
   id: string;
@@ -52,25 +53,25 @@ function createTestPack(overrides: Partial<{
 }
 
 interface TestContext {
-  tokenAdapter: FakeCapabilityTokenAdapter;
+  teachers: SignedInTeachers;
   packRepo: InMemoryCurriculumPackRepository;
   deps: {
     packRepo: InMemoryCurriculumPackRepository;
-    tokenVerifier: FakeCapabilityTokenAdapter;
+    accountTokenVerifier: SignedInTeachers["verifier"];
     apiKey: string;
     requireApiKey: boolean;
   };
 }
 
 function createTestContext(packs: CurriculumPack[] = []): TestContext {
-  const tokenAdapter = new FakeCapabilityTokenAdapter();
+  const teachers = new SignedInTeachers();
   const packRepo = new InMemoryCurriculumPackRepository(packs);
   return {
-    tokenAdapter,
+    teachers,
     packRepo,
     deps: {
       packRepo,
-      tokenVerifier: tokenAdapter,
+      accountTokenVerifier: teachers.verifier,
       apiKey: "test-api-key",
       requireApiKey: true,
     },
@@ -103,10 +104,7 @@ describe("pOST /api/v1/packs/{packId}/archive", () => {
     const pack = createTestPack();
     const ctx = createTestContext([pack]);
     const handler = createArchivePackHandler(ctx.deps);
-    const token = await ctx.tokenAdapter.signToken({
-      sessionId: "instructor-session",
-      role: "instructor",
-    });
+    const token = await ctx.teachers.tokenFor();
 
     const result = (await handler(
       createEvent("test-pack", token),
@@ -124,10 +122,7 @@ describe("pOST /api/v1/packs/{packId}/archive", () => {
     const pack = createTestPack({ isSystemPack: true });
     const ctx = createTestContext([pack]);
     const handler = createArchivePackHandler(ctx.deps);
-    const token = await ctx.tokenAdapter.signToken({
-      sessionId: "instructor-session",
-      role: "instructor",
-    });
+    const token = await ctx.teachers.tokenFor();
 
     const result = (await handler(
       createEvent("test-pack", token),
@@ -143,10 +138,7 @@ describe("pOST /api/v1/packs/{packId}/archive", () => {
     const pack = createTestPack({ isArchived: true });
     const ctx = createTestContext([pack]);
     const handler = createArchivePackHandler(ctx.deps);
-    const token = await ctx.tokenAdapter.signToken({
-      sessionId: "instructor-session",
-      role: "instructor",
-    });
+    const token = await ctx.teachers.tokenFor();
 
     const result = (await handler(
       createEvent("test-pack", token),
@@ -161,10 +153,7 @@ describe("pOST /api/v1/packs/{packId}/archive", () => {
   it("returns 404 for non-existent pack", async () => {
     const ctx = createTestContext([]);
     const handler = createArchivePackHandler(ctx.deps);
-    const token = await ctx.tokenAdapter.signToken({
-      sessionId: "instructor-session",
-      role: "instructor",
-    });
+    const token = await ctx.teachers.tokenFor();
 
     const result = (await handler(
       createEvent("nonexistent-pack", token),
@@ -176,13 +165,13 @@ describe("pOST /api/v1/packs/{packId}/archive", () => {
     expect(body.code).toBe("PACK_NOT_FOUND");
   });
 
-  it("returns 403 for non-instructor role", async () => {
+  it("returns 401 for an instructor Capability Token instead of an Account Token", async () => {
     const pack = createTestPack();
     const ctx = createTestContext([pack]);
     const handler = createArchivePackHandler(ctx.deps);
-    const token = await ctx.tokenAdapter.signToken({
-      sessionId: "participant-session",
-      role: "participant",
+    const token = await new FakeCapabilityTokenAdapter().signToken({
+      sessionId: "instructor-session",
+      role: "instructor",
     });
 
     const result = (await handler(
@@ -190,6 +179,6 @@ describe("pOST /api/v1/packs/{packId}/archive", () => {
       {} as never,
     )) as APIGatewayProxyResult;
 
-    expect(result.statusCode).toBe(403);
+    expect(result.statusCode).toBe(401);
   });
 });

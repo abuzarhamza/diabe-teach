@@ -14,7 +14,7 @@ import { InMemoryGameSessionRepository } from "../../src/adapters/outbound/in-me
 import { CurriculumPack as CurriculumPackEntity } from "../../src/domain/curriculum-pack/curriculum-pack.js";
 import { DIABE_TEACH_PACK } from "../../src/domain/curriculum-pack/diabe-teach-pack.js";
 import { GameSession } from "../../src/domain/game-session/game-session.js";
-import { createSignedInCreateSessionHandler } from "./support/signed-in-teacher.js";
+import { createSignedInCreateSessionHandler, OTHER_TEACHER, SignedInTeachers } from "./support/signed-in-teacher.js";
 
 const PACK_ID = "pinning-pack";
 const API_KEY = "test-api-key";
@@ -116,6 +116,7 @@ async function sessionStartedOnV1ThenV2Registered() {
   const packRepo = new InMemoryCurriculumPackRepository([V1]);
   const sessionRepo = new InMemoryGameSessionRepository();
   const tokens = new FakeCapabilityTokenAdapter();
+  const teachers = new SignedInTeachers();
   const deps = {
     packRepo,
     sessionRepo,
@@ -131,7 +132,8 @@ async function sessionStartedOnV1ThenV2Registered() {
     transition: createTransitionPhaseHandler(deps),
     assessment: createSubmitAssessmentHandler(deps),
     survey: createSubmitSurveyHandler(deps),
-    register: createRegisterPackHandler(deps),
+    // Releasing a Pack Version takes a teacher's Account Token (ADR-0007).
+    register: createRegisterPackHandler({ ...deps, accountTokenVerifier: teachers.verifier }),
   };
 
   const created = await invoke(handlers.create, makeEvent("POST", "/api/v1/sessions", {
@@ -156,7 +158,7 @@ async function sessionStartedOnV1ThenV2Registered() {
 
   const registered = await invoke(handlers.register, makeEvent("POST", "/api/v1/packs", {
     body: version2Body(),
-    token: instructorToken,
+    token: await teachers.tokenFor(OTHER_TEACHER),
   }));
   expect(registered.statusCode).toBe(201);
   expect((await packRepo.findById(V1.id))?.version).toBe("2.0.0");
@@ -270,16 +272,16 @@ describe("a Game Session keeps the Pack Version it started with", () => {
     const participant = legacy.addParticipant("Bob");
     const sessionRepo = new InMemoryGameSessionRepository([legacy]);
     const tokens = new FakeCapabilityTokenAdapter();
+    const teachers = new SignedInTeachers();
     const register = createRegisterPackHandler({
       packRepo,
-      tokenVerifier: tokens,
+      accountTokenVerifier: teachers.verifier,
       apiKey: API_KEY,
       requireApiKey: true,
     });
-    const instructorToken = await tokens.signToken({ role: "instructor", sessionId: legacy.sessionId.value });
     expect((await invoke(register, makeEvent("POST", "/api/v1/packs", {
       body: version2Body(),
-      token: instructorToken,
+      token: await teachers.tokenFor(),
     }))).statusCode).toBe(201);
     const survey = createSubmitSurveyHandler({
       packRepo,

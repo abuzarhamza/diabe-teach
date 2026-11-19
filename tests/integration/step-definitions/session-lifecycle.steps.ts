@@ -62,6 +62,13 @@ When(
 );
 
 When(
+  "the instructor creates a classroom session with the registered pack",
+  async function (this: TestWorld) {
+    await createClassroomSession(this, this.registeredPackId!);
+  },
+);
+
+When(
   "the instructor creates a classroom session with pack {string} and an instructor-driven chain-mapping phase",
   async function (this: TestWorld, packId: string) {
     await createClassroomSession(this, packId, { roundMappingSec: null });

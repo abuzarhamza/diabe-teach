@@ -184,6 +184,10 @@ implements CurriculumPackRepositoryPort {
       authorName: doc.authorName,
       createdAt: doc.createdAt,
       archivedAt: doc.archivedAt,
+      // Absent on documents stored before ADR-0007.
+      archivedBy: doc.archivedBy ?? null,
+      unarchivedAt: doc.unarchivedAt ?? null,
+      unarchivedBy: doc.unarchivedBy ?? null,
     });
   }
 
@@ -206,6 +210,9 @@ implements CurriculumPackRepositoryPort {
       authorName: pack.authorName,
       createdAt: pack.createdAt,
       archivedAt: pack.archivedAt,
+      archivedBy: pack.archivedBy,
+      unarchivedAt: pack.unarchivedAt,
+      unarchivedBy: pack.unarchivedBy,
     };
   }
 }

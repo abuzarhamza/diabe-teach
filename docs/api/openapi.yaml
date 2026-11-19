@@ -18,7 +18,10 @@ tags:
   - name: Accounts
     description: Instructor Account sign-up and sign-in, which issue Account Tokens
   - name: Packs
-    description: Curriculum Pack discovery, validation, and registration
+    description: >-
+      The shared Curriculum Pack library: discovery, plus validation,
+      registration, new Pack Versions, archiving and unarchiving with an
+      Account Token
   - name: Sessions
     description: Game Session creation, classroom room join, phase transitions, and SSE stream
   - name: Chains
@@ -183,7 +186,20 @@ paths:
     post:
       operationId: registerCurriculumPack
       tags: [Packs]
-      summary: Validate and register a new Curriculum Pack
+      summary: Validate and register a Curriculum Pack, or release a new Pack Version of one
+      description: >-
+        Needs a signed-in teacher's Account Token (`AccountAuth`); no Game
+        Session is needed, and an instructor Capability Token is refused.
+        The pack library is shared: any signed-in teacher may register a new
+        pack, or release a new Pack Version of any pack (including a
+        colleague's) by registering the same `id` with a new `version`. Each
+        Pack Version records the releasing account id as `createdBy`. A new
+        version always starts unarchived, so releasing a new version of an
+        archived pack lists it again. System Packs refuse new versions (403),
+        and an existing `id` and `version` is never overwritten (409).
+      security:
+        - ApiKeyAuth: []
+          AccountAuth: []
       requestBody:
         required: true
         content:
@@ -203,8 +219,27 @@ paths:
                     $ref: "#/components/schemas/CurriculumPackSummary"
         "400":
           $ref: "#/components/responses/BadRequestError"
+        "401":
+          description: >-
+            UNAUTHORIZED_TOKEN. No Account Token, or one that is malformed,
+            tampered, expired, or of another kind. An instructor Capability
+            Token is not accepted on pack routes.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "403":
+          description: >-
+            PACK_IS_SYSTEM_PACK. The pack id belongs to a System Pack, which
+            users cannot release new versions of.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
         "409":
-          description: A Curriculum Pack with the given id already exists
+          description: >-
+            PACK_ALREADY_EXISTS. That pack id and version are already
+            registered (by anyone); release a new version instead.
           content:
             application/json:
               schema:
@@ -225,6 +260,13 @@ paths:
       operationId: validateCurriculumPack
       tags: [Packs]
       summary: Validate a draft Curriculum Pack payload without registering it
+      description: >-
+        Needs a signed-in teacher's Account Token (`AccountAuth`), so packs
+        can be prepared before any Game Session exists. An instructor
+        Capability Token is refused.
+      security:
+        - ApiKeyAuth: []
+          AccountAuth: []
       requestBody:
         required: true
         content:
@@ -246,6 +288,15 @@ paths:
                     type: array
                     items:
                       $ref: "#/components/schemas/PackValidationIssue"
+        "401":
+          description: >-
+            UNAUTHORIZED_TOKEN. No Account Token, or one that is malformed,
+            tampered, expired, or of another kind. An instructor Capability
+            Token is not accepted on pack routes.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
 
   /api/v1/packs/{packId}:
     get:
@@ -280,6 +331,125 @@ paths:
           $ref: "#/components/responses/UnauthorizedError"
         "404":
           $ref: "#/components/responses/NotFoundError"
+
+  /api/v1/packs/{packId}/archive:
+    post:
+      operationId: archiveCurriculumPack
+      tags: [Packs]
+      summary: Archive a Curriculum Pack (hides it from the list; nothing is deleted)
+      description: >-
+        Any signed-in teacher may archive any pack except a System Pack,
+        including a colleague's (ADR-0007). Archives the latest Pack Version
+        and records the acting account and the time. Game Sessions already
+        using the pack keep working. There is no delete route.
+      security:
+        - ApiKeyAuth: []
+          AccountAuth: []
+      parameters:
+        - name: packId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: The pack is archived
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [packId, isArchived, archivedAt, archivedBy]
+                properties:
+                  packId:
+                    type: string
+                  isArchived:
+                    type: boolean
+                    const: true
+                  archivedAt:
+                    type: string
+                    format: date-time
+                  archivedBy:
+                    type: string
+                    description: The Instructor Account id that archived the pack.
+        "401":
+          description: >-
+            UNAUTHORIZED_TOKEN. No Account Token, or one that is malformed,
+            tampered, expired, or of another kind. An instructor Capability
+            Token is not accepted on pack routes.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "403":
+          description: PACK_IS_SYSTEM_PACK. System Packs cannot be archived.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+        "409":
+          description: PACK_ALREADY_ARCHIVED. The pack is already archived.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+
+  /api/v1/packs/{packId}/unarchive:
+    post:
+      operationId: unarchiveCurriculumPack
+      tags: [Packs]
+      summary: Unarchive a Curriculum Pack so it is listed again
+      description: >-
+        Any signed-in teacher may unarchive any archived pack (ADR-0007).
+        Records the acting account and the time; the last archive stays on
+        record.
+      security:
+        - ApiKeyAuth: []
+          AccountAuth: []
+      parameters:
+        - name: packId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: The pack is no longer archived
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [packId, isArchived, unarchivedAt, unarchivedBy]
+                properties:
+                  packId:
+                    type: string
+                  isArchived:
+                    type: boolean
+                    const: false
+                  unarchivedAt:
+                    type: string
+                    format: date-time
+                  unarchivedBy:
+                    type: string
+                    description: The Instructor Account id that unarchived the pack.
+        "401":
+          description: >-
+            UNAUTHORIZED_TOKEN. No Account Token, or one that is malformed,
+            tampered, expired, or of another kind. An instructor Capability
+            Token is not accepted on pack routes.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+        "409":
+          description: PACK_NOT_ARCHIVED. The pack is not archived.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
 
   /api/v1/sessions:
     post:
@@ -824,6 +994,9 @@ components:
         - EMAIL_ALREADY_REGISTERED
         - INVALID_CREDENTIALS
         - ACCOUNT_TEMPORARILY_LOCKED
+        - PACK_IS_SYSTEM_PACK
+        - PACK_ALREADY_ARCHIVED
+        - PACK_NOT_ARCHIVED
 
     ApiErrorResponse:
       type: object

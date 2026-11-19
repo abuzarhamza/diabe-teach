@@ -7,7 +7,7 @@ import { authMiddleware } from "../../../src/adapters/inbound/http/middy/auth.mi
 import { domainErrorMiddleware } from "../../../src/adapters/inbound/http/middy/domain-error.middleware.js";
 import { AppRuntime } from "../../../src/app-runtime.js";
 import { UnarchiveCurriculumPackUseCase } from "../../../src/application/use-cases/unarchive-curriculum-pack.use-case.js";
-import { ForbiddenRoleError } from "../../../src/domain/errors/domain-errors.js";
+import { UnauthorizedTokenError } from "../../../src/domain/errors/domain-errors.js";
 
 export function createUnarchivePackHandler(
   dependencies?: Partial<ProductionDependencies>,
@@ -16,15 +16,18 @@ export function createUnarchivePackHandler(
     ...AppRuntime.getProductionDependencies(),
     ...dependencies,
   };
-  const useCase = new UnarchiveCurriculumPackUseCase({ packRepo: deps.packRepo });
+  const useCase = new UnarchiveCurriculumPackUseCase({
+    packRepo: deps.packRepo,
+    clock: deps.clock,
+  });
 
   const rawHandler = async (
     event: AuthenticatedEvent,
   ): Promise<APIGatewayProxyResult> => {
-    if (event.auth?.role !== "instructor") {
-      throw new ForbiddenRoleError(
-        "Only instructors can unarchive curriculum packs.",
-      );
+    // Any signed-in teacher may unarchive any non-system pack (ADR-0007).
+    const account = event.account;
+    if (!account) {
+      throw new UnauthorizedTokenError("An Account Token is required to unarchive curriculum packs. Sign in first.");
     }
 
     const packId = event.pathParameters?.packId;
@@ -38,7 +41,7 @@ export function createUnarchivePackHandler(
       };
     }
 
-    const result = await useCase.execute({ packId });
+    const result = await useCase.execute({ packId, accountId: account.accountId });
 
     return {
       statusCode: 200,
@@ -46,6 +49,8 @@ export function createUnarchivePackHandler(
       body: JSON.stringify({
         packId: result.packId,
         isArchived: result.isArchived,
+        unarchivedAt: result.unarchivedAt.toISOString(),
+        unarchivedBy: result.unarchivedBy,
       }),
     };
   };
@@ -53,7 +58,8 @@ export function createUnarchivePackHandler(
   return middy(rawHandler)
     .use(
       authMiddleware({
-        tokenVerifier: deps.tokenVerifier,
+        bearerScheme: "AccountAuth",
+        accountTokenVerifier: deps.accountTokenVerifier,
         apiKey: deps.apiKey,
         requireApiKey: deps.requireApiKey,
       }),

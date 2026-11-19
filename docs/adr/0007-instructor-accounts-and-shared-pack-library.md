@@ -35,7 +35,7 @@ Sign-up and sign-in return an **Account Token**: a bearer token that proves whic
 
 ### 3. A shared Curriculum Pack library
 
-Every signed-in teacher can see and use every pack, release a new Pack Version of any pack, and archive or unarchive any pack except a System Pack. Nothing is ever deleted (ADR-0006 §4 still holds). Each Pack Version records who released it, and archiving records who archived the pack and when, so a surprising archive can be explained and undone. The **author handle** shown for a version is the part of the releasing account's email before the @; it is worked out when the pack is read, not stored.
+Every signed-in teacher can see and use every pack, release a new Pack Version of any pack, and archive or unarchive any pack except a System Pack. Nothing is ever deleted (ADR-0006 §4 still holds). Each Pack Version records who released it, and archiving records who archived the pack and when, so a surprising archive can be explained and undone. The **author handle** shown for a version is the part of the releasing account's email before the @; it is worked out when the pack is read, not stored. A new Pack Version always starts unarchived, so releasing a new version of an archived pack lists it again. Unarchiving records the acting account and the time too, and keeps the last archive's record.
 
 This replaces ADR-0006 §1: registering a pack needs an Account Token, not an instructor Capability Token, so packs can be prepared before any game starts.
 

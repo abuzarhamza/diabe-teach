@@ -29,10 +29,15 @@ export const curriculumPackSchema = new Schema<CurriculumPackDocument>(
     perceptionSurvey: { type: Schema.Types.Mixed },
     isSystemPack: { type: Boolean, required: true, default: false },
     isArchived: { type: Boolean, required: true, default: false },
+    // The releasing Instructor Account's id (ADR-0007); older Pack Versions
+    // keep the instructor session id they were registered with.
     createdBy: { type: String, default: null },
     authorName: { type: String, default: null },
     createdAt: { type: Date, required: true, default: Date.now },
     archivedAt: { type: Date, default: null },
+    archivedBy: { type: String, default: null },
+    unarchivedAt: { type: Date, default: null },
+    unarchivedBy: { type: String, default: null },
   },
   {
     collection: CURRICULUM_PACKS_COLLECTION,

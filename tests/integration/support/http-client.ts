@@ -192,3 +192,17 @@ export async function signInInstructor(body: { email?: string; password?: string
 
   return toApiGatewayResult(res);
 }
+
+/** POST /api/v1/packs, the documented registration path, with an optional bearer token. */
+export async function registerPack(body: Record<string, unknown>, token?: string) {
+  const req = request(BASE_URL)
+    .post("/api/v1/packs")
+    .set("Content-Type", "application/json")
+    .set("x-api-key", API_KEY);
+  if (token) {
+    req.set("Authorization", `Bearer ${token}`);
+  }
+  const res = await req.send(body);
+
+  return toApiGatewayResult(res);
+}

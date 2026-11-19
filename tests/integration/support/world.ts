@@ -41,6 +41,8 @@ export class TestWorld extends World {
   public signedUpAccountId: string | null = null;
   /** The signed-in teacher's Account Token, needed to start a classroom game. */
   public accountToken: string | null = null;
+  /** The pack id this scenario registered, unique per run. */
+  public registeredPackId: string | null = null;
 
   public reset(): void {
     this.clock = new FakeClock();
@@ -56,6 +58,7 @@ export class TestWorld extends World {
     this.teacherEmail = null;
     this.signedUpAccountId = null;
     this.accountToken = null;
+    this.registeredPackId = null;
   }
 
   public parseLastResponse(): void {

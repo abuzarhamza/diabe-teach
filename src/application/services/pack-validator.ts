@@ -11,7 +11,7 @@ import type {
 
 type PackInput = Omit<
   CurriculumPackProps,
-  "id" | "isSystemPack" | "isArchived" | "createdBy" | "authorName" | "createdAt" | "archivedAt"
+  "id" | "isSystemPack" | "isArchived" | "createdBy" | "authorName" | "createdAt" | "archivedAt" | "archivedBy" | "unarchivedAt" | "unarchivedBy"
 > & { readonly id: string };
 
 export interface PackValidationResult {

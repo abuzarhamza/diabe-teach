@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { createRegisterPackHandler } from "../../netlify/functions/packs/register-pack.js";
 import { FakeCapabilityTokenAdapter } from "../../src/adapters/outbound/fake-capability-token-adapter.js";
 import { InMemoryCurriculumPackRepository } from "../../src/adapters/outbound/in-memory-curriculum-pack-repository.js";
+import { SignedInTeachers } from "./support/signed-in-teacher.js";
 
 function createCards(count: number): Array<Record<string, unknown>> {
   return Array.from({ length: count }, (_, index) => ({
@@ -45,25 +46,25 @@ function createMinimalValidPack(): Record<string, unknown> {
 }
 
 interface TestContext {
-  tokenAdapter: FakeCapabilityTokenAdapter;
+  teachers: SignedInTeachers;
   packRepo: InMemoryCurriculumPackRepository;
   deps: {
     packRepo: InMemoryCurriculumPackRepository;
-    tokenVerifier: FakeCapabilityTokenAdapter;
+    accountTokenVerifier: SignedInTeachers["verifier"];
     apiKey: string;
     requireApiKey: boolean;
   };
 }
 
 function createTestContext(): TestContext {
-  const tokenAdapter = new FakeCapabilityTokenAdapter();
+  const teachers = new SignedInTeachers();
   const packRepo = new InMemoryCurriculumPackRepository([]);
   return {
-    tokenAdapter,
+    teachers,
     packRepo,
     deps: {
       packRepo,
-      tokenVerifier: tokenAdapter,
+      accountTokenVerifier: teachers.verifier,
       apiKey: "test-api-key",
       requireApiKey: true,
     },
@@ -99,10 +100,7 @@ describe("pOST /api/v1/packs", () => {
     const ctx = createTestContext();
     const handler = createRegisterPackHandler(ctx.deps);
     const pack = createMinimalValidPack();
-    const token = await ctx.tokenAdapter.signToken({
-      sessionId: "instructor-session",
-      role: "instructor",
-    });
+    const token = await ctx.teachers.tokenFor();
 
     const result = (await handler(
       createEvent(pack, token),
@@ -119,10 +117,7 @@ describe("pOST /api/v1/packs", () => {
     const ctx = createTestContext();
     const handler = createRegisterPackHandler(ctx.deps);
     const pack = createMinimalValidPack();
-    const token = await ctx.tokenAdapter.signToken({
-      sessionId: "instructor-session",
-      role: "instructor",
-    });
+    const token = await ctx.teachers.tokenFor();
 
     await handler(createEvent(pack, token), {} as never);
 
@@ -139,10 +134,7 @@ describe("pOST /api/v1/packs", () => {
   it("returns 422 for invalid pack structure", async () => {
     const ctx = createTestContext();
     const handler = createRegisterPackHandler(ctx.deps);
-    const token = await ctx.tokenAdapter.signToken({
-      sessionId: "instructor-session",
-      role: "instructor",
-    });
+    const token = await ctx.teachers.tokenFor();
 
     const invalidPack = {
       id: "Invalid ID!",
@@ -160,12 +152,12 @@ describe("pOST /api/v1/packs", () => {
     expect(body.error.errors.length).toBeGreaterThan(0);
   });
 
-  it("returns 403 for non-instructor role", async () => {
+  it("returns 401 for an instructor Capability Token instead of an Account Token", async () => {
     const ctx = createTestContext();
     const handler = createRegisterPackHandler(ctx.deps);
-    const token = await ctx.tokenAdapter.signToken({
-      sessionId: "participant-session",
-      role: "participant",
+    const token = await new FakeCapabilityTokenAdapter().signToken({
+      sessionId: "instructor-session",
+      role: "instructor",
     });
 
     const result = (await handler(
@@ -173,16 +165,13 @@ describe("pOST /api/v1/packs", () => {
       {} as never,
     )) as APIGatewayProxyResult;
 
-    expect(result.statusCode).toBe(403);
+    expect(result.statusCode).toBe(401);
   });
 
   it("allows registering same packId with different version", async () => {
     const ctx = createTestContext();
     const handler = createRegisterPackHandler(ctx.deps);
-    const token = await ctx.tokenAdapter.signToken({
-      sessionId: "instructor-session",
-      role: "instructor",
-    });
+    const token = await ctx.teachers.tokenFor();
 
     const pack1 = createMinimalValidPack();
     pack1.version = "1.0.0";
@@ -204,10 +193,7 @@ describe("pOST /api/v1/packs", () => {
   describe("pack capacity: the cards must fill the board", () => {
     async function register(ctx: TestContext, pack: Record<string, unknown>) {
       const handler = createRegisterPackHandler(ctx.deps);
-      const token = await ctx.tokenAdapter.signToken({
-        sessionId: "instructor-session",
-        role: "instructor",
-      });
+      const token = await ctx.teachers.tokenFor();
       return (await handler(
         createEvent(pack, token),
         {} as never,

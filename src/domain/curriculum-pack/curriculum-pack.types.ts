@@ -87,4 +87,10 @@ export interface CurriculumPackProps {
   readonly authorName: string | null;
   readonly createdAt: Date;
   readonly archivedAt: Date | null;
+  /** The Instructor Account that last archived the pack (null before ADR-0007). */
+  readonly archivedBy?: string | null;
+  /** When the pack was last unarchived, or null if never. */
+  readonly unarchivedAt?: Date | null;
+  /** The Instructor Account that last unarchived the pack. */
+  readonly unarchivedBy?: string | null;
 }

@@ -41,3 +41,23 @@ Feature: Teacher account journey
     When someone who has not signed in tries to create a classroom session with pack "diabe-teach"
     Then the response status should be 401
     And the response error code should be "UNAUTHORIZED_TOKEN"
+
+  @packs
+  Scenario: A signed-up teacher registers a pack and starts a classroom game on it
+    Given a teacher with a new email address
+    When the teacher signs up with the password "correct horse battery"
+    Then the response status should be 201
+    When the teacher registers a new pack
+    Then the response status should be 201
+    When the instructor creates a classroom session with the registered pack
+    Then the response status should be 201
+    And the response should contain a 6-character roomCode
+    When participant "Alice" joins using the room code
+    Then the response status should be 200
+    And the participant count should be 1
+
+  @packs
+  Scenario: Registering a pack without signing in is refused
+    When someone who has not signed in tries to register a new pack
+    Then the response status should be 401
+    And the response error code should be "UNAUTHORIZED_TOKEN"

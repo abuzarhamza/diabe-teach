@@ -47,3 +47,23 @@ export function createSignedInCreateSessionHandler(
     ) as Promise<APIGatewayProxyResult>;
   };
 }
+
+/** A second teacher, for the shared pack library's "a colleague's pack" cases. */
+export const OTHER_TEACHER: VerifiedAccount = {
+  accountId: "teacher-account-2",
+  email: "colleague@example.edu",
+};
+
+/**
+ * Account Tokens for handler tests of the Account Token routes (the pack
+ * routes): pass `verifier` as the handler's `accountTokenVerifier` and send
+ * `tokenFor(teacher)` as the bearer token.
+ */
+export class SignedInTeachers {
+  public readonly verifier = new FakeAccountTokenAdapter();
+
+  public async tokenFor(teacher: VerifiedAccount = TEST_TEACHER): Promise<string> {
+    const { token } = await this.verifier.signAccountToken(teacher, new Date());
+    return token;
+  }
+}
