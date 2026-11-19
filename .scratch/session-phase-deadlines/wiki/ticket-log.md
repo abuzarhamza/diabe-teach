@@ -43,3 +43,9 @@
   - 07: prototype screens
 
   Edges: 02, 04 and 05 are blocked by 01; 06 by 04 and 05; 07 by 02, 04 and 06. The frontier is 01 and 03.
+- **2026-11-19:** Teacher-login ticket 01 committed as `b6b9fde`. It was the only agent running, on the branch, with no worktree. The agent reported:
+  - Checks: vitest 408/408 (31 files); BDD 5/5 features; lint 118 and boundaries 6, the same as before.
+  - New routes: `POST /api/v1/accounts/sign-up` (409 `EMAIL_ALREADY_REGISTERED`), `POST /api/v1/accounts/sign-in` (401 `INVALID_CREDENTIALS`), and an extra `GET /api/v1/accounts/me` so the `AccountAuth` scheme has a route to test against.
+  - Both token kinds now carry a `kind` claim; Capability Tokens with no `kind` are still accepted. The decision record is ADR-0007.
+
+  Claude checked the commit: typecheck passes, the 2 new test files pass 33/33, and no real secret was committed. Next: ticket 03.
