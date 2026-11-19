@@ -9,15 +9,22 @@
  *   npm run test:bdd -- tests/integration/features/survey-journey.feature
  *
  * Needs a running dev server (`npm run dev:local` recommended: in-memory MongoDB).
+ * Before any feature runs, it waits (up to 60s) for `GET /api/v1/packs` to
+ * answer with a non-404 status, the same check behind `dev:local`'s
+ * `DEV READY` line, and stops with a clear message if it never does.
  */
 
 import { spawnSync } from "node:child_process";
 import { readdirSync } from "node:fs";
 import { join, relative } from "node:path";
 import process from "node:process";
+import { setTimeout as delay } from "node:timers/promises";
 
 const FEATURES_DIR = "tests/integration/features";
 const CUCUMBER_BIN = "node_modules/@cucumber/cucumber/bin/cucumber.js";
+const DEV_URL = process.env.NETLIFY_DEV_URL || "http://localhost:8888";
+const READY_PROBE_PATH = "/api/v1/packs";
+const READY_WAIT_MS = 60_000;
 
 interface FeatureResult {
   readonly feature: string;
@@ -59,7 +66,33 @@ function runFeature(feature: string): FeatureResult {
   };
 }
 
-function main(): void {
+async function devServerReady(): Promise<boolean> {
+  const deadline = Date.now() + READY_WAIT_MS;
+  while (Date.now() < deadline) {
+    try {
+      const response = await fetch(`${DEV_URL}${READY_PROBE_PATH}`, {
+        signal: AbortSignal.timeout(5_000),
+      });
+      await response.body?.cancel();
+      if (response.status !== 404) {
+        return true;
+      }
+    }
+    catch {
+      // Not listening yet.
+    }
+    await delay(1_000);
+  }
+  return false;
+}
+
+async function main(): Promise<void> {
+  if (!(await devServerReady())) {
+    console.error(`Dev server at ${DEV_URL} is not ready (${READY_PROBE_PATH} unreachable or 404 after ${READY_WAIT_MS / 1000}s).`);
+    console.error("Start it with `npm run dev:local`, wait for the `DEV READY` line, then rerun `npm run test:bdd`.");
+    process.exitCode = 1;
+    return;
+  }
   const features = listFeatures(process.argv.slice(2));
   const results: FeatureResult[] = [];
   for (const feature of features) {
@@ -77,4 +110,4 @@ function main(): void {
     : 0;
 }
 
-main();
+void main();
