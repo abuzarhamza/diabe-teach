@@ -48,3 +48,5 @@ Observations to turn into pit-of-success fixes. Each item is dated; mark it done
   - **Unused dependencies:** `@middy/http-cors`, `http-security-headers` and `http-header-normalizer` are installed but never used.
 
   Fix idea: an api-hardening ticket for the first two (error shape, size limit). Remove the redirects for sessions and accounts, then either wire the unused middy packages into `createApiHandler` or drop them. Source: the doc-rewrite agent's report.
+- **2026-11-19 (from list-round-chains 01, `def5537`):** Under netlify dev, a function returning 403 or 404 is retried by the dev server as `<path>.html`, which drops the route params; clients then see a 401/400 "missing path parameters" instead of the real error. Seen on list-round-chains and get-standings; likely the cause of teacher-login 08. Handler tests can't catch it; only live/BDD checks can. Pit-of-success fix: one shared approach for path params (or a BDD check per route asserting real 403/404 codes).
+- **2026-11-19 (from list-round-chains 01):** OpenAPI `SubmittedChain.stepRationales` says `StepRationale` objects, but the API returns plain strings. Pre-existing contract drift.

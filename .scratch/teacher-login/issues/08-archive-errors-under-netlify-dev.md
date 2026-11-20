@@ -19,3 +19,7 @@ See spec: `.scratch/teacher-login/spec.md`. Found in the ticket 07 report (2026-
 - [ ] `GET /api/v1/packs/{packId}` checked the same way
 - [ ] The API overlay's friction note on this is removed
 - [ ] Typecheck, vitest, BDD, lint (96) and boundaries (6) are no worse
+
+## Comments
+
+**2026-11-19 (Claude).** The list-round-chains ticket 01 agent (`def5537`) found the same pattern on get-standings and list-round-chains: under netlify dev, any 403/404 function response is retried as `<path>.html` with no route params. So this is not specific to archive; a fix should cover every route with path params.

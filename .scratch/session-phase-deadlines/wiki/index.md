@@ -2,7 +2,7 @@
 
 Chief-of-staff memory for the session phase deadline effort. It is a historical record: every claim is dated or cites a commit.
 
-Sources: [spec](../spec.md), [tickets](../issues/). Later efforts that reuse this wiki: [server-owned-board](../../server-owned-board/spec.md), [teacher-login](../../teacher-login/spec.md).
+Sources: [spec](../spec.md), [tickets](../issues/). Later efforts that reuse this wiki: [server-owned-board](../../server-owned-board/spec.md), [teacher-login](../../teacher-login/spec.md), [list-round-chains](../../list-round-chains/spec.md).
 
 ## Decisions
 - [Timed or instructor-driven phases](decision-timed-or-instructor-driven-phases.md): per-phase timer, null means instructor-driven, enforcement with 5s grace, no auto-advance.
@@ -22,4 +22,4 @@ Sources: [spec](../spec.md), [tickets](../issues/). Later efforts that reuse thi
 - [API key in the test config](incident-api-key-in-test-config.md): the real API key has been in a public repo since `3e37faf`; rotation recommended (2026-11-19).
 
 ## Progress
-- [Ticket log](ticket-log.md): status of tickets across efforts (phase deadlines, server-owned board, teacher login), with commits.
+- [Ticket log](ticket-log.md): status of tickets across efforts (phase deadlines, server-owned board, teacher login, list round chains), with commits.
