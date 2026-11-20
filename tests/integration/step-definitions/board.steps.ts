@@ -56,3 +56,17 @@ Then(
     expect(activeBoardOf(this)).to.deep.equal(this.notedBoard);
   },
 );
+
+Then(
+  "the submitted chain should list the noted board's cards at its path",
+  function (this: TestWorld) {
+    const board = this.notedBoard as BoardGridView | null;
+    expect(board, "noted board").to.be.an("object");
+    const body = this.lastResponseBody as {
+      chain?: { path: { row: number; col: number }[]; keywordIds: string[] };
+    };
+    expect(body.chain, "chain").to.be.an("object");
+    const expected = body.chain!.path.map(cell => board!.cells[cell.row]![cell.col]!.card.id);
+    expect(body.chain!.keywordIds).to.deep.equal(expected);
+  },
+);

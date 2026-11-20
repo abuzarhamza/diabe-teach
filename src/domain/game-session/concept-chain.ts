@@ -71,6 +71,26 @@ export class ConceptChain {
     return new ConceptChain(props);
   }
 
+  /**
+   * A copy of this chain naming `keywordIds` as its Keyword Cards; every
+   * other field, including the chain id and submission time, is kept.
+   */
+  public withKeywordIds(keywordIds: readonly string[]): ConceptChain {
+    return new ConceptChain({
+      chainId: this.#chainId,
+      participantId: this.#participantId,
+      roundNumber: this.#roundNumber,
+      path: this.#path,
+      keywordIds,
+      narrativeExplanation: this.#narrativeExplanation,
+      stepRationales: this.#stepRationales,
+      status: this.#status,
+      peerVotes: this.#peerVotes,
+      verdict: this.#verdict,
+      submittedAt: this.#submittedAt,
+    });
+  }
+
   public get chainId(): string {
     return this.#chainId;
   }

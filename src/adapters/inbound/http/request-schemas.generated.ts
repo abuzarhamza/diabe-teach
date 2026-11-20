@@ -868,7 +868,8 @@ export const requestBodySchemas = {
         },
         "keywordIds": {
           "type": "array",
-          "description": "The keyword ids of the path's cells, in path order. Stored as sent and returned on the chain; the server does not derive them from the board. Defaults to an empty list.",
+          "deprecated": true,
+          "description": "Deprecated; send only `path`. Ignored for a round with a server-dealt board: the server derives the chain's keyword ids from the board at each path cell. Accepted (not rejected) so older clients keep working. Only for a session stored before boards were dealt (no `activeBoard`) are these ids stored as sent, defaulting to an empty list.",
           "items": {
             "type": "string"
           }

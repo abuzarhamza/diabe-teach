@@ -750,7 +750,9 @@ paths:
               $ref: "#/components/schemas/SubmitChainRequest"
       responses:
         "201":
-          description: Concept Chain passed topological validation and was recorded
+          description: >-
+            Concept Chain passed topological validation and was recorded. Its
+            `keywordIds` name the board's Keyword Cards at the path's cells.
           content:
             application/json:
               schema:
@@ -787,7 +789,12 @@ paths:
               schema:
                 $ref: "#/components/schemas/ApiErrorResponse"
         "422":
-          description: Concept Chain failed topological validation (CHAIN_TOPOLOGY_INVALID)
+          description: >-
+            CHAIN_TOPOLOGY_INVALID. The Concept Chain failed topological
+            validation: fewer cells than the minimum chain length, two
+            consecutive cells that are not adjacent, a cell used twice, or a
+            cell outside the round's board (`row` must be below the board's
+            `rows` and `col` below its `cols`). Nothing is recorded.
           content:
             application/json:
               schema:
@@ -1730,10 +1737,14 @@ components:
           minLength: 1
         keywordIds:
           type: array
+          deprecated: true
           description: >-
-            The keyword ids of the path's cells, in path order. Stored as sent
-            and returned on the chain; the server does not derive them from
-            the board. Defaults to an empty list.
+            Deprecated; send only `path`. Ignored for a round with a
+            server-dealt board: the server derives the chain's keyword ids
+            from the board at each path cell. Accepted (not rejected) so older
+            clients keep working. Only for a session stored before boards were
+            dealt (no `activeBoard`) are these ids stored as sent, defaulting
+            to an empty list.
           items:
             type: string
         stepRationales:
@@ -1828,6 +1839,11 @@ components:
             $ref: "#/components/schemas/GridCoord"
         keywordIds:
           type: array
+          description: >-
+            The ids of the Keyword Cards at the path's cells, in path order.
+            Derived by the server from the round's board, never taken from the
+            client. Only a chain recorded in a session stored before boards
+            were dealt keeps the ids its client sent.
           items:
             type: string
         narrativeExplanation:

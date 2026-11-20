@@ -86,7 +86,7 @@ export async function submitChain(
   token: string,
   body: {
     path: Array<{ row: number; col: number }>;
-    keywordIds: string[];
+    keywordIds?: string[];
     narrativeExplanation: string;
     stepRationales?: string[];
   },

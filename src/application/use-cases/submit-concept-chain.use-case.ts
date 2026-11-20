@@ -58,8 +58,7 @@ implements SubmitConceptChainUseCasePort {
           stepRationales: command.stepRationales,
         });
 
-        session.addChain(built, receivedAt);
-        return built;
+        return session.addChain(built, receivedAt);
       },
     );
 

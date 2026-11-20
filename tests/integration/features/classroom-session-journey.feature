@@ -166,7 +166,7 @@ Feature: Classroom Game Session Journey
     And the response error code should be "PHASE_CLOSED_FOR_SUBMISSIONS"
 
   @board @shared-board
-  Scenario: Instructor and participant see the same server-dealt round 1 board
+  Scenario: Instructor and participant see the same server-dealt round 1 board and chains are checked against it
     When the instructor creates a classroom session with pack "diabe-teach"
     And participant "Alice" joins using the room code
     Then the session should have no active board
@@ -178,6 +178,12 @@ Feature: Classroom Game Session Journey
     Then the active board should be the noted board
     When participant "Alice" retrieves the session state
     Then the active board should be the noted board
+    When participant "Alice" submits a concept chain for round 1
+    Then the response status should be 201
+    And the submitted chain should list the noted board's cards at its path
+    When participant "Alice" submits a chain that runs off the bottom of the board
+    Then the response status should be 422
+    And the response error code should be "CHAIN_TOPOLOGY_INVALID"
 
   @session-state @instructor
   Scenario: Instructor retrieves session state

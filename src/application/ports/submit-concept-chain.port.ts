@@ -14,6 +14,10 @@ export interface SubmitConceptChainCommand {
   readonly roundNumber: 1 | 2;
   readonly verifiedCapability: VerifiedCapability;
   readonly path: readonly GridCoord[];
+  /**
+   * Keyword ids claimed by the client. Ignored when the round has a dealt
+   * board (the ids come from the board); kept only for legacy sessions.
+   */
   readonly keywordIds: readonly string[];
   readonly narrativeExplanation: string;
   readonly stepRationales?: readonly string[];

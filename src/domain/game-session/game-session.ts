@@ -18,6 +18,7 @@ import { randomUUID } from "node:crypto";
 import {
   AssessmentAlreadySubmittedError,
   ChainAlreadySubmittedError,
+  ChainTopologyInvalidError,
   InvalidPhaseTransitionError,
   InvalidTimerConfigError,
   PhaseClosedForSubmissionsError,
@@ -311,8 +312,13 @@ export class GameSession {
    * grace period. An expired phase stays current (closed) until the
    * instructor transitions it. An instructor-driven phase (no `phaseEndsAt`)
    * accepts chains until then.
+   *
+   * When the round has a dealt board, every path cell must lie on it, and the
+   * recorded chain names the Keyword Cards at its path cells (any keyword ids
+   * on `chain` are replaced). A round without a board (legacy sessions) keeps
+   * the chain's own keyword ids. Returns the chain as recorded.
    */
-  public addChain(chain: ConceptChain, now: Date): void {
+  public addChain(chain: ConceptChain, now: Date): ConceptChain {
     if (!this.isChainMappingPhase()) {
       throw new PhaseClosedForSubmissionsError(this.#currentPhase);
     }
@@ -323,18 +329,18 @@ export class GameSession {
       });
     }
     const phaseEndsAt = this.phaseEndsAt;
-    if (phaseEndsAt === null) {
-      this.#recordChain(chain);
-      return;
+    if (phaseEndsAt !== null) {
+      const closesAtMs = phaseEndsAt.getTime() + SUBMISSION_GRACE_PERIOD_SEC * 1000;
+      if (now.getTime() > closesAtMs) {
+        throw new PhaseClosedForSubmissionsError(this.#currentPhase, {
+          phaseEndsAt,
+          gracePeriodSec: SUBMISSION_GRACE_PERIOD_SEC,
+        });
+      }
     }
-    const closesAtMs = phaseEndsAt.getTime() + SUBMISSION_GRACE_PERIOD_SEC * 1000;
-    if (now.getTime() > closesAtMs) {
-      throw new PhaseClosedForSubmissionsError(this.#currentPhase, {
-        phaseEndsAt,
-        gracePeriodSec: SUBMISSION_GRACE_PERIOD_SEC,
-      });
-    }
-    this.#recordChain(chain);
+    const placed = this.#placeOnBoard(chain);
+    this.#recordChain(placed);
+    return placed;
   }
 
   public getChain(chainId: string): ConceptChain | undefined {
@@ -518,6 +524,33 @@ export class GameSession {
       return 0;
     }
     return this.#timerConfig[field];
+  }
+
+  /**
+   * Checks a chain's path against its round's board and returns the chain
+   * naming the Keyword Cards at its path cells. Throws
+   * ChainTopologyInvalidError for a cell outside the board. A round without a
+   * board returns the chain unchanged.
+   */
+  #placeOnBoard(chain: ConceptChain): ConceptChain {
+    const board = this.boardForRound(chain.roundNumber);
+    if (board === null) {
+      return chain;
+    }
+    const keywordIds = chain.path.map((cell, index) => {
+      const card = Number.isInteger(cell.row) && Number.isInteger(cell.col)
+        && cell.row >= 0 && cell.row < board.rows
+        && cell.col >= 0 && cell.col < board.cols
+        ? board.cells[cell.row]?.[cell.col]
+        : undefined;
+      if (card === undefined) {
+        throw new ChainTopologyInvalidError(
+          `Cell at position ${index} (row ${cell.row}, col ${cell.col}) is outside the ${board.rows}×${board.cols} board`,
+        );
+      }
+      return card.id;
+    });
+    return chain.withKeywordIds(keywordIds);
   }
 
   /**
