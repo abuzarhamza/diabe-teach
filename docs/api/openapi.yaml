@@ -667,8 +667,14 @@ paths:
 
 
         Visibility: the session's instructor Capability Token sees every chain
-        of the round, in any phase. A participant Capability Token sees only
-        that participant's own chains, in every phase.
+        of the round, in any phase. A participant Capability Token's view
+        depends on the session's current phase: while that round is in
+        chain-mapping, or before it (pretest, trial-orientation, or any Round 1
+        phase when listing Round 2), the participant sees only their own
+        chains, so nobody can copy a classmate's chain. From that round's
+        peer-adjudication on (peer-adjudication, round-summary, later rounds,
+        posttest, feedback-survey, completed), the participant sees every
+        chain of the round, so they can review and vote.
 
 
         Teachers call this with the session's instructor Capability Token, not

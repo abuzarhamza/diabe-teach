@@ -28,6 +28,7 @@ import {
   DEFAULT_TIMER_CONFIG,
   MAX_TIMER_DURATION_SEC,
   PHASE_GAMEPLAY_ROUND,
+  PHASE_ORDER,
   PHASE_TIMER_FIELD,
   PHASE_TRANSITIONS,
   SUBMISSION_GRACE_PERIOD_SEC,
@@ -345,16 +346,33 @@ export class GameSession {
   }
 
   /**
+   * Whether a participant may see classmates' Concept Chains in a Gameplay
+   * Round: only from that round's peer-adjudication on (peer-adjudication,
+   * round-summary, later rounds, posttest, survey, completed). During the
+   * round's chain-mapping, or before it, a participant sees only their own
+   * chains so nobody can copy a classmate's chain.
+   */
+  public mayParticipantSeeClassmatesChains(roundNumber: 1 | 2): boolean {
+    const revealPhase: PhaseIdentifier = roundNumber === 1
+      ? "round-1:peer-adjudication"
+      : "round-2:peer-adjudication";
+    return PHASE_ORDER.indexOf(this.#currentPhase) >= PHASE_ORDER.indexOf(revealPhase);
+  }
+
+  /**
    * The Concept Chains of a Gameplay Round that `viewer` may see, sorted by
-   * submission time, then chain id. The instructor sees every chain; a
-   * participant sees only their own (in every phase, for now).
+   * submission time, then chain id. The instructor sees every chain in every
+   * phase; a participant sees every chain from the round's peer-adjudication
+   * on, and only their own before that.
    */
   public getChainsForRoundVisibleTo(
     roundNumber: 1 | 2,
     viewer: ChainViewer,
   ): readonly ConceptChain[] {
+    const seesAll = viewer.role === "instructor"
+      || this.mayParticipantSeeClassmatesChains(roundNumber);
     const visible = this.getChainsForRound(roundNumber).filter(
-      chain => viewer.role === "instructor"
+      chain => seesAll
         || (viewer.participantId !== undefined
           && chain.participantId === viewer.participantId),
     );

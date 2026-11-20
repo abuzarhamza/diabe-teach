@@ -49,7 +49,10 @@ function pathOnRow(row: number, length: number) {
  * of submission order: Bob's (10:02), Alice's first (10:01, with a peer vote
  * and a locked Instructor Final Ruling) and Alice's second (10:03).
  */
-function makeWorld(addMoreChains?: (session: GameSession, carolId: string) => void) {
+function makeWorld(
+  addMoreChains?: (session: GameSession, carolId: string) => void,
+  playOn?: (session: GameSession, people: { aliceId: string; bobId: string; carolId: string }) => void,
+) {
   const session = GameSession.create({
     packId: "diabe-teach",
     mode: "classroom",
@@ -102,6 +105,11 @@ function makeWorld(addMoreChains?: (session: GameSession, carolId: string) => vo
   session.addChain(aliceFirst, new Date());
   session.addChain(aliceSecond, new Date());
   addMoreChains?.(session, carol.participantId);
+  playOn?.(session, {
+    aliceId: alice.participantId,
+    bobId: bob.participantId,
+    carolId: carol.participantId,
+  });
 
   const otherSession = GameSession.create({
     packId: "diabe-teach",
@@ -135,6 +143,39 @@ function makeWorld(addMoreChains?: (session: GameSession, carolId: string) => vo
       };
     },
   };
+}
+
+function chainIds(body: { chains: Array<{ chainId: string }> }): string[] {
+  return body.chains.map(c => c.chainId);
+}
+
+function allRound1(world: ReturnType<typeof makeWorld>): string[] {
+  return [
+    world.chains.aliceFirst.chainId,
+    world.chains.bobChain.chainId,
+    world.chains.aliceSecond.chainId,
+  ];
+}
+
+/** Moves Round 1 on to Round 2 chain-mapping, where Alice and Bob each submit one chain. */
+function enterRound2WithChains(session: GameSession, aliceId: string, bobId: string): void {
+  session.transitionTo("round-1:peer-adjudication", new Date());
+  session.transitionTo("round-1:round-summary", new Date());
+  session.transitionTo("round-2:chain-mapping", new Date());
+  for (const [index, [chainId, participantId]] of ([
+    ["r2-alice", aliceId],
+    ["r2-bob", bobId],
+  ] as const).entries()) {
+    session.addChain(ConceptChain.create({
+      chainId,
+      participantId,
+      roundNumber: 2,
+      path: pathOnRow(index, 4),
+      keywordIds: [],
+      narrativeExplanation: chainId,
+      submittedAt: new Date(`2026-11-19T11:0${index}:00.000Z`),
+    }), new Date());
+  }
 }
 
 describe("get /api/v1/sessions/{sessionId}/rounds/{roundNumber}/chains", () => {
@@ -276,15 +317,69 @@ describe("get /api/v1/sessions/{sessionId}/rounds/{roundNumber}/chains", () => {
     expect(body.chains.map((c: { chainId: string }) => c.chainId)).toEqual(["chain-a", "chain-b"]);
   });
 
-  it("shows a participant only their own chains", async () => {
+  it("during Round 1 chain-mapping shows a participant only their own chains, and the instructor all of them", async () => {
     const world = makeWorld();
-    const { statusCode, body } = await world.list(1, await world.participantToken(world.alice.participantId));
+    const asAlice = await world.list(1, await world.participantToken(world.alice.participantId));
+    const asInstructor = await world.list(1, await world.instructorToken());
 
-    expect(statusCode).toBe(200);
-    expect(body.chains.map((c: { chainId: string }) => c.chainId)).toEqual([
+    expect(world.session.currentPhase).toBe("round-1:chain-mapping");
+    expect(asAlice.statusCode).toBe(200);
+    expect(chainIds(asAlice.body)).toEqual([
       world.chains.aliceFirst.chainId,
       world.chains.aliceSecond.chainId,
     ]);
+    expect(chainIds(asInstructor.body)).toEqual(allRound1(world));
+  });
+
+  it.each([
+    ["round-1:peer-adjudication"],
+    ["round-1:round-summary"],
+  ] as const)("during %s shows a participant every Round 1 chain", async (phase) => {
+    const world = makeWorld(undefined, (session) => {
+      session.transitionTo("round-1:peer-adjudication", new Date());
+      if (phase === "round-1:round-summary")
+        session.transitionTo("round-1:round-summary", new Date());
+    });
+
+    const { statusCode, body } = await world.list(1, await world.participantToken(world.carol.participantId));
+
+    expect(statusCode).toBe(200);
+    expect(chainIds(body)).toEqual(allRound1(world));
+  });
+
+  it("while Round 2 is in chain-mapping shows a participant every Round 1 chain but only their own Round 2 chains", async () => {
+    const world = makeWorld(undefined, (session, { aliceId, bobId }) => {
+      enterRound2WithChains(session, aliceId, bobId);
+    });
+    const aliceToken = await world.participantToken(world.alice.participantId);
+
+    const round1 = await world.list(1, aliceToken);
+    const round2 = await world.list(2, aliceToken);
+
+    expect(chainIds(round1.body)).toEqual(allRound1(world));
+    expect(chainIds(round2.body)).toEqual(["r2-alice"]);
+  });
+
+  it("after the game is completed shows a participant every chain of both rounds", async () => {
+    const world = makeWorld(undefined, (session, { aliceId, bobId }) => {
+      enterRound2WithChains(session, aliceId, bobId);
+      for (const phase of [
+        "round-2:peer-adjudication",
+        "round-2:round-summary",
+        "posttest",
+        "feedback-survey",
+        "completed",
+      ] as const) {
+        session.transitionTo(phase, new Date());
+      }
+    });
+    const carolToken = await world.participantToken(world.carol.participantId);
+
+    const round1 = await world.list(1, carolToken);
+    const round2 = await world.list(2, carolToken);
+
+    expect(chainIds(round1.body)).toEqual(allRound1(world));
+    expect(chainIds(round2.body)).toEqual(["r2-alice", "r2-bob"]);
   });
 
   it("returns an empty list for a participant with no chains", async () => {

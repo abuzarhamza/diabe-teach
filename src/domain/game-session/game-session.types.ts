@@ -179,6 +179,21 @@ export const PHASE_GAMEPLAY_ROUND: Readonly<Record<PhaseIdentifier, 1 | 2 | null
   "completed": null,
 };
 
+/** Every phase, in the order a Game Session moves through them. */
+export const PHASE_ORDER: readonly PhaseIdentifier[] = [
+  "pretest",
+  "trial-orientation",
+  "round-1:chain-mapping",
+  "round-1:peer-adjudication",
+  "round-1:round-summary",
+  "round-2:chain-mapping",
+  "round-2:peer-adjudication",
+  "round-2:round-summary",
+  "posttest",
+  "feedback-survey",
+  "completed",
+];
+
 export const PHASE_TRANSITIONS: ReadonlyMap<PhaseIdentifier, PhaseIdentifier> = new Map([
   ["pretest", "trial-orientation"],
   ["trial-orientation", "round-1:chain-mapping"],
