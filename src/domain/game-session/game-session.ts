@@ -1,10 +1,11 @@
-import type { ConceptChain, GridCoord } from "./concept-chain.js";
+import type { GridCoord } from "./concept-chain.js";
 import type {
   AdjudicationMode,
   AssessmentAttempt,
   AssessmentStage,
   ChainViewer,
   GameSessionProps,
+  GameSessionSnapshot,
   LikertRating,
   McqAnswerChoice,
   Participant,
@@ -30,6 +31,7 @@ import {
   SurveyAlreadySubmittedError,
 } from "../errors/domain-errors.js";
 import { BoardDealer } from "./board-dealer.js";
+import { ConceptChain } from "./concept-chain.js";
 import {
   DEFAULT_TIMER_CONFIG,
   MAX_PHASE_EXTENSION_SEC,
@@ -136,6 +138,64 @@ export class GameSession {
    */
   public static rehydrate(props: GameSessionProps): GameSession {
     return new GameSession(props);
+  }
+
+  /**
+   * Restores a session exactly as `toSnapshot` captured it, without
+   * create-time validation. The one path every repository loads through.
+   */
+  public static fromSnapshot(snapshot: GameSessionSnapshot): GameSession {
+    return new GameSession({
+      sessionId: snapshot.sessionId,
+      roomCode: snapshot.roomCode,
+      packId: snapshot.packId,
+      packVersion: snapshot.packVersion,
+      ownerAccountId: snapshot.ownerAccountId,
+      mode: snapshot.mode,
+      adjudicationMode: snapshot.adjudicationMode,
+      timerConfig: snapshot.timerConfig,
+      currentPhase: snapshot.currentPhase,
+      phaseStartedAt: snapshot.phaseStartedAt,
+      extendedPhaseEndsAt: snapshot.extendedPhaseEndsAt,
+      participants: snapshot.participants.map(p => ({ ...p })),
+      activeRoundNumber: snapshot.activeRoundNumber,
+      createdAt: snapshot.createdAt,
+      creationSeed: snapshot.creationSeed,
+      version: snapshot.version,
+      _chains: snapshot.chains.map(chain => ConceptChain.fromSnapshot(chain)),
+      _assessments: snapshot.assessments,
+      _surveyResponses: snapshot.surveyResponses,
+      _roundBoards: snapshot.roundBoards,
+    });
+  }
+
+  /**
+   * Every field of this session as plain data, with its own copies of the
+   * mutable parts. The one path every repository saves through.
+   */
+  public toSnapshot(): GameSessionSnapshot {
+    return {
+      sessionId: this.#sessionId.value,
+      roomCode: this.#roomCode.value,
+      packId: this.#packId,
+      packVersion: this.#packVersion,
+      ownerAccountId: this.#ownerAccountId,
+      mode: this.#mode,
+      adjudicationMode: this.#adjudicationMode,
+      timerConfig: { ...this.#timerConfig },
+      currentPhase: this.#currentPhase,
+      phaseStartedAt: this.#phaseStartedAt,
+      extendedPhaseEndsAt: this.#extendedPhaseEndsAt,
+      participants: this.#participants.map(p => ({ ...p })),
+      activeRoundNumber: this.#activeRoundNumber,
+      createdAt: this.#createdAt,
+      creationSeed: this.#creationSeed,
+      chains: this.#chains.map(chain => chain.toSnapshot()),
+      assessments: this.assessmentAttempts,
+      surveyResponses: this.surveyResponses,
+      roundBoards: this.roundBoards,
+      version: this.#version,
+    };
   }
 
   public get sessionId(): SessionId {

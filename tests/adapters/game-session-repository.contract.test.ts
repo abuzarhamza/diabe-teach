@@ -1,5 +1,6 @@
 import type { GameSessionRepositoryPort } from "../../src/application/ports/game-session-repository.port.js";
-import type { LikertRating, McqAnswerChoice } from "../../src/domain/game-session/game-session.types.js";
+import type { KeywordCard } from "../../src/domain/curriculum-pack/curriculum-pack.types.js";
+import type { GameSessionSnapshot, LikertRating, McqAnswerChoice } from "../../src/domain/game-session/game-session.types.js";
 import type { RoundBoard } from "../../src/domain/game-session/round-board.types.js";
 import mongoose from "mongoose";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -63,6 +64,152 @@ function firstAnswer(choice: McqAnswerChoice): ReadonlyMap<string, McqAnswerChoi
   return new Map<string, McqAnswerChoice>().set("dm-mcq-01", choice);
 }
 
+/** A card with every field set, aliases included. */
+function populatedCard(id: string): KeywordCard {
+  return {
+    id,
+    verbatimLabel: `Verbatim ${id}`,
+    displayLabel: `Display ${id}`,
+    aliases: [
+      `alias-${id}`,
+    ],
+    domainId: "domain-a",
+    summary: `Summary of ${id}`,
+  };
+}
+
+/**
+ * A session snapshot with every field, and every optional field nested in
+ * it, set to a non-empty value. Typed as the domain snapshot, so a field
+ * added to the snapshot must be added here too.
+ */
+function fullyPopulatedSnapshot(sessionId: string, roomCode: string): GameSessionSnapshot {
+  return {
+    sessionId,
+    roomCode,
+    packId: "diabe-teach",
+    packVersion: "1.2.0",
+    ownerAccountId: "account-owner-1",
+    mode: "classroom",
+    adjudicationMode: "hybrid",
+    timerConfig: {
+      pretestSec: 600,
+      trialOrientationSec: 300,
+      roundMappingSec: 1200,
+      roundAdjudicationSec: 480,
+      posttestSec: 700,
+      feedbackSurveySec: 200,
+    },
+    currentPhase: "round-2:peer-adjudication",
+    phaseStartedAt: new Date("2026-03-01T10:00:00.000Z"),
+    extendedPhaseEndsAt: new Date("2026-03-01T10:30:00.000Z"),
+    participants: [
+      {
+        participantId: "p-alice",
+        displayName: "Alice",
+        joinedAt: new Date("2026-03-01T09:01:00.000Z"),
+        leftAt: new Date("2026-03-01T09:50:00.000Z"),
+      },
+    ],
+    activeRoundNumber: 2,
+    createdAt: new Date("2026-03-01T09:00:00.000Z"),
+    creationSeed: "creation-seed",
+    chains: [
+      {
+        chainId: "chain-1",
+        participantId: "p-alice",
+        roundNumber: 1,
+        path: [
+          { row: 0, col: 0 },
+          { row: 0, col: 1 },
+          { row: 1, col: 1 },
+        ],
+        keywordIds: [
+          "card-0",
+          "card-1",
+          "card-4",
+        ],
+        narrativeExplanation: "Insulin lowers glucose.",
+        stepRationales: [
+          "first step",
+          "second step",
+        ],
+        status: "approved",
+        peerVotes: [
+          {
+            voterParticipantId: "p-bob",
+            decision: "approve",
+            comment: "Nice link",
+            votedAt: new Date("2026-03-01T09:40:00.000Z"),
+          },
+        ],
+        verdict: {
+          isApproved: true,
+          isLocked: true,
+          feedback: "Well argued",
+          qualityScore: 4,
+          decidedBy: "instructor",
+          decidedAt: new Date("2026-03-01T09:45:00.000Z"),
+        },
+        submittedAt: new Date("2026-03-01T09:30:00.000Z"),
+      },
+    ],
+    assessments: [
+      {
+        participantId: "p-alice",
+        stage: "pretest",
+        answers: firstAnswer(2),
+        submittedAt: new Date("2026-03-01T09:05:00.000Z"),
+      },
+    ],
+    surveyResponses: [
+      {
+        participantId: "p-alice",
+        responses: new Map<string, LikertRating>().set("survey-q1", 4),
+        comments: "Loved it",
+        submittedAt: new Date("2026-03-01T09:48:00.000Z"),
+      },
+    ],
+    roundBoards: [1, 2].map(roundNumber => ({
+      roundNumber: roundNumber as 1 | 2,
+      seed: `round-${roundNumber}-seed`,
+      rows: 2,
+      cols: 3,
+      cells: [
+        [0, 1, 2].map(i => populatedCard(`card-${i}`)),
+        [3, 4, 5].map(i => populatedCard(`card-${i}`)),
+      ],
+    })),
+    version: 0,
+  };
+}
+
+/** Fails, naming the path, on any null, undefined, empty list or empty map anywhere in `value`. */
+function expectFullyPopulated(value: unknown, path = "session"): void {
+  expect(value, `${path} is set`).not.toBeNull();
+  expect(value, `${path} is set`).not.toBeUndefined();
+  if (value instanceof Date) {
+    return;
+  }
+  if (value instanceof Map) {
+    expect(value.size, `${path} is not empty`).toBeGreaterThan(0);
+    for (const [key, entry] of value) {
+      expectFullyPopulated(entry, `${path}.${String(key)}`);
+    }
+    return;
+  }
+  if (Array.isArray(value)) {
+    expect(value.length, `${path} is not empty`).toBeGreaterThan(0);
+    value.forEach((entry, index) => expectFullyPopulated(entry, `${path}[${index}]`));
+    return;
+  }
+  if (typeof value === "object") {
+    for (const [key, entry] of Object.entries(value as object)) {
+      expectFullyPopulated(entry, `${path}.${key}`);
+    }
+  }
+}
+
 function defineGameSessionRepositoryContract(
   name: string,
   setup: () => Promise<RepositoryHarness>,
@@ -77,6 +224,22 @@ function defineGameSessionRepositoryContract(
 
     afterAll(async () => {
       await teardown();
+    });
+
+    it("keeps every field of a fully populated session across a save and load", async () => {
+      const snapshot = fullyPopulatedSnapshot(`full-${name}`, "FULL01");
+      expectFullyPopulated(snapshot);
+      await harness.repo.create(GameSession.fromSnapshot(snapshot));
+
+      const loaded = await harness.repo.findById(SessionId.from(snapshot.sessionId));
+      expect(loaded?.toSnapshot()).toEqual(snapshot);
+      await harness.repo.update(loaded!);
+
+      const reloaded = await harness.repo.findByRoomCode(loaded!.roomCode);
+      expect(reloaded?.toSnapshot()).toEqual({
+        ...snapshot,
+        version: 1,
+      });
     });
 
     it("stores a new session at version 0", async () => {

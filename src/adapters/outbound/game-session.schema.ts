@@ -1,4 +1,5 @@
 import { Schema } from "mongoose";
+import { PHASE_ORDER } from "../../domain/game-session/game-session.types.js";
 
 export const GAME_SESSION_MODEL_NAME = "GameSession";
 export const GAME_SESSIONS_COLLECTION = "game_sessions";
@@ -191,19 +192,7 @@ export const gameSessionSchema = new Schema(
     timerConfig: { type: timerConfigSchema, required: true },
     currentPhase: {
       type: String,
-      enum: [
-        "pretest",
-        "trial-orientation",
-        "round-1:chain-mapping",
-        "round-1:peer-adjudication",
-        "round-1:round-summary",
-        "round-2:chain-mapping",
-        "round-2:peer-adjudication",
-        "round-2:round-summary",
-        "posttest",
-        "feedback-survey",
-        "completed",
-      ],
+      enum: [...PHASE_ORDER],
       default: "pretest",
     },
     phaseStartedAt: { type: Date, required: true },

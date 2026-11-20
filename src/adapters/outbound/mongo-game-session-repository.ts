@@ -5,18 +5,14 @@ import type { RoomCode } from "../../domain/game-session/room-code.js";
 import type { RoundBoard } from "../../domain/game-session/round-board.types.js";
 import type { SessionId } from "../../domain/game-session/session-id.js";
 import type {
-  AssessmentAttemptDocument,
-  ConceptChainDocument,
   GameSessionCollectionLike,
   GameSessionDocument,
   MongoGameSessionConnectionConfig,
   MongoGameSessionRepositoryOptions,
   ParticipantDocument,
   RoundBoardDocument,
-  SurveyResponseDocument,
 } from "./mongo-game-session-repository.types.js";
 import { ConcurrentUpdateConflictError } from "../../domain/errors/domain-errors.js";
-import { ConceptChain } from "../../domain/game-session/concept-chain.js";
 import { GameSession } from "../../domain/game-session/game-session.js";
 import { DEFAULT_MONGODB_DB_NAME } from "./curriculum-pack.schema.js";
 import {
@@ -135,50 +131,16 @@ export class MongoGameSessionRepository implements GameSessionRepositoryPort {
     }
   }
 
+  /** Builds the domain snapshot a stored document holds, filling fields older documents lack. */
   static #toDomain(doc: GameSessionDocument): GameSession {
-    // Restore chains for rehydration
-    const chains = doc.chains.map(chainDoc =>
-      ConceptChain.create({
-        chainId: chainDoc.chainId,
-        participantId: chainDoc.participantId,
-        roundNumber: chainDoc.roundNumber,
-        path: chainDoc.path,
-        keywordIds: chainDoc.keywordIds,
-        narrativeExplanation: chainDoc.narrativeExplanation,
-        stepRationales: chainDoc.stepRationales,
-        status: chainDoc.status,
-        peerVotes: chainDoc.peerVotes,
-        verdict: chainDoc.verdict,
-        submittedAt: chainDoc.submittedAt,
-      }),
-    );
-
-    // Restore assessments for rehydration
-    const assessments: AssessmentAttempt[] = (doc.assessments ?? []).map(
-      (attemptDoc): AssessmentAttempt => ({
-        participantId: attemptDoc.participantId,
-        stage: attemptDoc.stage,
-        answers: new Map(Object.entries(attemptDoc.answers)) as ReadonlyMap<string, McqAnswerChoice>,
-        submittedAt: attemptDoc.submittedAt,
-      }),
-    );
-
-    // Restore survey responses for rehydration. A document stored before
-    // per-participant responses holds a single `surveyResponse` and no list.
+    // A document stored before per-participant responses holds a single
+    // `surveyResponse` and no list.
     const legacySurveyResponseDocs = doc.surveyResponse
       ? [doc.surveyResponse]
       : [];
     const surveyResponseDocs = doc.surveyResponses ?? legacySurveyResponseDocs;
-    const surveyResponses: SurveyResponse[] = surveyResponseDocs.map(
-      (responseDoc): SurveyResponse => ({
-        participantId: responseDoc.participantId,
-        responses: new Map(Object.entries(responseDoc.responses)) as ReadonlyMap<string, LikertRating>,
-        ...(responseDoc.comments !== undefined && { comments: responseDoc.comments }),
-        submittedAt: responseDoc.submittedAt,
-      }),
-    );
 
-    return GameSession.rehydrate({
+    return GameSession.fromSnapshot({
       sessionId: doc._id,
       roomCode: doc.roomCode,
       packId: doc.packId,
@@ -199,11 +161,30 @@ export class MongoGameSessionRepository implements GameSessionRepositoryPort {
       activeRoundNumber: doc.activeRoundNumber,
       createdAt: doc.createdAt,
       creationSeed: doc.creationSeed ?? null,
+      chains: doc.chains.map(chainDoc => ({
+        ...chainDoc,
+        stepRationales: chainDoc.stepRationales ?? [],
+        peerVotes: chainDoc.peerVotes ?? [],
+        verdict: chainDoc.verdict ?? null,
+      })),
+      assessments: (doc.assessments ?? []).map(
+        (attemptDoc): AssessmentAttempt => ({
+          participantId: attemptDoc.participantId,
+          stage: attemptDoc.stage,
+          answers: new Map(Object.entries(attemptDoc.answers)) as ReadonlyMap<string, McqAnswerChoice>,
+          submittedAt: attemptDoc.submittedAt,
+        }),
+      ),
+      surveyResponses: surveyResponseDocs.map(
+        (responseDoc): SurveyResponse => ({
+          participantId: responseDoc.participantId,
+          responses: new Map(Object.entries(responseDoc.responses)) as ReadonlyMap<string, LikertRating>,
+          ...(responseDoc.comments !== undefined && { comments: responseDoc.comments }),
+          submittedAt: responseDoc.submittedAt,
+        }),
+      ),
+      roundBoards: (doc.roundBoards ?? []).map(MongoGameSessionRepository.#copyRoundBoard),
       version: doc.version ?? 0,
-      _chains: chains,
-      _assessments: assessments,
-      _surveyResponses: surveyResponses,
-      _roundBoards: (doc.roundBoards ?? []).map(MongoGameSessionRepository.#copyRoundBoard),
     });
   }
 
@@ -225,76 +206,48 @@ export class MongoGameSessionRepository implements GameSessionRepositoryPort {
     };
   }
 
+  /**
+   * Stores the domain snapshot. Plain fields are spread through unchanged, so
+   * a new snapshot field reaches the document without a change here; only
+   * fields that need converting are listed. `version` is set by the caller.
+   */
   static #toDocument(session: GameSession): GameSessionDocument {
+    const {
+      sessionId,
+      participants,
+      chains,
+      assessments,
+      surveyResponses,
+      roundBoards,
+      version: _version,
+      ...plainFields
+    } = session.toSnapshot();
     return {
-      _id: session.sessionId.value,
-      roomCode: session.roomCode.value,
-      packId: session.packId,
-      packVersion: session.packVersion,
-      ownerAccountId: session.ownerAccountId,
-      mode: session.mode,
-      adjudicationMode: session.adjudicationMode,
-      timerConfig: session.timerConfig,
-      currentPhase: session.currentPhase,
-      phaseStartedAt: session.phaseStartedAt,
-      extendedPhaseEndsAt: session.extendedPhaseEndsAt,
-      participants: session.participants.map(p => ({
-        participantId: p.participantId,
-        displayName: p.displayName,
-        joinedAt: p.joinedAt,
-        leftAt: p.leftAt,
+      _id: sessionId,
+      ...plainFields,
+      participants: participants.map(p => ({ ...p })),
+      chains: chains.map(chain => ({
+        ...chain,
+        path: [...chain.path],
+        keywordIds: [...chain.keywordIds],
+        stepRationales: [...chain.stepRationales],
+        peerVotes: [...chain.peerVotes],
       })),
-      activeRoundNumber: session.activeRoundNumber,
-      chains: session.chains.map(c =>
-        MongoGameSessionRepository.#chainToDocument(c),
-      ),
-      assessments: MongoGameSessionRepository.#assessmentsToDocument(session.assessmentAttempts),
-      surveyResponses: session.surveyResponses.map(response =>
-        MongoGameSessionRepository.#surveyResponseToDocument(response),
-      ),
+      assessments: assessments.map(attempt => ({
+        participantId: attempt.participantId,
+        stage: attempt.stage,
+        answers: Object.fromEntries(attempt.answers) as Record<string, McqAnswerChoice>,
+        submittedAt: attempt.submittedAt,
+      })),
+      surveyResponses: surveyResponses.map(response => ({
+        participantId: response.participantId,
+        responses: Object.fromEntries(response.responses) as Record<string, LikertRating>,
+        ...(response.comments !== undefined && { comments: response.comments }),
+        submittedAt: response.submittedAt,
+      })),
       // Clears the legacy single-response field so it cannot diverge from the list.
       surveyResponse: null,
-      createdAt: session.createdAt,
-      creationSeed: session.creationSeed,
-      roundBoards: session.roundBoards.map(MongoGameSessionRepository.#copyRoundBoard),
-    };
-  }
-
-  static #surveyResponseToDocument(
-    surveyResponse: SurveyResponse,
-  ): SurveyResponseDocument {
-    return {
-      participantId: surveyResponse.participantId,
-      responses: Object.fromEntries(surveyResponse.responses) as Record<string, LikertRating>,
-      ...(surveyResponse.comments !== undefined && { comments: surveyResponse.comments }),
-      submittedAt: surveyResponse.submittedAt,
-    };
-  }
-
-  static #assessmentsToDocument(
-    assessments: readonly AssessmentAttempt[],
-  ): AssessmentAttemptDocument[] {
-    return assessments.map(attempt => ({
-      participantId: attempt.participantId,
-      stage: attempt.stage,
-      answers: Object.fromEntries(attempt.answers) as Record<string, McqAnswerChoice>,
-      submittedAt: attempt.submittedAt,
-    }));
-  }
-
-  static #chainToDocument(chain: ConceptChain): ConceptChainDocument {
-    return {
-      chainId: chain.chainId,
-      participantId: chain.participantId,
-      roundNumber: chain.roundNumber,
-      path: [...chain.path],
-      keywordIds: [...chain.keywordIds],
-      narrativeExplanation: chain.narrativeExplanation,
-      stepRationales: [...chain.stepRationales],
-      status: chain.status,
-      peerVotes: [...chain.peerVotes],
-      verdict: chain.verdict,
-      submittedAt: chain.submittedAt,
+      roundBoards: roundBoards.map(MongoGameSessionRepository.#copyRoundBoard),
     };
   }
 }

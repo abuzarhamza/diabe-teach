@@ -1,3 +1,4 @@
+import type { ConceptChainSnapshot } from "./concept-chain.js";
 import type { RoomCode } from "./room-code.js";
 import type { RoundBoard } from "./round-board.types.js";
 import type { SessionId } from "./session-id.js";
@@ -117,6 +118,34 @@ export interface GameSessionProps {
   readonly _surveyResponses?: readonly SurveyResponse[];
   /** Each Gameplay Round's dealt board; sessions stored before boards have none. */
   readonly _roundBoards?: readonly RoundBoard[];
+}
+
+/**
+ * Every field of a Game Session as plain data: what both repositories store
+ * and what `GameSession.fromSnapshot` restores. A field added to the session
+ * belongs here, so no repository can drop it silently.
+ */
+export interface GameSessionSnapshot {
+  readonly sessionId: string;
+  readonly roomCode: string;
+  readonly packId: string;
+  readonly packVersion: string | null;
+  readonly ownerAccountId: string | null;
+  readonly mode: SessionMode;
+  readonly adjudicationMode: AdjudicationMode;
+  readonly timerConfig: SessionTimerConfig;
+  readonly currentPhase: PhaseIdentifier;
+  readonly phaseStartedAt: Date;
+  readonly extendedPhaseEndsAt: Date | null;
+  readonly participants: readonly Participant[];
+  readonly activeRoundNumber: 1 | 2 | null;
+  readonly createdAt: Date;
+  readonly creationSeed: string | null;
+  readonly chains: readonly ConceptChainSnapshot[];
+  readonly assessments: readonly AssessmentAttempt[];
+  readonly surveyResponses: readonly SurveyResponse[];
+  readonly roundBoards: readonly RoundBoard[];
+  readonly version: number;
 }
 
 /**
