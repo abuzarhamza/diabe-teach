@@ -18,6 +18,7 @@ export default antfu(
       "**/wiki/**",
       "**/assets/**",
       "docs/**",
+      "src/**/*.generated.ts",
     ],
   },
   {

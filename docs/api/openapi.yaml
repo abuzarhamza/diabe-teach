@@ -96,7 +96,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/AccountCredentialsRequest"
+              $ref: "#/components/schemas/SignInRequest"
       responses:
         "200":
           description: Signed in
@@ -1146,6 +1146,21 @@ components:
           minLength: 10
           maxLength: 1024
 
+    SignInRequest:
+      type: object
+      description: >-
+        Unlike sign-up, nothing is required and no email or password rules
+        apply: a missing field, a malformed email or a short password gets the
+        same 401 INVALID_CREDENTIALS as a wrong password.
+      properties:
+        email:
+          type: string
+          maxLength: 254
+          example: rahman.s@aku.edu
+        password:
+          type: string
+          maxLength: 1024
+
     AccountTokenResponse:
       type: object
       required: [accountId, email, accountToken, expiresAt]
@@ -1685,15 +1700,10 @@ components:
             seed. Ignored for transitions that enter no round.
 
     StepRationale:
-      type: object
-      required: [fromCoord, toCoord, rationale]
-      properties:
-        fromCoord:
-          $ref: "#/components/schemas/GridCoord"
-        toCoord:
-          $ref: "#/components/schemas/GridCoord"
-        rationale:
-          type: string
+      type: string
+      description: >-
+        The learner's reason for one link of the chain, as plain text. Item i
+        of `stepRationales` explains the step from `path[i]` to `path[i + 1]`.
 
     SubmitChainRequest:
       type: object
@@ -1707,6 +1717,14 @@ components:
         narrativeExplanation:
           type: string
           minLength: 1
+        keywordIds:
+          type: array
+          description: >-
+            The keyword ids of the path's cells, in path order. Stored as sent
+            and returned on the chain; the server does not derive them from
+            the board. Defaults to an empty list.
+          items:
+            type: string
         stepRationales:
           type: array
           items:
@@ -1852,6 +1870,7 @@ components:
                           participant can't be found.
 
     AdjudicateChainRequest:
+      type: object
       oneOf:
         - $ref: "#/components/schemas/PeerVoteActionRequest"
         - $ref: "#/components/schemas/AiEvaluateActionRequest"
