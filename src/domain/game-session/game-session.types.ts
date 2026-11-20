@@ -59,6 +59,15 @@ export interface Participant {
   readonly joinedAt: Date;
 }
 
+/**
+ * Who is asking to see a Gameplay Round's Concept Chains: the session's
+ * instructor, or one participant (by id).
+ */
+export interface ChainViewer {
+  readonly role: "instructor" | "participant";
+  readonly participantId?: string;
+}
+
 export interface GameSessionProps {
   readonly sessionId?: SessionId | string;
   readonly roomCode?: RoomCode | string;

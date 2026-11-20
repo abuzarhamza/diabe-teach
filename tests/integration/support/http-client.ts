@@ -123,6 +123,19 @@ export async function adjudicateChain(
   return toApiGatewayResult(res);
 }
 
+export async function listRoundChains(
+  sessionId: string,
+  roundNumber: number,
+  token: string,
+) {
+  const res = await request(BASE_URL)
+    .get(`/api/v1/sessions/${sessionId}/rounds/${roundNumber}/chains`)
+    .set("x-api-key", API_KEY)
+    .set("Authorization", `Bearer ${token}`);
+
+  return toApiGatewayResult(res);
+}
+
 export async function getStandings(
   sessionId: string,
   roundNumber: number,

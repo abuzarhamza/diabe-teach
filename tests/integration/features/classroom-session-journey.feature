@@ -71,6 +71,24 @@ Feature: Classroom Game Session Journey
     And the response should contain a chainId
     And the chain length should be 4
 
+  @chain-listing
+  Scenario: Teacher lists the round's chains after a learner submits one
+    When the instructor creates a classroom session with pack "diabe-teach"
+    And participants "Alice" and "Bob" join using the room code
+    And the instructor advances the phase 2 times
+    Then the session phase should be "round-1:chain-mapping"
+    When participant "Alice" submits a concept chain for round 1
+    Then the response status should be 201
+    When the instructor lists the chains of round 1
+    Then the response status should be 200
+    And the listed chains should be exactly the last submitted chain, from participant "Alice"
+    When participant "Bob" lists the chains of round 1
+    Then the response status should be 200
+    And the listed chains should be empty
+    When participant "Alice" lists the chains of round 1
+    Then the response status should be 200
+    And the listed chains should be exactly the last submitted chain, from participant "Alice"
+
   @chain-submission @validation
   Scenario: Chain submission rejected outside chain-mapping phase
     When the instructor creates a classroom session with pack "diabe-teach"

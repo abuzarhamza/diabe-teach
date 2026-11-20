@@ -648,6 +648,77 @@ paths:
                 $ref: "#/components/schemas/ApiErrorResponse"
 
   /api/v1/sessions/{sessionId}/rounds/{roundNumber}/chains:
+    get:
+      operationId: listRoundChains
+      tags: [Chains]
+      summary: List the Concept Chains of a Gameplay Round that the caller may see
+      description: >-
+        Returns the Gameplay Round's Concept Chains, each in the same
+        `SubmittedChain` shape that submit and adjudicate return (path,
+        keywords, narrative, step rationales, status, peer votes, verdict),
+        sorted by `submittedAt` ascending, then `chainId`. A round with no
+        chains, or one that has not started yet, returns 200 with an empty
+        `chains` list.
+
+
+        Visibility: the session's instructor Capability Token sees every chain
+        of the round, in any phase. A participant Capability Token sees only
+        that participant's own chains, in every phase.
+
+
+        Teachers call this with the session's instructor Capability Token, not
+        an Account Token (ADR-0007).
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/SessionIdParam"
+        - $ref: "#/components/parameters/RoundNumberParam"
+      responses:
+        "200":
+          description: The round's Concept Chains the caller may see, in submission order
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [roundNumber, chains]
+                properties:
+                  roundNumber:
+                    type: integer
+                    enum: [1, 2]
+                  chains:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/SubmittedChain"
+        "400":
+          description: >-
+            INVALID_REQUEST_BODY. `roundNumber` is not 1 or 2.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "401":
+          description: >-
+            UNAUTHORIZED_TOKEN. No bearer token, or one that is malformed,
+            invalid, expired, or an Account Token instead of a Capability
+            Token.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "403":
+          description: >-
+            FORBIDDEN_ROLE. The Capability Token belongs to another Game
+            Session.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "404":
+          description: SESSION_NOT_FOUND. No Game Session has this id.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
     post:
       operationId: submitConceptChain
       tags: [Chains]

@@ -3,6 +3,7 @@ import type {
   AdjudicationMode,
   AssessmentAttempt,
   AssessmentStage,
+  ChainViewer,
   GameSessionProps,
   LikertRating,
   McqAnswerChoice,
@@ -341,6 +342,32 @@ export class GameSession {
 
   public getChainsForRound(roundNumber: 1 | 2): readonly ConceptChain[] {
     return this.#chains.filter(c => c.roundNumber === roundNumber);
+  }
+
+  /**
+   * The Concept Chains of a Gameplay Round that `viewer` may see, sorted by
+   * submission time, then chain id. The instructor sees every chain; a
+   * participant sees only their own (in every phase, for now).
+   */
+  public getChainsForRoundVisibleTo(
+    roundNumber: 1 | 2,
+    viewer: ChainViewer,
+  ): readonly ConceptChain[] {
+    const visible = this.getChainsForRound(roundNumber).filter(
+      chain => viewer.role === "instructor"
+        || (viewer.participantId !== undefined
+          && chain.participantId === viewer.participantId),
+    );
+    return [...visible].sort((a, b) => {
+      const timeDiff = a.submittedAt.getTime() - b.submittedAt.getTime();
+      if (timeDiff !== 0)
+        return timeDiff;
+      return a.chainId < b.chainId
+        ? -1
+        : a.chainId > b.chainId
+          ? 1
+          : 0;
+    });
   }
 
   public isChainMappingPhase(): boolean {

@@ -41,11 +41,10 @@
   status = 200
   force = true
 
-[[redirects]]
-  from = "/api/v1/sessions/:sessionId/rounds/:roundNumber/chains"
-  to = "/.netlify/functions/submit-chain"
-  status = 200
-  force = true
+# No redirect for `/api/v1/sessions/:sessionId/rounds/:roundNumber/chains`:
+# its POST (submit-chain) and GET (list-round-chains) each route through their
+# own `config.path` and `method`. A forced redirect matches every method and
+# sent both to submit-chain (list-round-chains ticket 01).
 
 [[redirects]]
   from = "/api/v1/sessions/:sessionId/assessments/:stage"

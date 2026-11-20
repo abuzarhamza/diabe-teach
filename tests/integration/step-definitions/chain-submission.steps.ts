@@ -1,6 +1,7 @@
 import type { TestWorld } from "../support/world.js";
-import { When } from "@cucumber/cucumber";
-import { adjudicateChain, getStandings, submitChain } from "../support/http-client.js";
+import { Then, When } from "@cucumber/cucumber";
+import { expect } from "chai";
+import { adjudicateChain, getStandings, listRoundChains, submitChain } from "../support/http-client.js";
 
 When(
   "participant {string} submits a concept chain for round {int}",
@@ -69,10 +70,14 @@ When(
     const current = { row: start.row, col: start.col };
 
     while (current.row !== end.row || current.col !== end.col) {
-      if (current.row < end.row) current.row++;
-      else if (current.row > end.row) current.row--;
-      else if (current.col < end.col) current.col++;
-      else if (current.col > end.col) current.col--;
+      if (current.row < end.row)
+        current.row++;
+      else if (current.row > end.row)
+        current.row--;
+      else if (current.col < end.col)
+        current.col++;
+      else if (current.col > end.col)
+        current.col--;
 
       path.push({ row: current.row, col: current.col });
     }
@@ -237,5 +242,71 @@ When(
       token,
     );
     this.parseLastResponse();
+  },
+);
+
+When(
+  "the instructor lists the chains of round {int}",
+  async function (this: TestWorld, roundNumber: number) {
+    if (!this.currentSessionId || !this.instructorToken) {
+      throw new Error("No session or instructor token available.");
+    }
+
+    this.lastResponse = await listRoundChains(
+      this.currentSessionId,
+      roundNumber,
+      this.instructorToken,
+    );
+    this.parseLastResponse();
+  },
+);
+
+When(
+  "participant {string} lists the chains of round {int}",
+  async function (this: TestWorld, displayName: string, roundNumber: number) {
+    if (!this.currentSessionId) {
+      throw new Error("No session available.");
+    }
+
+    const token = this.participantTokens.get(displayName);
+    if (!token) {
+      throw new Error(`No token found for participant '${displayName}'.`);
+    }
+
+    this.lastResponse = await listRoundChains(
+      this.currentSessionId,
+      roundNumber,
+      token,
+    );
+    this.parseLastResponse();
+  },
+);
+
+interface ListedChainsBody {
+  readonly chains: ReadonlyArray<{ chainId: string; participantId: string; status: string }>;
+}
+
+Then(
+  "the listed chains should be exactly the last submitted chain, from participant {string}",
+  function (this: TestWorld, displayName: string) {
+    const body = this.lastResponseBody as ListedChainsBody;
+    expect(body?.chains, JSON.stringify(this.lastResponseBody)).to.be.an("array");
+    expect(
+      body.chains.map(chain => [chain.chainId, chain.participantId, chain.status]),
+    ).to.deep.equal([
+      [
+        this.lastChainId,
+        this.participantIds.get(displayName),
+        "pending-review",
+      ],
+    ]);
+  },
+);
+
+Then(
+  "the listed chains should be empty",
+  function (this: TestWorld) {
+    const body = this.lastResponseBody as ListedChainsBody;
+    expect(body?.chains, JSON.stringify(this.lastResponseBody)).to.deep.equal([]);
   },
 );
