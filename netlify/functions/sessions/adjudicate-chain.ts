@@ -3,7 +3,6 @@ import type { AdjudicateConceptChainCommand } from "../../../src/application/por
 import type { CapabilityTokenPort, VerifiedCapability } from "../../../src/application/ports/capability-token.port.js";
 import type { GameSessionRepositoryPort } from "../../../src/application/ports/game-session-repository.port.js";
 import { readOptionalJsonObjectBody } from "../../../src/adapters/inbound/http/json-object-body.js";
-import { wrapLambdaHandler } from "../../../src/adapters/inbound/http/lambda-to-v2-wrapper.js";
 import { createApiHandler } from "../../../src/adapters/inbound/http/middy/api-handler.js";
 import { AppRuntime } from "../../../src/app-runtime.js";
 import { AdjudicateConceptChainUseCase } from "../../../src/application/use-cases/adjudicate-concept-chain.use-case.js";
@@ -85,4 +84,3 @@ export function createAdjudicateChainHandler(
 }
 
 export const lambdaHandler = createAdjudicateChainHandler();
-export default wrapLambdaHandler(lambdaHandler);

@@ -232,3 +232,22 @@ export async function listPacks(options: { includeArchived?: boolean } = {}) {
 
   return toApiGatewayResult(res);
 }
+
+/** POST /api/v1/packs/{packId}/archive with a teacher's Account Token. */
+export async function archivePack(packId: string, accountToken: string) {
+  const res = await request(BASE_URL)
+    .post(`/api/v1/packs/${encodeURIComponent(packId)}/archive`)
+    .set("x-api-key", API_KEY)
+    .set("Authorization", `Bearer ${accountToken}`);
+
+  return toApiGatewayResult(res);
+}
+
+/** GET /api/v1/packs/{packId}. */
+export async function getPackById(packId: string) {
+  const res = await request(BASE_URL)
+    .get(`/api/v1/packs/${encodeURIComponent(packId)}`)
+    .set("x-api-key", API_KEY);
+
+  return toApiGatewayResult(res);
+}

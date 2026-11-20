@@ -92,20 +92,13 @@ Then(
 );
 
 /**
- * Special assertion for forbidden access that handles Netlify Dev quirks.
- *
- * In production, 403 is returned correctly.
- * In Netlify Dev, a form submission fallback may return 401 instead.
- * We verify the request was rejected (not 2xx) as the core invariant.
+ * A forbidden request gets 403 through `netlify dev` too: route parameters
+ * survive its `.html` retry of a 403 (api-hardening 03).
  */
 Then(
   "the request should be forbidden",
   function (this: TestWorld) {
-    const status = this.lastResponse?.statusCode;
-    // In production: 403 Forbidden
-    // In Netlify Dev: may get 401 due to form submission fallback
-    // Core invariant: the request was rejected (not 2xx success)
-    expect(status).to.be.oneOf([401, 403], "Expected request to be rejected with 401 or 403");
+    expect(this.lastResponse?.statusCode).to.equal(403);
   },
 );
 

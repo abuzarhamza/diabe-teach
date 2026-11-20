@@ -2,7 +2,6 @@ import type { APIGatewayProxyResult } from "aws-lambda";
 import type { AuthenticatedEvent } from "../../../src/adapters/inbound/http/middy/auth.middleware.js";
 import type { ProductionDependencies } from "../../../src/app-runtime.types.js";
 import { readJsonObjectBody } from "../../../src/adapters/inbound/http/json-object-body.js";
-import { wrapLambdaHandler } from "../../../src/adapters/inbound/http/lambda-to-v2-wrapper.js";
 import { createApiHandler } from "../../../src/adapters/inbound/http/middy/api-handler.js";
 import { AppRuntime } from "../../../src/app-runtime.js";
 import { SignUpInstructorUseCase } from "../../../src/application/use-cases/sign-up-instructor.use-case.js";
@@ -52,4 +51,3 @@ export function createSignUpHandler(dependencies?: SignUpHandlerDependencies) {
 }
 
 export const lambdaHandler = createSignUpHandler();
-export default wrapLambdaHandler(lambdaHandler);

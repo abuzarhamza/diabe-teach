@@ -35,6 +35,7 @@
     "jose": "^6.2.13",
     "mongodb": "^6.13.0",
     "mongoose": "^9.11.4",
+    "path-to-regexp": "^8.4.2",
     "seedrandom": "^3.0.5",
     "semver": "^7.8.6",
     "word-count": "^0.3.1",

@@ -1,7 +1,6 @@
 import type { APIGatewayProxyEvent, APIGatewayProxyResult } from "aws-lambda";
 import type { CapabilityTokenPort, VerifiedCapability } from "../../../src/application/ports/capability-token.port.js";
 import type { GameSessionRepositoryPort } from "../../../src/application/ports/game-session-repository.port.js";
-import { wrapLambdaHandler } from "../../../src/adapters/inbound/http/lambda-to-v2-wrapper.js";
 import { createApiHandler } from "../../../src/adapters/inbound/http/middy/api-handler.js";
 import { AppRuntime } from "../../../src/app-runtime.js";
 import { GetGameSessionStateUseCase } from "../../../src/application/use-cases/get-game-session-state.use-case.js";
@@ -72,4 +71,3 @@ export function createGetSessionHandler(
 }
 
 export const lambdaHandler = createGetSessionHandler();
-export default wrapLambdaHandler(lambdaHandler);

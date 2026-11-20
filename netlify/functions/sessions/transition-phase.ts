@@ -6,7 +6,6 @@ import type { CurriculumPackRepositoryPort } from "../../../src/application/port
 import type { GameSessionRepositoryPort } from "../../../src/application/ports/game-session-repository.port.js";
 import type { TransitionSessionPhaseCommand } from "../../../src/application/ports/transition-session-phase.port.js";
 import { readOptionalJsonObjectBody } from "../../../src/adapters/inbound/http/json-object-body.js";
-import { wrapLambdaHandler } from "../../../src/adapters/inbound/http/lambda-to-v2-wrapper.js";
 import { createApiHandler } from "../../../src/adapters/inbound/http/middy/api-handler.js";
 import { AppRuntime } from "../../../src/app-runtime.js";
 import { TransitionSessionPhaseUseCase } from "../../../src/application/use-cases/transition-session-phase.use-case.js";
@@ -93,4 +92,3 @@ export function createTransitionPhaseHandler(
 }
 
 export const lambdaHandler = createTransitionPhaseHandler();
-export default wrapLambdaHandler(lambdaHandler);

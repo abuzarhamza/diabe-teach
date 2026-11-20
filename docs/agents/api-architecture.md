@@ -27,12 +27,12 @@ src/
 └── adapters/
     ├── inbound/http/
     │   ├── middy/            createApiHandler (api-handler.ts) + its four middlewares
-    │   ├── lambda-to-v2-wrapper.ts   wrapLambdaHandler: Netlify v2 Request <-> Lambda event/result
+    │   ├── lambda-to-v2-wrapper.ts   wrapLambdaHandler(handler, config): Netlify v2 Request <-> Lambda event/result
     │   └── json-object-body.ts       readJsonObjectBody / readOptionalJsonObjectBody
     └── outbound/             Mongo (mongoose) + in-memory repositories, token adapters,
                               clock, id/seed generators, argon2 hasher, YAML env loader
 netlify/functions/
-├── <route>.ts                One per route: re-exports the handler, declares `config` (path + method)
+├── <route>.ts                One per route: declares `config` (path + method), default-exports wrapLambdaHandler(lambdaHandler, config)
 ├── packs/<route>.ts          Handler implementations for pack routes
 ├── sessions/<route>.ts       Handler implementations for session routes
 ├── accounts/<route>.ts       Handler implementations for account routes
@@ -69,7 +69,8 @@ The composition roots are `src/app-runtime.ts`, the handler files under `netlify
 
 ### Routing
 
-- Every route has its own Netlify Functions v2 file at `netlify/functions/<route>.ts`. It re-exports `default`, `lambdaHandler` and `create<Route>Handler` from `packs/`, `sessions/` or `accounts/`, and declares `export const config: Config = { path, method }`.
+- Every route has its own Netlify Functions v2 file at `netlify/functions/<route>.ts`. It re-exports `lambdaHandler` and `create<Route>Handler` from `packs/`, `sessions/` or `accounts/`, declares `export const config: Config = { path, method }` once, and ends with `export default wrapLambdaHandler(lambdaHandler, config);`.
+- **Route parameters** come from one place: `wrapLambdaHandler` matches the request URL against `config.path` with `path-to-regexp` and fills `event.pathParameters`; `context.params` is only a cross-check and fallback. This matters because `netlify dev` retries any 403 or 404 response as `<path>.html`, `<path>.htm`, `<path>/index.html` and `<path>/index.htm`, and the retry reaches the same function with empty or suffixed `context.params` (api-hardening 03). The wrapper strips those suffixes from `/api/` paths, so a retry gets the same parameters and the same answer.
 - **Pack routes** (`/api/v1/packs`, `/packs/validate`, `/packs/:packId`, `/packs/:packId/archive`, `/packs/:packId/unarchive`) route only by their own `config.path` + `method`. `netlify.toml` has no pack redirects; they were removed in teacher-login ticket 05 (`8a1e968`) because a forced redirect sent every method to one function. An undocumented path such as `/api/v1/packs/register` gets 405.
 - **Session routes** (`/api/v1/sessions...`) still also have forced `[[redirects]]` in `netlify.toml` to `/.netlify/functions/<name>`, even though each session function declares its own `config.path` + `method`. The exception is `/api/v1/sessions/:sessionId/rounds/:roundNumber/chains`: its redirect was removed in list-round-chains ticket 01, so its `POST` (submit-chain) and `GET` (list-round-chains) each route by their own `config`. The **account routes** (`/api/v1/accounts/sign-up|sign-in|me`) are in the same state. A forced redirect matches every method, so do not add a second method on a redirected path until those redirects are removed (environment backlog, 2026-11-19).
 - `docs/api/openapi.yaml` is the contract that clients and the `claudPoc` drift tests check against. Keep it in step by hand when you add or change a route.
@@ -81,7 +82,7 @@ Each implementation file (`netlify/functions/<area>/<route>.ts`) follows the sam
 1. `create<Route>Handler(dependencies?)` merges `AppRuntime.getProductionDependencies()` with the overrides (or uses the overrides as they are), and builds the use case from those ports.
 2. A `rawHandler(event: AuthenticatedEvent)` reads `event.pathParameters`, `event.queryStringParameters`, the already-parsed `event.body`, and `event.auth` (Capability Token) or `event.account` (Account Token). It calls the use case and returns an `APIGatewayProxyResult`.
 3. It returns `createApiHandler(rawHandler, authOptions)`.
-4. The file ends with `export const lambdaHandler = create<Route>Handler();` and `export default wrapLambdaHandler(lambdaHandler);`. `wrapLambdaHandler` turns the Netlify v2 `Request` + `context.params` into a Lambda-style event and turns the result back into a `Response`.
+4. The file ends with `export const lambdaHandler = create<Route>Handler();`. The route file (`netlify/functions/<route>.ts`) wraps it with `wrapLambdaHandler(lambdaHandler, config)`, which turns the Netlify v2 `Request` into a Lambda-style event (route parameters matched from the URL against `config.path`) and turns the result back into a `Response`.
 
 ### `createApiHandler` (`src/adapters/inbound/http/middy/api-handler.ts`)
 
@@ -122,7 +123,7 @@ Every `/api/v1` route uses this one middy chain. `before` steps run in this orde
 2. **Application**: add the command/result contract in `src/application/ports/<name>.port.ts`, and the use case class in `src/application/use-cases/<name>.use-case.ts`. It depends only on ports.
 3. **Outbound**: if the use case needs a new port method, implement it in **both** the Mongo and the in-memory adapter, and extend the matching repository contract suite in `tests/adapters/`.
 4. **Handler**: create `netlify/functions/<area>/<route>.ts` following the handler shape above. Choose `bearerScheme` (`BearerAuth` / `AccountAuth` / `none`) and set `tokenRequired: true` if the route must refuse anonymous callers.
-5. **Entrypoint**: create `netlify/functions/<route>.ts` that re-exports `default`, `lambdaHandler` and `create<Route>Handler` and declares `config = { path, method }`. **Do not add a `netlify.toml` redirect.** If the path is already behind a session/account redirect, remove that redirect first.
+5. **Entrypoint**: create `netlify/functions/<route>.ts` that re-exports `lambdaHandler` and `create<Route>Handler`, declares `config = { path, method }`, and ends with `export default wrapLambdaHandler(lambdaHandler, config);` (a test checks every route file does this). **Do not add a `netlify.toml` redirect.** If the path is already behind a session/account redirect, remove that redirect first.
 6. **Errors**: map any new `DomainError` in `domainErrorMiddleware`.
 7. **Contract**: add the operation, schemas and error codes to `docs/api/openapi.yaml`.
 8. **Wiring**: if you add a new adapter, wire it in `AppRuntime.buildProductionDependencies` (and its type in `app-runtime.types.ts`).

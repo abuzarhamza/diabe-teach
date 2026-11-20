@@ -3,7 +3,6 @@ import type {
   AuthenticatedEvent,
 } from "../../../src/adapters/inbound/http/middy/auth.middleware.js";
 import type { AccountTokenVerifierPort } from "../../../src/application/ports/account-token.port.js";
-import { wrapLambdaHandler } from "../../../src/adapters/inbound/http/lambda-to-v2-wrapper.js";
 import { createApiHandler } from "../../../src/adapters/inbound/http/middy/api-handler.js";
 import { AppRuntime } from "../../../src/app-runtime.js";
 import { ValidateCurriculumPackUseCase } from "../../../src/application/use-cases/validate-curriculum-pack.use-case.js";
@@ -56,4 +55,3 @@ export function createValidatePackHandler(
 }
 
 export const lambdaHandler = createValidatePackHandler();
-export default wrapLambdaHandler(lambdaHandler);

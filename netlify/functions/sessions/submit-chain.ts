@@ -4,7 +4,6 @@ import type { ClockPort } from "../../../src/application/ports/clock.port.js";
 import type { GameSessionRepositoryPort } from "../../../src/application/ports/game-session-repository.port.js";
 import type { SubmitConceptChainCommand } from "../../../src/application/ports/submit-concept-chain.port.js";
 import { readOptionalJsonObjectBody } from "../../../src/adapters/inbound/http/json-object-body.js";
-import { wrapLambdaHandler } from "../../../src/adapters/inbound/http/lambda-to-v2-wrapper.js";
 import { createApiHandler } from "../../../src/adapters/inbound/http/middy/api-handler.js";
 import { AppRuntime } from "../../../src/app-runtime.js";
 import { SubmitConceptChainUseCase } from "../../../src/application/use-cases/submit-concept-chain.use-case.js";
@@ -89,4 +88,3 @@ export function createSubmitChainHandler(
 }
 
 export const lambdaHandler = createSubmitChainHandler();
-export default wrapLambdaHandler(lambdaHandler);

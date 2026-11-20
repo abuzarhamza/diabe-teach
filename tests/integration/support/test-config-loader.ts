@@ -99,6 +99,22 @@ export function loadTestConfig(): ResolvedTestConfig {
 }
 
 // Singleton instance for convenience
+/**
+ * The Capability Token secret `npm run dev:local` signs with (the same
+ * precedence as `AppRuntime`: the environment, then `.env.dev.yaml`), so a
+ * scenario can hold a valid token for a session that does not exist. Local
+ * environment only; the value is never logged.
+ */
+export function localCapabilityTokenSecret(): string | undefined {
+  const fromEnv = process.env.CAPABILITY_TOKEN_SECRET?.trim();
+  if (fromEnv) {
+    return fromEnv;
+  }
+  const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
+  const yaml = EnvYamlConfigLoader.loadFromFile(join(repoRoot, ".env.dev.yaml"));
+  return EnvYamlConfigLoader.toRuntimeEnvConfig(yaml).capabilityTokenSecret?.trim() || undefined;
+}
+
 let _cachedConfig: ResolvedTestConfig | null = null;
 
 export function getTestConfig(): ResolvedTestConfig {

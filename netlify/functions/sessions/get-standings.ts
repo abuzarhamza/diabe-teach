@@ -1,7 +1,6 @@
 import type { APIGatewayProxyEvent, APIGatewayProxyResult } from "aws-lambda";
 import type { CapabilityTokenPort, VerifiedCapability } from "../../../src/application/ports/capability-token.port.js";
 import type { GameSessionRepositoryPort } from "../../../src/application/ports/game-session-repository.port.js";
-import { wrapLambdaHandler } from "../../../src/adapters/inbound/http/lambda-to-v2-wrapper.js";
 import { createApiHandler } from "../../../src/adapters/inbound/http/middy/api-handler.js";
 import { AppRuntime } from "../../../src/app-runtime.js";
 import { GetRoundStandingsUseCase } from "../../../src/application/use-cases/get-round-standings.use-case.js";
@@ -76,4 +75,3 @@ export function createGetStandingsHandler(
 }
 
 export const lambdaHandler = createGetStandingsHandler();
-export default wrapLambdaHandler(lambdaHandler);

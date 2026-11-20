@@ -1,7 +1,6 @@
 import type { APIGatewayProxyResult } from "aws-lambda";
 import type { AuthenticatedEvent } from "../../../src/adapters/inbound/http/middy/auth.middleware.js";
 import type { ProductionDependencies } from "../../../src/app-runtime.types.js";
-import { wrapLambdaHandler } from "../../../src/adapters/inbound/http/lambda-to-v2-wrapper.js";
 import { createApiHandler } from "../../../src/adapters/inbound/http/middy/api-handler.js";
 import { AppRuntime } from "../../../src/app-runtime.js";
 import { UnarchiveCurriculumPackUseCase } from "../../../src/application/use-cases/unarchive-curriculum-pack.use-case.js";
@@ -64,4 +63,3 @@ export function createUnarchivePackHandler(
 }
 
 export const lambdaHandler = createUnarchivePackHandler();
-export default wrapLambdaHandler(lambdaHandler);

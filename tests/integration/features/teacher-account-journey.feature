@@ -64,3 +64,26 @@ Feature: Teacher account journey
     When someone who has not signed in tries to register a new pack
     Then the response status should be 401
     And the response error code should be "UNAUTHORIZED_TOKEN"
+
+  # netlify dev retries a 403 or 404 as `<path>.html`; these check the real code still arrives (api-hardening 03).
+  @packs @route-params
+  Scenario: Archiving the System Pack is refused as a System Pack
+    Given a teacher with a new email address
+    When the teacher signs up with the password "correct horse battery"
+    And the teacher archives the pack "diabe-teach"
+    Then the response status should be 403
+    And the response error code should be "PACK_IS_SYSTEM_PACK"
+
+  @packs @route-params
+  Scenario: Archiving a pack that does not exist is refused as not found
+    Given a teacher with a new email address
+    When the teacher signs up with the password "correct horse battery"
+    And the teacher archives a pack that does not exist
+    Then the response status should be 404
+    And the response error code should be "PACK_NOT_FOUND"
+
+  @packs @route-params
+  Scenario: Opening a pack that does not exist is refused as not found
+    When someone opens a pack that does not exist
+    Then the response status should be 404
+    And the response error code should be "PACK_NOT_FOUND"

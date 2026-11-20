@@ -53,9 +53,28 @@ Feature: Classroom Game Session Journey
     When the instructor creates a classroom session with pack "diabe-teach"
     And participant "Alice" joins using the room code
     And participant "Alice" attempts to advance the phase
-    # Note: In production this returns 403. In Netlify Dev, a form fallback may return 401.
-    # The core invariant is that the request is rejected (not 2xx).
     Then the request should be forbidden
+
+  # netlify dev retries a 403 or 404 as `<path>.html`; these check the real code still arrives (api-hardening 03).
+  @route-params @error-handling
+  Scenario: Opening the state of a session that does not exist is refused as not found
+    When an instructor opens the state of a session that does not exist
+    Then the response status should be 404
+    And the response error code should be "SESSION_NOT_FOUND"
+
+  @route-params @authorization
+  Scenario: Another session's token cannot read this session's standings
+    When the instructor creates a classroom session with pack "diabe-teach"
+    And the instructor of another session retrieves standings for round 1
+    Then the response status should be 403
+    And the response error code should be "FORBIDDEN_ROLE"
+
+  @route-params @authorization
+  Scenario: Another session's token cannot list this session's chains
+    When the instructor creates a classroom session with pack "diabe-teach"
+    And the instructor of another session lists the chains of round 1
+    Then the response status should be 403
+    And the response error code should be "FORBIDDEN_ROLE"
 
   @e2e @full-journey
   Scenario: Complete classroom session lifecycle

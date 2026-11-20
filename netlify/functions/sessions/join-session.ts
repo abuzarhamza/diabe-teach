@@ -3,7 +3,6 @@ import type { CapabilityTokenSignerPort } from "../../../src/application/ports/c
 import type { GameSessionRepositoryPort } from "../../../src/application/ports/game-session-repository.port.js";
 import type { JoinGameSessionCommand } from "../../../src/application/ports/join-game-session.port.js";
 import { readOptionalJsonObjectBody } from "../../../src/adapters/inbound/http/json-object-body.js";
-import { wrapLambdaHandler } from "../../../src/adapters/inbound/http/lambda-to-v2-wrapper.js";
 import { createApiHandler } from "../../../src/adapters/inbound/http/middy/api-handler.js";
 import { AppRuntime } from "../../../src/app-runtime.js";
 import { JoinGameSessionUseCase } from "../../../src/application/use-cases/join-game-session.use-case.js";
@@ -57,4 +56,3 @@ export function createJoinSessionHandler(
 }
 
 export const lambdaHandler = createJoinSessionHandler();
-export default wrapLambdaHandler(lambdaHandler);

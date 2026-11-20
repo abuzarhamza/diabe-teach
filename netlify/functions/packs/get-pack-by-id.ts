@@ -1,6 +1,5 @@
 import type { APIGatewayProxyEvent, APIGatewayProxyResult } from "aws-lambda";
 import type { ProductionDependencies } from "../../../src/app-runtime.types.js";
-import { wrapLambdaHandler } from "../../../src/adapters/inbound/http/lambda-to-v2-wrapper.js";
 import { createApiHandler } from "../../../src/adapters/inbound/http/middy/api-handler.js";
 import { AppRuntime } from "../../../src/app-runtime.js";
 import { GetCurriculumPackByIdUseCase } from "../../../src/application/use-cases/get-curriculum-pack-by-id.use-case.js";
@@ -44,4 +43,3 @@ export function createGetPackByIdHandler(
 }
 
 export const lambdaHandler = createGetPackByIdHandler();
-export default wrapLambdaHandler(lambdaHandler);

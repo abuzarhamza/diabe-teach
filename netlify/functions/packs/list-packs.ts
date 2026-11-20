@@ -1,7 +1,6 @@
 import type { Config } from "@netlify/functions";
 import type { APIGatewayProxyEvent, APIGatewayProxyResult } from "aws-lambda";
 import type { ProductionDependencies } from "../../../src/app-runtime.types.js";
-import { wrapLambdaHandler } from "../../../src/adapters/inbound/http/lambda-to-v2-wrapper.js";
 import { createApiHandler } from "../../../src/adapters/inbound/http/middy/api-handler.js";
 import { AppRuntime } from "../../../src/app-runtime.js";
 import { ListCurriculumPacksUseCase } from "../../../src/application/use-cases/list-curriculum-packs.use-case.js";
@@ -40,7 +39,6 @@ export function createListPacksHandler(
 export const lambdaHandler = createListPacksHandler();
 
 // v2 handler for Netlify CLI local dev
-export default wrapLambdaHandler(lambdaHandler);
 
 export const config: Config = {
   path: "/api/v1/packs",
