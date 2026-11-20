@@ -67,6 +67,13 @@ export class MongoInstructorAccountRepository implements InstructorAccountReposi
           updateSignInCounters: async (accountId, counters) => {
             await model.updateOne({ _id: accountId }, { $set: counters }).exec();
           },
+          findOneAndUpdatePipeline: async (filter, update) =>
+            model
+              .findOneAndUpdate(filter, [
+                ...update,
+              ], { returnDocument: "after", updatePipeline: true })
+              .lean<InstructorAccountDocument | null>()
+              .exec(),
         };
       },
     });
@@ -115,6 +122,59 @@ export class MongoInstructorAccountRepository implements InstructorAccountReposi
       failedSignInCount: account.failedSignInCount,
       lockedUntil: account.lockedUntil,
     });
+  }
+
+  /**
+   * One atomic findOneAndUpdate. The filter skips an account locked at `now`
+   * (nothing is counted while locked). The pipeline adds one to the count
+   * and, when that reaches the limit, sets the 15-minute lock and restarts
+   * the count, the same rule as InstructorAccount.recordFailedSignIn.
+   */
+  public async recordFailedSignIn(accountId: string, now: Date): Promise<InstructorAccount | null> {
+    const collection = await this.#getCollection();
+    const nextCount = {
+      $add: [
+        {
+          $ifNull: ["$failedSignInCount", 0],
+        },
+        1,
+      ],
+    };
+    const reachesLimit = {
+      $gte: [nextCount, InstructorAccount.MAX_FAILED_SIGN_INS],
+    };
+    const updated = await collection.findOneAndUpdatePipeline(
+      {
+        _id: accountId,
+        $or: [
+          { lockedUntil: null },
+          {
+            lockedUntil: { $lte: now },
+          },
+        ],
+      },
+      [
+        {
+          $set: {
+            failedSignInCount: {
+              $cond: [reachesLimit, 0, nextCount],
+            },
+            lockedUntil: {
+              $cond: [
+                reachesLimit,
+                new Date(now.getTime() + InstructorAccount.LOCK_DURATION_MS),
+                null,
+              ],
+            },
+          },
+        },
+      ],
+    );
+    if (updated) {
+      return MongoInstructorAccountRepository.#toDomain(updated);
+    }
+    // Locked at `now` (nothing counted), or no such account.
+    return this.findById(accountId);
   }
 
   static #isDuplicateEmail(error: unknown): boolean {

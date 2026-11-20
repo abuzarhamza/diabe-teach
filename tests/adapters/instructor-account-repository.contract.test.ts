@@ -101,6 +101,63 @@ function defineInstructorAccountRepositoryContract(
       expect(cleared?.toProps()).toEqual(account.toProps());
     });
 
+    it("counts every one of four concurrent failed attempts", async () => {
+      const account = await newAccount(`concurrent-four-${name}@aku.edu`);
+      await harness.repo.create(account);
+      const now = new Date("2026-11-19T09:00:00.000Z");
+
+      await Promise.all(
+        Array.from({ length: 4 }, async () => harness.repo.recordFailedSignIn(account.accountId, now)),
+      );
+
+      const stored = await harness.repo.findById(account.accountId);
+      expect(stored?.failedSignInCount).toBe(4);
+      expect(stored?.lockedUntil).toBeNull();
+    });
+
+    it("five concurrent failed attempts are all counted and give exactly one 15-minute lock", async () => {
+      const account = await newAccount(`concurrent-five-${name}@aku.edu`);
+      await harness.repo.create(account);
+      const now = new Date("2026-11-19T09:00:00.000Z");
+
+      const results = await Promise.all(
+        Array.from({ length: 5 }, async () => harness.repo.recordFailedSignIn(account.accountId, now)),
+      );
+
+      // Each attempt saw its own count (1 to 4), and exactly one (the fifth)
+      // set the lock and restarted the count: none lost, none doubled.
+      expect(results.map(result => result?.failedSignInCount).sort()).toEqual([0, 1, 2, 3, 4]);
+      expect(results.filter(result => result?.isLockedAt(now))).toHaveLength(1);
+      const stored = await harness.repo.findById(account.accountId);
+      expect(stored?.lockedUntil?.toISOString()).toBe("2026-11-19T09:15:00.000Z");
+      expect(stored?.failedSignInCount).toBe(0);
+    });
+
+    it("does not count a failed attempt while locked, nor extend the lock", async () => {
+      const account = await newAccount(`while-locked-${name}@aku.edu`);
+      await harness.repo.create(account);
+      const now = new Date("2026-11-19T09:00:00.000Z");
+      for (let attempt = 0; attempt < 5; attempt++) {
+        await harness.repo.recordFailedSignIn(account.accountId, now);
+      }
+
+      const later = new Date("2026-11-19T09:10:00.000Z");
+      const result = await harness.repo.recordFailedSignIn(account.accountId, later);
+
+      expect(result?.lockedUntil?.toISOString()).toBe("2026-11-19T09:15:00.000Z");
+      expect(result?.failedSignInCount).toBe(0);
+      const afterLock = await harness.repo.recordFailedSignIn(
+        account.accountId,
+        new Date("2026-11-19T09:15:00.000Z"),
+      );
+      expect(afterLock?.failedSignInCount).toBe(1);
+      expect(afterLock?.lockedUntil).toBeNull();
+    });
+
+    it("records nothing for an unknown account", async () => {
+      expect(await harness.repo.recordFailedSignIn("no-such-account", new Date())).toBeNull();
+    });
+
     it("never stores the plain password", async () => {
       const account = await newAccount(`no-plain-${name}@aku.edu`);
 
