@@ -79,6 +79,8 @@ export interface GameSessionDocument {
   timerConfig: SessionTimerConfig;
   currentPhase: PhaseIdentifier;
   phaseStartedAt: Date;
+  /** The current phase's extended deadline. Absent on sessions stored before extensions (read as null). */
+  extendedPhaseEndsAt?: Date | null;
   participants: ParticipantDocument[];
   activeRoundNumber: 1 | 2 | null;
   chains: ConceptChainDocument[];

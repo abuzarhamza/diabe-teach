@@ -189,6 +189,7 @@ export class MongoGameSessionRepository implements GameSessionRepositoryPort {
       timerConfig: doc.timerConfig,
       currentPhase: doc.currentPhase,
       phaseStartedAt: doc.phaseStartedAt,
+      extendedPhaseEndsAt: doc.extendedPhaseEndsAt ?? null,
       participants: doc.participants.map((p: ParticipantDocument) => ({
         participantId: p.participantId,
         displayName: p.displayName,
@@ -235,6 +236,7 @@ export class MongoGameSessionRepository implements GameSessionRepositoryPort {
       timerConfig: session.timerConfig,
       currentPhase: session.currentPhase,
       phaseStartedAt: session.phaseStartedAt,
+      extendedPhaseEndsAt: session.extendedPhaseEndsAt,
       participants: session.participants.map(p => ({
         participantId: p.participantId,
         displayName: p.displayName,

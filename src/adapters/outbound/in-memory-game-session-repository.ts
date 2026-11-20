@@ -70,6 +70,7 @@ implements GameSessionRepositoryPort {
       timerConfig: session.timerConfig,
       currentPhase: session.currentPhase,
       phaseStartedAt: session.phaseStartedAt,
+      extendedPhaseEndsAt: session.extendedPhaseEndsAt,
       participants: session.participants,
       activeRoundNumber: session.activeRoundNumber,
       createdAt: session.createdAt,

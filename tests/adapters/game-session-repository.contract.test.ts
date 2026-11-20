@@ -280,6 +280,25 @@ function defineGameSessionRepositoryContract(
       expect((await harness.repo.findById(session.sessionId))?.ownerAccountId).toBe("account-owner-1");
     });
 
+    it("round-trips an extended phase deadline across an update", async () => {
+      const session = GameSession.create({
+        packId: "diabe-teach",
+        mode: "classroom",
+        adjudicationMode: "peer-instructor",
+        phaseStartedAt: new Date("2026-03-01T09:00:00.000Z"),
+        timerConfig: { pretestSec: 60 },
+      });
+      await harness.repo.create(session);
+
+      const loaded = await harness.repo.findById(session.sessionId);
+      expect(loaded?.extendedPhaseEndsAt).toBeNull();
+      loaded!.extendPhase(30, new Date("2026-03-01T09:00:10.000Z"));
+      await harness.repo.update(loaded!);
+
+      const reloaded = await harness.repo.findById(session.sessionId);
+      expect(reloaded?.phaseEndsAt).toEqual(new Date("2026-03-01T09:01:30.000Z"));
+    });
+
     it("stores a solo session with no owner", async () => {
       const session = GameSession.create({
         packId: "diabe-teach",

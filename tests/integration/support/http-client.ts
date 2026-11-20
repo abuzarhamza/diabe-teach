@@ -80,6 +80,21 @@ export async function transitionPhase(
   return toApiGatewayResult(res);
 }
 
+export async function extendPhase(
+  sessionId: string,
+  token: string,
+  body: { seconds?: number } = {},
+) {
+  const res = await request(BASE_URL)
+    .post(`/api/v1/sessions/${sessionId}/phase/extend`)
+    .set("Content-Type", "application/json")
+    .set("x-api-key", API_KEY)
+    .set("Authorization", `Bearer ${token}`)
+    .send(body);
+
+  return toApiGatewayResult(res);
+}
+
 export async function submitChain(
   sessionId: string,
   roundNumber: number,

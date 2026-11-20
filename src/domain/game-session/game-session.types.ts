@@ -88,6 +88,12 @@ export interface GameSessionProps {
   readonly timerConfig?: Partial<SessionTimerConfig>;
   readonly currentPhase?: PhaseIdentifier;
   readonly phaseStartedAt?: Date;
+  /**
+   * The current phase's deadline after an instructor extended it, or `null`
+   * (the default, and for sessions stored before extensions) when it keeps
+   * its scheduled end.
+   */
+  readonly extendedPhaseEndsAt?: Date | null;
   readonly participants?: readonly Participant[];
   readonly activeRoundNumber?: 1 | 2 | null;
   readonly createdAt?: Date;
@@ -141,6 +147,9 @@ export const TIMER_FIELDS: readonly (keyof SessionTimerConfig)[] = [
  * date; a phase that should run longer can be untimed (`null`).
  */
 export const MAX_TIMER_DURATION_SEC = 86_400;
+
+/** The most seconds one instructor extension may add to a phase. */
+export const MAX_PHASE_EXTENSION_SEC = 600;
 
 /**
  * Which timer-config field sets each phase's duration. `null` means the phase

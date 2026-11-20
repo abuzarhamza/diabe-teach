@@ -15,6 +15,7 @@ import {
   InvalidAccountPasswordError,
   InvalidBoardSeedError,
   InvalidCredentialsError,
+  InvalidPhaseExtensionError,
   InvalidPhaseTransitionError,
   InvalidSurveyResponseError,
   InvalidTimerConfigError,
@@ -28,7 +29,9 @@ import {
   PackNotFoundError,
   PackValidationFailedError,
   PhaseClosedForSubmissionsError,
+  PhaseHasNoTimerError,
   RoomCodeNotFoundError,
+  SessionAlreadyCompletedError,
   SessionNotFoundError,
   SurveyAlreadySubmittedError,
   SurveyCommentsTooLongError,
@@ -51,6 +54,7 @@ export function domainErrorMiddleware(): MiddlewareObj<any, any> {
         else if (
           error instanceof InvalidTimerConfigError
           || error instanceof InvalidBoardSeedError
+          || error instanceof InvalidPhaseExtensionError
           || error instanceof MalformedRequestBodyError
           || error instanceof InvalidAccountEmailError
           || error instanceof InvalidAccountPasswordError
@@ -76,6 +80,8 @@ export function domainErrorMiddleware(): MiddlewareObj<any, any> {
           || error instanceof ConcurrentUpdateConflictError
           || error instanceof ChainAlreadySubmittedError
           || error instanceof EmailAlreadyRegisteredError
+          || error instanceof SessionAlreadyCompletedError
+          || error instanceof PhaseHasNoTimerError
         ) {
           statusCode = 409;
         }

@@ -41,6 +41,36 @@ export class InvalidPhaseTransitionError extends DomainError {
   }
 }
 
+export class SessionAlreadyCompletedError extends DomainError {
+  public readonly code = "SESSION_ALREADY_COMPLETED" as const;
+
+  public constructor(sessionId: string) {
+    super(`Session '${sessionId}' is already completed.`, { sessionId });
+  }
+}
+
+export class PhaseHasNoTimerError extends DomainError {
+  public readonly code = "PHASE_HAS_NO_TIMER" as const;
+
+  public constructor(phase: string) {
+    super(
+      `Phase '${phase}' is instructor-driven and has no timer to extend.`,
+      { phase },
+    );
+  }
+}
+
+export class InvalidPhaseExtensionError extends DomainError {
+  public readonly code = "INVALID_REQUEST_BODY" as const;
+
+  public constructor(seconds: unknown) {
+    super(
+      "Invalid 'seconds': a phase extension must be a whole number of seconds from 1 to 600.",
+      { field: "seconds", value: seconds },
+    );
+  }
+}
+
 export class SessionNotFoundError extends DomainError {
   public readonly code = "SESSION_NOT_FOUND" as const;
 

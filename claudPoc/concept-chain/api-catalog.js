@@ -777,6 +777,33 @@
           "x-api-key is checked when the server has API_KEY set, but the spec does not declare it here.",
         ],
       },
+      extendSessionPhase: {
+        method: "POST",
+        path: "/api/v1/sessions/{sessionId}/phase/extend",
+        pathParams: { sessionId: "Game Session id (from createGameSession)" },
+        auth: ["apiKey", "instructor"],
+        request: { seconds: 60 },
+        response: {
+          status: 200,
+          body: { state: { ...sampleState, phaseEndsAt: "2026-11-17T09:21:00.000Z" } },
+        },
+        errors: [
+          { status: 400, code: "INVALID_REQUEST_BODY" },
+          { status: 401, code: "UNAUTHORIZED_TOKEN" },
+          { status: 403, code: "FORBIDDEN_ROLE" },
+          { status: 404, code: "SESSION_NOT_FOUND" },
+          { status: 409, code: "PHASE_HAS_NO_TIMER" },
+          { status: 409, code: "SESSION_ALREADY_COMPLETED" },
+          { status: 409, code: "CONCURRENT_UPDATE_CONFLICT" },
+        ],
+        status: "implemented",
+        notes: [
+          "`seconds` is a whole number from 1 to 600. The new deadline is `max(phaseEndsAt, now) + seconds`, so a Chain-Mapping phase whose time ran out reopens for submissions.",
+          "The extension lasts until the next phase transition.",
+          "An instructor-driven phase (`phaseEndsAt` null) has no timer to extend: 409 PHASE_HAS_NO_TIMER.",
+        ],
+        deviations: [],
+      },
       // Operations with no screen in this prototype yet: listed in the legend's "no screen yet" section only.
       submitAssessmentAttempt: {
         method: "POST",
@@ -843,10 +870,6 @@
       boardPreview: {
         title: "Board preview",
         note: "Dealt in the browser from the pack, board size and preview seed. No API deals or returns a board yet: `state.activeBoard` is in the spec but never returned, and createGameSession ignores `seed`.",
-      },
-      extend: {
-        title: "Extend the phase (+1 min)",
-        note: "No API can extend a phase: `phaseEndsAt` is fixed from the session's timerConfig when the phase starts, and a timerConfig can only be set at createGameSession. The demo changes its local timer only.",
       },
     },
 
@@ -961,6 +984,10 @@
       "C.myChains": {
         ops: ["listRoundChains", "streamGameSessionEvents"],
         note: "The learner's chains come from list-round-chains (filter by your `participantId`), with later peer votes (and voter names) and the Instructor Final Ruling. No stream yet (`chain.adjudicated` is specced only), so the screen polls.",
+      },
+      "D.extend": {
+        ops: ["extendSessionPhase"],
+        note: "+1 min sends `{ seconds: 60 }`; the returned `phaseEndsAt` is the new deadline.",
       },
       "E.builder": {
         note: "Builds the submitConceptChain body: tapped Keyword Cards → `path` (GridCoord), each link's reason → `stepRationales`, the story → `narrativeExplanation`.",

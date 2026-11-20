@@ -832,6 +832,24 @@ export const requestBodySchemas = {
       }
     }
   },
+  "extendSessionPhase": {
+    "required": true,
+    "schema": {
+      "type": "object",
+      "required": [
+        "seconds"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "seconds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 600,
+          "description": "Whole seconds to add to the current phase's deadline."
+        }
+      }
+    }
+  },
   "submitConceptChain": {
     "required": true,
     "schema": {
@@ -1028,6 +1046,7 @@ export const apiOperationIds = [
   "getGameSessionState",
   "streamGameSessionEvents",
   "transitionSessionPhase",
+  "extendSessionPhase",
   "listRoundChains",
   "submitConceptChain",
   "adjudicateConceptChain",

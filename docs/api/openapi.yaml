@@ -650,6 +650,61 @@ paths:
               schema:
                 $ref: "#/components/schemas/ApiErrorResponse"
 
+  /api/v1/sessions/{sessionId}/phase/extend:
+    post:
+      operationId: extendSessionPhase
+      tags: [Sessions]
+      summary: Give the current timed phase more time (instructor only)
+      description: >-
+        Moves the current phase's deadline to `max(phaseEndsAt, now) + seconds`.
+        A phase whose time had already run out (including the Chain-Mapping
+        submission grace period) reopens, so learners can submit chains again
+        until the new `phaseEndsAt`. The extension lasts until the next phase
+        transition. Instructor Capability Token only.
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/SessionIdParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExtendPhaseRequest"
+      responses:
+        "200":
+          description: Phase extended; the updated public state.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [state]
+                properties:
+                  state:
+                    $ref: "#/components/schemas/PublicSessionState"
+        "400":
+          $ref: "#/components/responses/BadRequestError"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "403":
+          $ref: "#/components/responses/ForbiddenError"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+        "409":
+          description: >-
+            PHASE_HAS_NO_TIMER. The current phase is instructor-driven (no
+            `phaseEndsAt`), so there is no deadline to extend.
+
+            SESSION_ALREADY_COMPLETED. The session has ended.
+
+            CONCURRENT_UPDATE_CONFLICT. Other requests kept changing the Game
+            Session while this one was being saved, and it still conflicted
+            after 3 attempts. Nothing was recorded. Safe to retry.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+
   /api/v1/sessions/{sessionId}/rounds/{roundNumber}/chains:
     get:
       operationId: listRoundChains
@@ -1136,6 +1191,8 @@ components:
         - PACK_IS_SYSTEM_PACK
         - PACK_ALREADY_ARCHIVED
         - PACK_NOT_ARCHIVED
+        - SESSION_ALREADY_COMPLETED
+        - PHASE_HAS_NO_TIMER
         - INTERNAL_ERROR
 
     ApiErrorResponse:
@@ -1749,6 +1806,17 @@ components:
             the session's creation seed for Round 1. Without it, Round 1 uses
             the creation seed and otherwise the server generates a random
             seed. Ignored for transitions that enter no round.
+
+    ExtendPhaseRequest:
+      type: object
+      required: [seconds]
+      additionalProperties: false
+      properties:
+        seconds:
+          type: integer
+          minimum: 1
+          maximum: 600
+          description: Whole seconds to add to the current phase's deadline.
 
     StepRationale:
       type: string

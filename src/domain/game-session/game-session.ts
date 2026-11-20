@@ -19,14 +19,18 @@ import {
   AssessmentAlreadySubmittedError,
   ChainAlreadySubmittedError,
   ChainTopologyInvalidError,
+  InvalidPhaseExtensionError,
   InvalidPhaseTransitionError,
   InvalidTimerConfigError,
   PhaseClosedForSubmissionsError,
+  PhaseHasNoTimerError,
+  SessionAlreadyCompletedError,
   SurveyAlreadySubmittedError,
 } from "../errors/domain-errors.js";
 import { BoardDealer } from "./board-dealer.js";
 import {
   DEFAULT_TIMER_CONFIG,
+  MAX_PHASE_EXTENSION_SEC,
   MAX_TIMER_DURATION_SEC,
   PHASE_GAMEPLAY_ROUND,
   PHASE_ORDER,
@@ -61,6 +65,8 @@ export class GameSession {
 
   #currentPhase: PhaseIdentifier;
   #phaseStartedAt: Date;
+  /** The current phase's deadline after an instructor extended it; reset on every transition. */
+  #extendedPhaseEndsAt: Date | null;
   #activeRoundNumber: 1 | 2 | null;
 
   private constructor(props: GameSessionProps) {
@@ -84,6 +90,7 @@ export class GameSession {
     this.#timerConfig = GameSession.#resolveTimerConfig(props.timerConfig);
     this.#currentPhase = props.currentPhase ?? "pretest";
     this.#phaseStartedAt = props.phaseStartedAt ?? new Date();
+    this.#extendedPhaseEndsAt = props.extendedPhaseEndsAt ?? null;
     this.#participants = props.participants
       ? [...props.participants]
       : [];
@@ -180,13 +187,48 @@ export class GameSession {
    * own timer config. Phases without a configured duration (round summaries,
    * completed) end the moment they start. `null` means the phase is
    * instructor-driven (its timer is set to `null`) and has no deadline.
+   * An instructor's extension (see `extendPhase`) replaces the scheduled end.
    */
   public get phaseEndsAt(): Date | null {
+    if (this.#extendedPhaseEndsAt !== null) {
+      return this.#extendedPhaseEndsAt;
+    }
     const durationSec = this.#currentPhaseDurationSec();
     if (durationSec === null) {
       return null;
     }
     return new Date(this.#phaseStartedAt.getTime() + durationSec * 1000);
+  }
+
+  /**
+   * The current phase's deadline as set by `extendPhase`, or `null` when the
+   * phase keeps its scheduled end. Stored so an extension survives reloads.
+   */
+  public get extendedPhaseEndsAt(): Date | null {
+    return this.#extendedPhaseEndsAt;
+  }
+
+  /**
+   * Gives a timed phase `seconds` more: the new deadline is
+   * `max(phaseEndsAt, now) + seconds`, so a phase whose time (and submission
+   * grace period) has run out reopens. A completed session refuses with
+   * SessionAlreadyCompletedError; an instructor-driven phase (no deadline)
+   * with PhaseHasNoTimerError. `seconds` must be a whole number from 1 to
+   * MAX_PHASE_EXTENSION_SEC.
+   */
+  public extendPhase(seconds: number, now: Date): void {
+    if (!Number.isInteger(seconds) || seconds < 1 || seconds > MAX_PHASE_EXTENSION_SEC) {
+      throw new InvalidPhaseExtensionError(seconds);
+    }
+    if (this.#currentPhase === "completed") {
+      throw new SessionAlreadyCompletedError(this.#sessionId.value);
+    }
+    const phaseEndsAt = this.phaseEndsAt;
+    if (phaseEndsAt === null) {
+      throw new PhaseHasNoTimerError(this.#currentPhase);
+    }
+    const fromMs = Math.max(phaseEndsAt.getTime(), now.getTime());
+    this.#extendedPhaseEndsAt = new Date(fromMs + seconds * 1000);
   }
 
   public get participantCount(): number {
@@ -278,6 +320,7 @@ export class GameSession {
 
     this.#currentPhase = targetPhase;
     this.#phaseStartedAt = now;
+    this.#extendedPhaseEndsAt = null;
 
     if (enteredRound !== null) {
       this.#activeRoundNumber = enteredRound;

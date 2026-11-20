@@ -206,6 +206,9 @@ export const gameSessionSchema = new Schema(
       default: "pretest",
     },
     phaseStartedAt: { type: Date, required: true },
+    // The current phase's deadline after an instructor extension; absent on
+    // sessions stored before extensions (loaded as null).
+    extendedPhaseEndsAt: { type: Date, default: null },
     participants: {
       type: [participantSchema],
       default: [],
