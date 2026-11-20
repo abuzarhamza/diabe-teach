@@ -100,6 +100,17 @@ function createEvent(packId: string, token: string): APIGatewayProxyEvent {
   };
 }
 
+/** Every pack-route error uses the standard `ApiErrorResponse` body. */
+function expectStandardError(result: APIGatewayProxyResult, status: number, code: string) {
+  expect(result.statusCode).toBe(status);
+  const body = JSON.parse(result.body);
+  expect(body).not.toHaveProperty("error");
+  expect(body.code).toBe(code);
+  expect(typeof body.message).toBe("string");
+  expect(body.message.length).toBeGreaterThan(0);
+  return body;
+}
+
 describe("pOST /api/v1/packs/{packId}/unarchive", () => {
   it("unarchives a pack and returns 200", async () => {
     const pack = createTestPack({ isArchived: true });
@@ -129,9 +140,7 @@ describe("pOST /api/v1/packs/{packId}/unarchive", () => {
       {} as never,
     )) as APIGatewayProxyResult;
 
-    expect(result.statusCode).toBe(409);
-    const body = JSON.parse(result.body);
-    expect(body.code).toBe("PACK_NOT_ARCHIVED");
+    expectStandardError(result, 409, "PACK_NOT_ARCHIVED");
   });
 
   it("returns 404 for non-existent pack", async () => {
@@ -144,9 +153,20 @@ describe("pOST /api/v1/packs/{packId}/unarchive", () => {
       {} as never,
     )) as APIGatewayProxyResult;
 
-    expect(result.statusCode).toBe(404);
-    const body = JSON.parse(result.body);
-    expect(body.code).toBe("PACK_NOT_FOUND");
+    expectStandardError(result, 404, "PACK_NOT_FOUND");
+  });
+
+  it("returns 404 with the standard body when packId is missing", async () => {
+    const ctx = createTestContext([]);
+    const handler = createUnarchivePackHandler(ctx.deps);
+    const token = await ctx.teachers.tokenFor();
+
+    const event = createEvent("", token);
+    event.pathParameters = null;
+
+    const result = (await handler(event, {} as never)) as APIGatewayProxyResult;
+
+    expectStandardError(result, 404, "PACK_NOT_FOUND");
   });
 
   it("returns 401 for an instructor Capability Token instead of an Account Token", async () => {

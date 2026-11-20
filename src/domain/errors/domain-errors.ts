@@ -191,6 +191,21 @@ export class PackNotArchivedError extends DomainError {
 }
 
 /**
+ * The Curriculum Pack failed the pack validator on registration. `details`
+ * carries the validator's `errors` and `warnings` lists.
+ */
+export class PackValidationFailedError extends DomainError {
+  public readonly code = "PACK_VALIDATION_FAILED" as const;
+
+  public constructor(errors: readonly unknown[], warnings: readonly unknown[]) {
+    super(
+      `The Curriculum Pack failed validation with ${errors.length} error(s).`,
+      { errors, warnings },
+    );
+  }
+}
+
+/**
  * The Curriculum Pack has fewer Keyword Cards than its `rows × cols` board,
  * so a Game Session could not deal a full board. Guards packs stored before
  * the pack validator enforced this.

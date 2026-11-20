@@ -128,7 +128,9 @@ describe("pOST /api/v1/packs", () => {
 
     expect(result.statusCode).toBe(409);
     const body = JSON.parse(result.body);
-    expect(body.error.code).toBe("PACK_ALREADY_EXISTS");
+    expect(body).not.toHaveProperty("error");
+    expect(body.code).toBe("PACK_ALREADY_EXISTS");
+    expect(body.message).toBe("Curriculum Pack 'test-pack' version '1.0.0' already exists.");
   });
 
   it("returns 422 for invalid pack structure", async () => {
@@ -148,8 +150,11 @@ describe("pOST /api/v1/packs", () => {
 
     expect(result.statusCode).toBe(422);
     const body = JSON.parse(result.body);
-    expect(body.error.code).toBe("PACK_VALIDATION_FAILED");
-    expect(body.error.errors.length).toBeGreaterThan(0);
+    expect(body).not.toHaveProperty("error");
+    expect(body.code).toBe("PACK_VALIDATION_FAILED");
+    expect(typeof body.message).toBe("string");
+    expect(body.details.errors.length).toBeGreaterThan(0);
+    expect(Array.isArray(body.details.warnings)).toBe(true);
   });
 
   it("returns 401 for an instructor Capability Token instead of an Account Token", async () => {
@@ -209,9 +214,10 @@ describe("pOST /api/v1/packs", () => {
 
       expect(result.statusCode).toBe(422);
       const body = JSON.parse(result.body);
-      expect(body.error.code).toBe("PACK_VALIDATION_FAILED");
+      expect(body).not.toHaveProperty("error");
+      expect(body.code).toBe("PACK_VALIDATION_FAILED");
       expect(
-        body.error.errors.some((e: { code: string; path: string }) =>
+        body.details.errors.some((e: { code: string; path: string }) =>
           e.code === "INSUFFICIENT_CARDS" && e.path === "cards"),
       ).toBe(true);
       expect(await ctx.packRepo.existsByIdAndVersion("test-pack", "1.0.0")).toBe(false);

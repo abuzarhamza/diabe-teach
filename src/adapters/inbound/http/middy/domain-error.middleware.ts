@@ -26,6 +26,7 @@ import {
   PackIsSystemPackError,
   PackNotArchivedError,
   PackNotFoundError,
+  PackValidationFailedError,
   PhaseClosedForSubmissionsError,
   RoomCodeNotFoundError,
   SessionNotFoundError,
@@ -93,6 +94,7 @@ export function domainErrorMiddleware(): MiddlewareObj<any, any> {
         else if (
           error instanceof ChainTopologyInvalidError
           || error instanceof PackCannotFillBoardError
+          || error instanceof PackValidationFailedError
           || error instanceof AssessmentIncompleteError
           || error instanceof SurveyCommentsTooLongError
           || error instanceof InvalidSurveyResponseError

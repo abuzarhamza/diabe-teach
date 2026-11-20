@@ -322,7 +322,8 @@ describe("shared pack library: rules that stay the same", () => {
     const response = await lib.register(await lib.teachers.tokenFor(OTHER_TEACHER), packBody("1.0.0", PACK_ID, "Overwrite"));
 
     expect(response.statusCode).toBe(409);
-    expect(response.body.error.code).toBe("PACK_ALREADY_EXISTS");
+    expect(response.body).not.toHaveProperty("error");
+    expect(response.body.code).toBe("PACK_ALREADY_EXISTS");
     const stored = await lib.packRepo.findByIdAndVersion(PackId.create(PACK_ID), "1.0.0");
     expect(stored?.title).toBe("Original");
     expect(stored?.createdBy).toBe(TEST_TEACHER.accountId);

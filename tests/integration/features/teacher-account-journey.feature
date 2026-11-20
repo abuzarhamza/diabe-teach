@@ -83,6 +83,25 @@ Feature: Teacher account journey
     And the response error code should be "PACK_NOT_FOUND"
 
   @packs @route-params
+  Scenario: Archiving twice and unarchiving twice each answer the repeat with 409
+    Given a teacher with a new email address
+    When the teacher signs up with the password "correct horse battery"
+    And the teacher registers a new pack
+    Then the response status should be 201
+    When the teacher archives the registered pack
+    Then the response status should be 200
+    When the teacher archives the registered pack
+    Then the response status should be 409
+    And the response error code should be "PACK_ALREADY_ARCHIVED"
+    And the response should be a standard error body
+    When the teacher unarchives the registered pack
+    Then the response status should be 200
+    When the teacher unarchives the registered pack
+    Then the response status should be 409
+    And the response error code should be "PACK_NOT_ARCHIVED"
+    And the response should be a standard error body
+
+  @packs @route-params
   Scenario: Opening a pack that does not exist is refused as not found
     When someone opens a pack that does not exist
     Then the response status should be 404

@@ -4,7 +4,11 @@ import type { ProductionDependencies } from "../../../src/app-runtime.types.js";
 import { createApiHandler } from "../../../src/adapters/inbound/http/middy/api-handler.js";
 import { AppRuntime } from "../../../src/app-runtime.js";
 import { RegisterCurriculumPackUseCase } from "../../../src/application/use-cases/register-curriculum-pack.use-case.js";
-import { UnauthorizedTokenError } from "../../../src/domain/errors/domain-errors.js";
+import {
+  PackAlreadyExistsError,
+  PackValidationFailedError,
+  UnauthorizedTokenError,
+} from "../../../src/domain/errors/domain-errors.js";
 
 export function createRegisterPackHandler(
   dependencies?: Partial<ProductionDependencies>,
@@ -38,29 +42,9 @@ export function createRegisterPackHandler(
 
     if (!result.success) {
       if (result.code === "PACK_ALREADY_EXISTS") {
-        return {
-          statusCode: 409,
-          headers: { "Content-Type": "application/json; charset=utf-8" },
-          body: JSON.stringify({
-            error: {
-              code: result.code,
-              message: `Pack '${result.packId}' version '${result.version}' already exists.`,
-            },
-          }),
-        };
+        throw new PackAlreadyExistsError(result.packId, result.version);
       }
-
-      return {
-        statusCode: 422,
-        headers: { "Content-Type": "application/json; charset=utf-8" },
-        body: JSON.stringify({
-          error: {
-            code: result.code,
-            errors: result.errors,
-            warnings: result.warnings,
-          },
-        }),
-      };
+      throw new PackValidationFailedError(result.errors, result.warnings);
     }
 
     return {

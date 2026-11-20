@@ -243,6 +243,16 @@ export async function archivePack(packId: string, accountToken: string) {
   return toApiGatewayResult(res);
 }
 
+/** POST /api/v1/packs/{packId}/unarchive. */
+export async function unarchivePack(packId: string, accountToken: string) {
+  const res = await request(BASE_URL)
+    .post(`/api/v1/packs/${encodeURIComponent(packId)}/unarchive`)
+    .set("x-api-key", API_KEY)
+    .set("Authorization", `Bearer ${accountToken}`);
+
+  return toApiGatewayResult(res);
+}
+
 /** GET /api/v1/packs/{packId}. */
 export async function getPackById(packId: string) {
   const res = await request(BASE_URL)

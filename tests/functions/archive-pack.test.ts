@@ -99,6 +99,17 @@ function createEvent(packId: string, token: string): APIGatewayProxyEvent {
   };
 }
 
+/** Every pack-route error uses the standard `ApiErrorResponse` body. */
+function expectStandardError(result: APIGatewayProxyResult, status: number, code: string) {
+  expect(result.statusCode).toBe(status);
+  const body = JSON.parse(result.body);
+  expect(body).not.toHaveProperty("error");
+  expect(body.code).toBe(code);
+  expect(typeof body.message).toBe("string");
+  expect(body.message.length).toBeGreaterThan(0);
+  return body;
+}
+
 describe("pOST /api/v1/packs/{packId}/archive", () => {
   it("archives a pack and returns 200", async () => {
     const pack = createTestPack();
@@ -129,9 +140,7 @@ describe("pOST /api/v1/packs/{packId}/archive", () => {
       {} as never,
     )) as APIGatewayProxyResult;
 
-    expect(result.statusCode).toBe(403);
-    const body = JSON.parse(result.body);
-    expect(body.code).toBe("PACK_IS_SYSTEM_PACK");
+    expectStandardError(result, 403, "PACK_IS_SYSTEM_PACK");
   });
 
   it("returns 409 for already archived pack", async () => {
@@ -145,9 +154,7 @@ describe("pOST /api/v1/packs/{packId}/archive", () => {
       {} as never,
     )) as APIGatewayProxyResult;
 
-    expect(result.statusCode).toBe(409);
-    const body = JSON.parse(result.body);
-    expect(body.code).toBe("PACK_ALREADY_ARCHIVED");
+    expectStandardError(result, 409, "PACK_ALREADY_ARCHIVED");
   });
 
   it("returns 404 for non-existent pack", async () => {
@@ -160,9 +167,20 @@ describe("pOST /api/v1/packs/{packId}/archive", () => {
       {} as never,
     )) as APIGatewayProxyResult;
 
-    expect(result.statusCode).toBe(404);
-    const body = JSON.parse(result.body);
-    expect(body.code).toBe("PACK_NOT_FOUND");
+    expectStandardError(result, 404, "PACK_NOT_FOUND");
+  });
+
+  it("returns 404 with the standard body when packId is missing", async () => {
+    const ctx = createTestContext([]);
+    const handler = createArchivePackHandler(ctx.deps);
+    const token = await ctx.teachers.tokenFor();
+
+    const event = createEvent("", token);
+    event.pathParameters = null;
+
+    const result = (await handler(event, {} as never)) as APIGatewayProxyResult;
+
+    expectStandardError(result, 404, "PACK_NOT_FOUND");
   });
 
   it("returns 401 for an instructor Capability Token instead of an Account Token", async () => {

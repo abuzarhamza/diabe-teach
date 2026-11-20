@@ -364,7 +364,6 @@
         ],
         deviations: [
           "Returns 201 `{ packId, version, warnings }`, not `{ pack: CurriculumPackSummary }`.",
-          "409 and 422 bodies are `{ error: { code, ... } }` (422 carries `errors` and `warnings`, no `message`), not ApiErrorResponse.",
         ],
       },
 
@@ -386,9 +385,7 @@
           "\"Archive\" on Game setup (it replaces Delete: nothing is ever deleted). Any signed-in teacher may archive any pack except a System Pack; the pack leaves the list until \"Show archived\" is on.",
           "Game Sessions already using the pack keep working.",
         ],
-        deviations: [
-          "Under `netlify dev`, a refusal (System Pack 403, unknown pack 404) comes back as 400 `{ error: { code: \"MISSING_PACK_ID\" } }`: netlify dev retries the POST as `/archive.html` without the path parameter. Seen on 2026-11-19 with `diabe-teach`.",
-        ],
+        deviations: [],
       },
 
       unarchiveCurriculumPack: {
@@ -407,9 +404,7 @@
         notes: [
           "\"Unarchive\" next to an archived pack while \"Show archived\" is on. Records the acting account; the last archive stays on record.",
         ],
-        deviations: [
-          "Under `netlify dev`, an unknown pack (404) comes back as 400 MISSING_PACK_ID, like archiveCurriculumPack.",
-        ],
+        deviations: [],
       },
 
       createGameSession: {

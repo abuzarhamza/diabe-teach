@@ -91,6 +91,17 @@ Then(
   },
 );
 
+/** The standard ApiErrorResponse body `{ code, message, details? }`, with no `error` wrapper (api-hardening 04). */
+Then(
+  "the response should be a standard error body",
+  function (this: TestWorld) {
+    const body = this.lastResponseBody as Record<string, unknown>;
+    expect(body).to.not.have.property("error");
+    expect(body.code).to.be.a("string");
+    expect(body.message).to.be.a("string").and.not.equal("");
+  },
+);
+
 /**
  * A forbidden request gets 403 through `netlify dev` too: route parameters
  * survive its `.html` retry of a 403 (api-hardening 03).

@@ -57,8 +57,8 @@ const CCApi = (() => {
   }
 
   // ---- HTTP ----
-  // Error bodies are ApiErrorResponse { code, message, details } on most routes; registerCurriculumPack's 409 and 422
-  // (and the 400 MISSING_PACK_ID) still send { error: { code, message } }. Both are read here.
+  // Error bodies are ApiErrorResponse { code, message, details }. The legacy { error: { code, message } } shape,
+  // sent by the pack routes before api-hardening 04, is still read here.
   async function request(method, path, { body, auth = false } = {}) {
     const headers = { accept: "application/json" };
     if (body !== undefined) headers["content-type"] = "application/json";

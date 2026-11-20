@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { Then, When } from "@cucumber/cucumber";
 import { expect } from "chai";
 import { DIABE_TEACH_PACK } from "../../../src/domain/curriculum-pack/diabe-teach-pack.js";
-import { listPacks, registerPack } from "../support/http-client.js";
+import { archivePack, listPacks, registerPack, unarchivePack } from "../support/http-client.js";
 
 /** A teacher's own pack, built from Diabe-teach's content under a new id. */
 function newPackBody(packId: string): Record<string, unknown> {
@@ -36,6 +36,22 @@ When(
   async function (this: TestWorld) {
     this.registeredPackId = `bdd-pack-${randomUUID().slice(0, 8)}`;
     this.lastResponse = await registerPack(newPackBody(this.registeredPackId));
+    this.parseLastResponse();
+  },
+);
+
+When(
+  "the teacher archives the registered pack",
+  async function (this: TestWorld) {
+    this.lastResponse = await archivePack(this.registeredPackId!, this.accountToken!);
+    this.parseLastResponse();
+  },
+);
+
+When(
+  "the teacher unarchives the registered pack",
+  async function (this: TestWorld) {
+    this.lastResponse = await unarchivePack(this.registeredPackId!, this.accountToken!);
     this.parseLastResponse();
   },
 );

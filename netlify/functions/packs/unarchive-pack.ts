@@ -4,7 +4,7 @@ import type { ProductionDependencies } from "../../../src/app-runtime.types.js";
 import { createApiHandler } from "../../../src/adapters/inbound/http/middy/api-handler.js";
 import { AppRuntime } from "../../../src/app-runtime.js";
 import { UnarchiveCurriculumPackUseCase } from "../../../src/application/use-cases/unarchive-curriculum-pack.use-case.js";
-import { UnauthorizedTokenError } from "../../../src/domain/errors/domain-errors.js";
+import { PackNotFoundError, UnauthorizedTokenError } from "../../../src/domain/errors/domain-errors.js";
 
 export function createUnarchivePackHandler(
   dependencies?: Partial<ProductionDependencies>,
@@ -27,15 +27,11 @@ export function createUnarchivePackHandler(
       throw new UnauthorizedTokenError("An Account Token is required to unarchive curriculum packs. Sign in first.");
     }
 
+    // The Netlify wrapper fills `packId` from `config.path`; this is only a
+    // final safety check.
     const packId = event.pathParameters?.packId;
     if (!packId) {
-      return {
-        statusCode: 400,
-        headers: { "Content-Type": "application/json; charset=utf-8" },
-        body: JSON.stringify({
-          error: { code: "MISSING_PACK_ID", message: "packId is required." },
-        }),
-      };
+      throw new PackNotFoundError("");
     }
 
     const result = await useCase.execute({ packId, accountId: account.accountId });
