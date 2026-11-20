@@ -22,6 +22,8 @@ These decisions affect data integrity for research studies, user experience for 
 
 Only users holding an **instructor** Capability Token can register new Curriculum Packs. This aligns with the existing security model where instructors have elevated privileges and prevents anonymous pack pollution.
 
+> **Updated by ADR-0007:** pack routes take an **Account Token** (a signed-in Instructor Account) instead of an instructor Capability Token, and any signed-in teacher may release a new version of, archive, or unarchive any non-system pack.
+
 ### 2. Immutability
 
 Registered Curriculum Packs are **completely immutable**. To "edit" a pack, authors must register a new version with an incremented `version` field. This preserves research integrity when comparing pre/post results across sessions that used the same pack version.
@@ -58,7 +60,9 @@ Returns `{ valid: boolean, errors: [], warnings: [] }` for actionable feedback.
 
 ### 7. Ownership
 
-Packs track `createdBy` (the instructor's sessionId) and an optional `authorName` metadata field for human-readable attribution.
+Packs track `createdBy` and an optional `authorName` metadata field for human-readable attribution.
+
+> **Updated by ADR-0007:** `createdBy` is the **Instructor Account id** of whoever released that Pack Version (each version records its own author), and archiving records the acting account and the time. The author handle shown in Game setup is the part of that account's email before the @. Packs registered before this change keep the instructor's sessionId in `createdBy` and show no author handle.
 
 ### 8. Minimum Pack Structure
 

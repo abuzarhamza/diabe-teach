@@ -1,6 +1,5 @@
 import type { GameSession } from "../../domain/game-session/game-session.js";
 import type { LikertRating } from "../../domain/game-session/game-session.types.js";
-import type { CurriculumPackRepositoryPort } from "../ports/curriculum-pack-repository.port.js";
 import type { GameSessionRepositoryPort } from "../ports/game-session-repository.port.js";
 import type {
   SubmitPerceptionSurveyCommand,
@@ -9,17 +8,16 @@ import type {
   SurveySubmissionReceipt,
 } from "./submit-perception-survey.port.js";
 import wordCount from "word-count";
-import { PackId } from "../../domain/curriculum-pack/pack-id.js";
 import {
   ForbiddenRoleError,
   InvalidSurveyResponseError,
-  PackNotFoundError,
   PhaseClosedForSubmissionsError,
   SessionNotFoundError,
   SurveyCommentsTooLongError,
 } from "../../domain/errors/domain-errors.js";
 import { SessionId } from "../../domain/game-session/session-id.js";
 import { GameSessionUpdateRetrier } from "../services/game-session-update-retrier.js";
+import { SessionPackLoader } from "../services/session-pack-loader.js";
 
 const MAX_COMMENT_WORDS = 1000;
 const VALID_LIKERT_VALUES = new Set<LikertRating>([1, 2, 3, 4, 5]);
@@ -27,12 +25,13 @@ const VALID_LIKERT_VALUES = new Set<LikertRating>([1, 2, 3, 4, 5]);
 export class SubmitPerceptionSurveyUseCase implements SubmitPerceptionSurveyUseCasePort {
   readonly #sessionRepo: GameSessionRepositoryPort;
   readonly #sessionUpdates: GameSessionUpdateRetrier;
-  readonly #packRepo: CurriculumPackRepositoryPort;
+  /** Reads the session's pinned Pack Version (or the latest, for legacy sessions). */
+  readonly #packs: SessionPackLoader;
 
   public constructor(deps: SubmitPerceptionSurveyDependencies) {
     this.#sessionRepo = deps.sessionRepo;
     this.#sessionUpdates = new GameSessionUpdateRetrier(deps.sessionRepo);
-    this.#packRepo = deps.packRepo;
+    this.#packs = new SessionPackLoader(deps.packRepo);
   }
 
   public async execute(
@@ -61,12 +60,7 @@ export class SubmitPerceptionSurveyUseCase implements SubmitPerceptionSurveyUseC
     this.#validatePhase(loaded);
 
     // Load curriculum pack for valid item IDs
-    const packId = PackId.create(loaded.packId);
-    const pack = await this.#packRepo.findById(packId);
-
-    if (!pack) {
-      throw new PackNotFoundError(loaded.packId);
-    }
+    const pack = await this.#packs.load(loaded);
 
     // Validate all response values are valid Likert ratings (1-5)
     this.#validateResponseValues(command.responses);

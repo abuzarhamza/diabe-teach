@@ -2,6 +2,18 @@ import type { APIGatewayProxyEvent, APIGatewayProxyResult } from "aws-lambda";
 import { describe, expect, it } from "vitest";
 import { createValidatePackHandler } from "../../netlify/functions/packs/validate-pack.js";
 import { FakeCapabilityTokenAdapter } from "../../src/adapters/outbound/fake-capability-token-adapter.js";
+import { SignedInTeachers } from "./support/signed-in-teacher.js";
+
+function createCards(count: number): Array<Record<string, unknown>> {
+  return Array.from({ length: count }, (_, index) => ({
+    id: `card-${index + 1}`,
+    verbatimLabel: `Card ${index + 1}`,
+    displayLabel: `Card ${index + 1}`,
+    aliases: [],
+    domainId: "domain-1",
+    summary: `Card number ${index + 1}`,
+  }));
+}
 
 function createMinimalValidPack(): Record<string, unknown> {
   return {
@@ -18,16 +30,8 @@ function createMinimalValidPack(): Record<string, unknown> {
     domains: [
       { id: "domain-1", label: "Domain 1", description: "First domain" },
     ],
-    cards: [
-      {
-        id: "card-1",
-        verbatimLabel: "Card 1",
-        displayLabel: "Card 1",
-        aliases: [],
-        domainId: "domain-1",
-        summary: "First card",
-      },
-    ],
+    // A 3×3 board needs at least 9 Keyword Cards.
+    cards: createCards(9),
     adjudicationRubric: {
       evaluatorPersona: "Test Evaluator",
       subjectDomain: "Testing",
@@ -40,20 +44,20 @@ function createMinimalValidPack(): Record<string, unknown> {
 }
 
 interface TestContext {
-  tokenAdapter: FakeCapabilityTokenAdapter;
+  teachers: SignedInTeachers;
   deps: {
-    tokenVerifier: FakeCapabilityTokenAdapter;
+    accountTokenVerifier: SignedInTeachers["verifier"];
     apiKey: string;
     requireApiKey: boolean;
   };
 }
 
 function createTestContext(): TestContext {
-  const tokenAdapter = new FakeCapabilityTokenAdapter();
+  const teachers = new SignedInTeachers();
   return {
-    tokenAdapter,
+    teachers,
     deps: {
-      tokenVerifier: tokenAdapter,
+      accountTokenVerifier: teachers.verifier,
       apiKey: "test-api-key",
       requireApiKey: true,
     },
@@ -89,10 +93,7 @@ describe("pOST /api/v1/packs/validate", () => {
     const ctx = createTestContext();
     const handler = createValidatePackHandler(ctx.deps);
     const pack = createMinimalValidPack();
-    const token = await ctx.tokenAdapter.signToken({
-      sessionId: "instructor-session",
-      role: "instructor",
-    });
+    const token = await ctx.teachers.tokenFor();
 
     const result = (await handler(
       createEvent(pack, token),
@@ -105,14 +106,29 @@ describe("pOST /api/v1/packs/validate", () => {
     expect(body.errors).toHaveLength(0);
   });
 
-  it("returns errors for missing required fields", async () => {
+  it("returns 400 naming a missing required field (request schema, api-hardening 06)", async () => {
     const ctx = createTestContext();
     const handler = createValidatePackHandler(ctx.deps);
-    const token = await ctx.tokenAdapter.signToken({
-      sessionId: "instructor-session",
-      role: "instructor",
-    });
+    const token = await ctx.teachers.tokenFor();
+    const { boardConfig: _omitted, ...pack } = createMinimalValidPack();
+
+    const result = (await handler(
+      createEvent(pack, token),
+      {} as never,
+    )) as APIGatewayProxyResult;
+
+    expect(result.statusCode).toBe(400);
+    const body = JSON.parse(result.body);
+    expect(body.code).toBe("INVALID_REQUEST_BODY");
+    expect(body.details).toEqual({ field: "boardConfig", reason: "is required" });
+  });
+
+  it("returns errors for empty required fields", async () => {
+    const ctx = createTestContext();
+    const handler = createValidatePackHandler(ctx.deps);
+    const token = await ctx.teachers.tokenFor();
     const pack = {
+      ...createMinimalValidPack(),
       id: "",
       title: "",
       version: "",
@@ -134,10 +150,7 @@ describe("pOST /api/v1/packs/validate", () => {
   it("returns errors when card references unknown domain", async () => {
     const ctx = createTestContext();
     const handler = createValidatePackHandler(ctx.deps);
-    const token = await ctx.tokenAdapter.signToken({
-      sessionId: "instructor-session",
-      role: "instructor",
-    });
+    const token = await ctx.teachers.tokenFor();
     const pack = createMinimalValidPack();
     const cards = pack.cards as Array<Record<string, unknown>>;
     if (cards && cards[0]) {
@@ -158,10 +171,7 @@ describe("pOST /api/v1/packs/validate", () => {
   it("returns warnings for optional fields", async () => {
     const ctx = createTestContext();
     const handler = createValidatePackHandler(ctx.deps);
-    const token = await ctx.tokenAdapter.signToken({
-      sessionId: "instructor-session",
-      role: "instructor",
-    });
+    const token = await ctx.teachers.tokenFor();
     const pack = createMinimalValidPack();
     pack.assessmentInstrument = null;
     pack.perceptionSurvey = null;
@@ -178,12 +188,12 @@ describe("pOST /api/v1/packs/validate", () => {
     expect(body.warnings.some((w: { code: string }) => w.code === "OPTIONAL_FIELD_MISSING")).toBe(true);
   });
 
-  it("returns 403 for non-instructor role", async () => {
+  it("returns 401 for an instructor Capability Token instead of an Account Token", async () => {
     const ctx = createTestContext();
     const handler = createValidatePackHandler(ctx.deps);
-    const token = await ctx.tokenAdapter.signToken({
-      sessionId: "participant-session",
-      role: "participant",
+    const token = await new FakeCapabilityTokenAdapter().signToken({
+      sessionId: "instructor-session",
+      role: "instructor",
     });
 
     const result = (await handler(
@@ -191,16 +201,13 @@ describe("pOST /api/v1/packs/validate", () => {
       {} as never,
     )) as APIGatewayProxyResult;
 
-    expect(result.statusCode).toBe(403);
+    expect(result.statusCode).toBe(401);
   });
 
   it("validates packId follows slug pattern", async () => {
     const ctx = createTestContext();
     const handler = createValidatePackHandler(ctx.deps);
-    const token = await ctx.tokenAdapter.signToken({
-      sessionId: "instructor-session",
-      role: "instructor",
-    });
+    const token = await ctx.teachers.tokenFor();
     const pack = createMinimalValidPack();
     pack.id = "Invalid Pack ID!";
 
@@ -218,10 +225,7 @@ describe("pOST /api/v1/packs/validate", () => {
   it("validates version follows semver pattern", async () => {
     const ctx = createTestContext();
     const handler = createValidatePackHandler(ctx.deps);
-    const token = await ctx.tokenAdapter.signToken({
-      sessionId: "instructor-session",
-      role: "instructor",
-    });
+    const token = await ctx.teachers.tokenFor();
     const pack = createMinimalValidPack();
     pack.version = "v1";
 
@@ -234,5 +238,54 @@ describe("pOST /api/v1/packs/validate", () => {
     const body = JSON.parse(result.body);
     expect(body.valid).toBe(false);
     expect(body.errors.some((e: { code: string }) => e.code === "INVALID_VERSION")).toBe(true);
+  });
+
+  describe("pack capacity: the cards must fill the board", () => {
+    async function validate(pack: Record<string, unknown>) {
+      const ctx = createTestContext();
+      const handler = createValidatePackHandler(ctx.deps);
+      const token = await ctx.teachers.tokenFor();
+      const result = (await handler(
+        createEvent(pack, token),
+        {} as never,
+      )) as APIGatewayProxyResult;
+      expect(result.statusCode).toBe(200);
+      return JSON.parse(result.body) as {
+        valid: boolean;
+        errors: Array<{ path: string; code: string; message: string }>;
+      };
+    }
+
+    it("reports the card shortfall when a pack has fewer cards than rows × cols", async () => {
+      const pack = createMinimalValidPack();
+      pack.cards = createCards(8);
+
+      const body = await validate(pack);
+
+      expect(body.valid).toBe(false);
+      const issue = body.errors.find(e => e.code === "INSUFFICIENT_CARDS");
+      expect(issue).toBeDefined();
+      expect(issue?.path).toBe("cards");
+      expect(issue?.message).toContain("8");
+      expect(issue?.message).toContain("9");
+      expect(issue?.message).toContain("3×3");
+    });
+
+    it("accepts a pack with exactly rows × cols cards", async () => {
+      const body = await validate(createMinimalValidPack());
+
+      expect(body.valid).toBe(true);
+      expect(body.errors).toHaveLength(0);
+    });
+
+    it("accepts a pack with more cards than rows × cols", async () => {
+      const pack = createMinimalValidPack();
+      pack.cards = createCards(12);
+
+      const body = await validate(pack);
+
+      expect(body.valid).toBe(true);
+      expect(body.errors).toHaveLength(0);
+    });
   });
 });

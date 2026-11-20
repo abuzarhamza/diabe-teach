@@ -1,9 +1,11 @@
 import type { GameSessionRepositoryPort } from "../../src/application/ports/game-session-repository.port.js";
 import type { LikertRating, McqAnswerChoice } from "../../src/domain/game-session/game-session.types.js";
+import type { RoundBoard } from "../../src/domain/game-session/round-board.types.js";
 import mongoose from "mongoose";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { InMemoryGameSessionRepository } from "../../src/adapters/outbound/in-memory-game-session-repository.js";
 import { MongoGameSessionRepository } from "../../src/adapters/outbound/mongo-game-session-repository.js";
+import { DIABE_TEACH_PACK } from "../../src/domain/curriculum-pack/diabe-teach-pack.js";
 import { ConcurrentUpdateConflictError } from "../../src/domain/errors/domain-errors.js";
 import { GameSession } from "../../src/domain/game-session/game-session.js";
 import { SessionId } from "../../src/domain/game-session/session-id.js";
@@ -37,6 +39,21 @@ function newSession(): GameSession {
     mode: "classroom",
     adjudicationMode: "peer-instructor",
   });
+}
+
+/** A 2 × 3 board of pack cards, starting at `firstCard` in the pack's card list. */
+function boardOf(roundNumber: 1 | 2, seed: string, firstCard: number): RoundBoard {
+  const cards = DIABE_TEACH_PACK.cards.slice(firstCard, firstCard + 6);
+  return {
+    roundNumber,
+    seed,
+    rows: 2,
+    cols: 3,
+    cells: [
+      cards.slice(0, 3),
+      cards.slice(3, 6),
+    ],
+  };
 }
 
 /** An answer set holding a single answer to question "dm-mcq-01". */
@@ -193,6 +210,111 @@ function defineGameSessionRepositoryContract(
       expect(aliceResponse?.comments).toBe("Loved it");
       expect(bobResponse?.responses.get("survey-q1")).toBe(2);
       expect(bobResponse?.comments).toBeUndefined();
+    });
+
+    it("round-trips the creation seed and each round's board", async () => {
+      const session = GameSession.create({
+        packId: "diabe-teach",
+        mode: "classroom",
+        adjudicationMode: "peer-instructor",
+        creationSeed: "creation-seed",
+      });
+      await harness.repo.create(session);
+      const round1Board = boardOf(1, "creation-seed", 0);
+      const round2Board = boardOf(2, "round-2-seed", 10);
+
+      const inRound1 = await harness.repo.findById(session.sessionId);
+      inRound1!.transitionTo("trial-orientation", new Date("2026-03-01T09:10:00.000Z"));
+      inRound1!.transitionTo("round-1:chain-mapping", new Date("2026-03-01T09:20:00.000Z"), round1Board);
+      await harness.repo.update(inRound1!);
+
+      const afterRound1 = await harness.repo.findById(session.sessionId);
+      expect(afterRound1?.creationSeed).toBe("creation-seed");
+      expect(afterRound1?.activeBoard).toEqual(round1Board);
+      expect(afterRound1?.boardForRound(2)).toBeNull();
+
+      for (const phase of ["round-1:peer-adjudication", "round-1:round-summary"] as const) {
+        afterRound1!.transitionTo(phase, new Date("2026-03-01T09:40:00.000Z"));
+      }
+      afterRound1!.transitionTo("round-2:chain-mapping", new Date("2026-03-01T09:50:00.000Z"), round2Board);
+      await harness.repo.update(afterRound1!);
+
+      const reloaded = await harness.repo.findById(session.sessionId);
+      expect(reloaded?.creationSeed).toBe("creation-seed");
+      expect(reloaded?.boardForRound(1)).toEqual(round1Board);
+      expect(reloaded?.boardForRound(2)).toEqual(round2Board);
+      expect(reloaded?.activeBoard).toEqual(round2Board);
+    });
+
+    it("round-trips the pinned Pack Version across an update", async () => {
+      const session = GameSession.create({
+        packId: "diabe-teach",
+        packVersion: "1.2.0",
+        mode: "classroom",
+        adjudicationMode: "peer-instructor",
+      });
+      await harness.repo.create(session);
+
+      const loaded = await harness.repo.findById(session.sessionId);
+      expect(loaded?.packVersion).toBe("1.2.0");
+      loaded!.transitionTo("trial-orientation", new Date("2026-03-01T09:10:00.000Z"));
+      await harness.repo.update(loaded!);
+
+      expect((await harness.repo.findById(session.sessionId))?.packVersion).toBe("1.2.0");
+    });
+
+    it("round-trips the owning Instructor Account across an update", async () => {
+      const session = GameSession.create({
+        packId: "diabe-teach",
+        ownerAccountId: "account-owner-1",
+        mode: "classroom",
+        adjudicationMode: "peer-instructor",
+      });
+      await harness.repo.create(session);
+
+      const loaded = await harness.repo.findById(session.sessionId);
+      expect(loaded?.ownerAccountId).toBe("account-owner-1");
+      loaded!.transitionTo("trial-orientation", new Date("2026-03-01T09:10:00.000Z"));
+      await harness.repo.update(loaded!);
+
+      expect((await harness.repo.findById(session.sessionId))?.ownerAccountId).toBe("account-owner-1");
+    });
+
+    it("stores a solo session with no owner", async () => {
+      const session = GameSession.create({
+        packId: "diabe-teach",
+        mode: "solo",
+        adjudicationMode: "ai",
+      });
+      await harness.repo.create(session);
+
+      expect((await harness.repo.findById(session.sessionId))?.ownerAccountId).toBeNull();
+    });
+
+    it("loads a session stored before Pack Versions were pinned with no pinned version", async () => {
+      const seed: LegacySessionSeed = {
+        sessionId: `unpinned-${name}`,
+        roomCode: "UNPIN1",
+        phaseStartedAt: new Date("2026-03-01T09:00:00.000Z"),
+      };
+      await harness.seedLegacySession(seed);
+
+      const loaded = await harness.repo.findById(SessionId.from(seed.sessionId));
+
+      expect(loaded?.packId).toBe("diabe-teach");
+      expect(loaded?.packVersion).toBeNull();
+      expect(loaded?.ownerAccountId).toBeNull();
+    });
+
+    it("stores a session created without a seed with no creation seed and no boards", async () => {
+      const session = newSession();
+      await harness.repo.create(session);
+
+      const found = await harness.repo.findById(session.sessionId);
+
+      expect(found?.creationSeed).toBeNull();
+      expect(found?.boardForRound(1)).toBeNull();
+      expect(found?.activeBoard).toBeNull();
     });
 
     it("reports a conflict when updating a session that was never stored", async () => {

@@ -7,3 +7,6 @@ coverage/
 *.local
 .claude/settings.local.json
 .claude/worktrees/
+
+# Example configs are tracked; real .env* files stay ignored.
+!.env*.example

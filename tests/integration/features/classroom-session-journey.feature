@@ -38,6 +38,14 @@ Feature: Classroom Game Session Journey
     Then the response status should be 404
     And the response error code should be "ROOM_CODE_NOT_FOUND"
 
+  @error-handling @validation
+  Scenario: Joining without a room code returns 400 naming the field
+    When someone attempts to join without a room code
+    Then the response status should be 400
+    And the response error code should be "INVALID_REQUEST_BODY"
+    And the error should name the field "roomCode"
+    And the response should be a standard error body
+
   @phase-transition
   Scenario: Instructor advances through phases
     When the instructor creates a classroom session with pack "diabe-teach"
@@ -53,9 +61,28 @@ Feature: Classroom Game Session Journey
     When the instructor creates a classroom session with pack "diabe-teach"
     And participant "Alice" joins using the room code
     And participant "Alice" attempts to advance the phase
-    # Note: In production this returns 403. In Netlify Dev, a form fallback may return 401.
-    # The core invariant is that the request is rejected (not 2xx).
     Then the request should be forbidden
+
+  # netlify dev retries a 403 or 404 as `<path>.html`; these check the real code still arrives (api-hardening 03).
+  @route-params @error-handling
+  Scenario: Opening the state of a session that does not exist is refused as not found
+    When an instructor opens the state of a session that does not exist
+    Then the response status should be 404
+    And the response error code should be "SESSION_NOT_FOUND"
+
+  @route-params @authorization
+  Scenario: Another session's token cannot read this session's standings
+    When the instructor creates a classroom session with pack "diabe-teach"
+    And the instructor of another session retrieves standings for round 1
+    Then the response status should be 403
+    And the response error code should be "FORBIDDEN_ROLE"
+
+  @route-params @authorization
+  Scenario: Another session's token cannot list this session's chains
+    When the instructor creates a classroom session with pack "diabe-teach"
+    And the instructor of another session lists the chains of round 1
+    Then the response status should be 403
+    And the response error code should be "FORBIDDEN_ROLE"
 
   @e2e @full-journey
   Scenario: Complete classroom session lifecycle
@@ -70,6 +97,29 @@ Feature: Classroom Game Session Journey
     And the response should contain a chain with status "pending-review"
     And the response should contain a chainId
     And the chain length should be 4
+
+  @chain-listing
+  Scenario: Teacher lists the round's chains; classmates see them from peer-adjudication on
+    When the instructor creates a classroom session with pack "diabe-teach"
+    And participants "Alice" and "Bob" join using the room code
+    And the instructor advances the phase 2 times
+    Then the session phase should be "round-1:chain-mapping"
+    When participant "Alice" submits a concept chain for round 1
+    Then the response status should be 201
+    When the instructor lists the chains of round 1
+    Then the response status should be 200
+    And the listed chains should be exactly the last submitted chain, from participant "Alice"
+    When participant "Bob" lists the chains of round 1
+    Then the response status should be 200
+    And the listed chains should be empty
+    When participant "Alice" lists the chains of round 1
+    Then the response status should be 200
+    And the listed chains should be exactly the last submitted chain, from participant "Alice"
+    When the instructor advances the phase
+    Then the session phase should be "round-1:peer-adjudication"
+    When participant "Bob" lists the chains of round 1
+    Then the response status should be 200
+    And the listed chains should be exactly the last submitted chain, from participant "Alice"
 
   @chain-submission @validation
   Scenario: Chain submission rejected outside chain-mapping phase
@@ -114,6 +164,20 @@ Feature: Classroom Game Session Journey
     When participant "Alice" submits a concept chain for round 1
     Then the response status should be 409
     And the response error code should be "PHASE_CLOSED_FOR_SUBMISSIONS"
+
+  @board @shared-board
+  Scenario: Instructor and participant see the same server-dealt round 1 board
+    When the instructor creates a classroom session with pack "diabe-teach"
+    And participant "Alice" joins using the room code
+    Then the session should have no active board
+    When the instructor advances the phase 2 times
+    Then the session phase should be "round-1:chain-mapping"
+    And the active board should be a 7 by 7 grid of distinct Keyword Cards
+    When the instructor notes the active board
+    And the instructor retrieves the session state
+    Then the active board should be the noted board
+    When participant "Alice" retrieves the session state
+    Then the active board should be the noted board
 
   @session-state @instructor
   Scenario: Instructor retrieves session state

@@ -4,6 +4,7 @@ import type { PackId } from "../../domain/curriculum-pack/pack-id.js";
 import type {
   CurriculumPackCollectionLike,
   CurriculumPackDocument,
+  CurriculumPackFilter,
   MongoCurriculumPackConnectionConfig,
   MongoCurriculumPackRepositoryOptions,
 } from "./mongo-curriculum-pack-repository.types.js";
@@ -15,6 +16,7 @@ import {
   DEFAULT_MONGODB_DB_NAME,
 } from "./curriculum-pack.schema.js";
 import { MongoConnectionManager } from "./mongo-client-singleton.js";
+import { PackVersionOrder } from "./pack-version-order.js";
 
 export {
   CURRICULUM_PACK_MODEL_NAME,
@@ -84,7 +86,23 @@ implements CurriculumPackRepositoryPort {
 
   public async findById(packId: PackId): Promise<CurriculumPack | null> {
     const collection = await this.#getCollection();
-    const doc = await collection.findOne({ _id: packId.value });
+    const docs = await collection.find(
+      MongoCurriculumPackRepository.#versionsOf(packId.value),
+    );
+    const latest = PackVersionOrder.latest(docs);
+    return latest
+      ? MongoCurriculumPackRepository.#toDomain(latest)
+      : null;
+  }
+
+  public async findByIdAndVersion(
+    packId: PackId,
+    version: string,
+  ): Promise<CurriculumPack | null> {
+    const collection = await this.#getCollection();
+    const doc = await collection.findOne(
+      MongoCurriculumPackRepository.#exactVersion(packId.value, version),
+    );
     return doc
       ? MongoCurriculumPackRepository.#toDomain(doc)
       : null;
@@ -93,25 +111,30 @@ implements CurriculumPackRepositoryPort {
   public async findAll(): Promise<readonly CurriculumPack[]> {
     const collection = await this.#getCollection();
     const docs = await collection.find();
-    return docs.map(doc => MongoCurriculumPackRepository.#toDomain(doc));
+    return PackVersionOrder.latestOfEach(
+      docs.map(doc => MongoCurriculumPackRepository.#toDomain(doc)),
+    );
   }
 
   public async findAllActive(): Promise<readonly CurriculumPack[]> {
-    const collection = await this.#getCollection();
-    const docs = await collection.find({ isArchived: false });
-    return docs.map(doc => MongoCurriculumPackRepository.#toDomain(doc));
+    return (await this.findAll()).filter(pack => !pack.isArchived);
   }
 
   public async create(pack: CurriculumPack): Promise<void> {
     const collection = await this.#getCollection();
-    await collection.create(MongoCurriculumPackRepository.#toDocument(pack));
+    await collection.create({
+      ...MongoCurriculumPackRepository.#toDocument(pack),
+      _id: `${pack.id.value}@${pack.version}`,
+    });
   }
 
   public async update(pack: CurriculumPack): Promise<void> {
     const collection = await this.#getCollection();
-    const doc = MongoCurriculumPackRepository.#toDocument(pack);
-    const { _id, ...updateFields } = doc;
-    await collection.updateOne({ _id }, updateFields);
+    const { _id, ...updateFields } = MongoCurriculumPackRepository.#toDocument(pack);
+    await collection.updateOne(
+      MongoCurriculumPackRepository.#exactVersion(_id, pack.version),
+      updateFields,
+    );
   }
 
   public async existsByIdAndVersion(
@@ -119,12 +142,33 @@ implements CurriculumPackRepositoryPort {
     version: string,
   ): Promise<boolean> {
     const collection = await this.#getCollection();
-    return collection.exists({ _id: packId, version });
+    return collection.exists(
+      MongoCurriculumPackRepository.#exactVersion(packId, version),
+    );
+  }
+
+  /** Every stored version of a pack, in either document layout. */
+  static #versionsOf(packId: string): CurriculumPackFilter {
+    return {
+      $or: [
+        { packId },
+        { _id: packId },
+      ],
+    };
+  }
+
+  static #exactVersion(packId: string, version: string): CurriculumPackFilter {
+    return {
+      $or: [
+        { packId, version },
+        { _id: packId, version },
+      ],
+    };
   }
 
   static #toDomain(doc: CurriculumPackDocument): CurriculumPack {
     return CurriculumPack.create({
-      id: doc._id,
+      id: doc.packId ?? doc._id,
       title: doc.title,
       version: doc.version,
       description: doc.description,
@@ -140,12 +184,17 @@ implements CurriculumPackRepositoryPort {
       authorName: doc.authorName,
       createdAt: doc.createdAt,
       archivedAt: doc.archivedAt,
+      // Absent on documents stored before ADR-0007.
+      archivedBy: doc.archivedBy ?? null,
+      unarchivedAt: doc.unarchivedAt ?? null,
+      unarchivedBy: doc.unarchivedBy ?? null,
     });
   }
 
   static #toDocument(pack: CurriculumPack): CurriculumPackDocument {
     return {
       _id: pack.id.value,
+      packId: pack.id.value,
       title: pack.title,
       version: pack.version,
       description: pack.description,
@@ -161,6 +210,9 @@ implements CurriculumPackRepositoryPort {
       authorName: pack.authorName,
       createdAt: pack.createdAt,
       archivedAt: pack.archivedAt,
+      archivedBy: pack.archivedBy,
+      unarchivedAt: pack.unarchivedAt,
+      unarchivedBy: pack.unarchivedBy,
     };
   }
 }

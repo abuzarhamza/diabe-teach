@@ -1,4 +1,5 @@
 import type { CurriculumPackProps } from "../../domain/curriculum-pack/curriculum-pack.types.js";
+import type { ClockPort } from "./clock.port.js";
 import type { CurriculumPackRepositoryPort } from "./curriculum-pack-repository.port.js";
 import type {
   ValidationError,
@@ -8,9 +9,10 @@ import type {
 export interface RegisterCurriculumPackInput {
   readonly pack: Omit<
     CurriculumPackProps,
-    "id" | "isSystemPack" | "isArchived" | "createdBy" | "authorName" | "createdAt" | "archivedAt"
+    "id" | "isSystemPack" | "isArchived" | "createdBy" | "authorName" | "createdAt" | "archivedAt" | "archivedBy" | "unarchivedAt" | "unarchivedBy"
   > & { readonly id: string; readonly authorName?: string };
-  readonly instructorSessionId: string;
+  /** The Instructor Account releasing this Pack Version; becomes its `createdBy`. */
+  readonly accountId: string;
 }
 
 export interface RegisterCurriculumPackSuccessResult {
@@ -41,6 +43,8 @@ export type RegisterCurriculumPackResult
 
 export interface RegisterCurriculumPackDependencies {
   readonly packRepo: CurriculumPackRepositoryPort;
+  /** Defaults to the wall clock. */
+  readonly clock?: ClockPort;
 }
 
 export interface RegisterCurriculumPackUseCasePort {

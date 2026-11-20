@@ -42,6 +42,10 @@ export class EnvYamlConfigLoader {
             typeof auth.capability_token_secret === "string"
               ? auth.capability_token_secret
               : undefined,
+          account_token_secret:
+            typeof auth.account_token_secret === "string"
+              ? auth.account_token_secret
+              : undefined,
           api_key: typeof auth.api_key === "string"
             ? auth.api_key
             : undefined,
@@ -74,6 +78,7 @@ export class EnvYamlConfigLoader {
       mongoUri: config.mongodb?.uri,
       mongoDbName: config.mongodb?.database ?? DEFAULT_MONGODB_DB_NAME,
       capabilityTokenSecret: config.auth?.capability_token_secret,
+      accountTokenSecret: config.auth?.account_token_secret,
       apiKey: config.auth?.api_key,
     };
   }

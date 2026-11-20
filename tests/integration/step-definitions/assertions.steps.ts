@@ -91,21 +91,35 @@ Then(
   },
 );
 
+/** A request schema failure names the field (api-hardening 06). */
+Then(
+  "the error should name the field {string}",
+  function (this: TestWorld, field: string) {
+    const body = this.lastResponseBody as { details?: { field?: string; reason?: string } };
+    expect(body.details?.field).to.equal(field);
+    expect(body.details?.reason).to.be.a("string").and.not.equal("");
+  },
+);
+
+/** The standard ApiErrorResponse body `{ code, message, details? }`, with no `error` wrapper (api-hardening 04). */
+Then(
+  "the response should be a standard error body",
+  function (this: TestWorld) {
+    const body = this.lastResponseBody as Record<string, unknown>;
+    expect(body).to.not.have.property("error");
+    expect(body.code).to.be.a("string");
+    expect(body.message).to.be.a("string").and.not.equal("");
+  },
+);
+
 /**
- * Special assertion for forbidden access that handles Netlify Dev quirks.
- *
- * In production, 403 is returned correctly.
- * In Netlify Dev, a form submission fallback may return 401 instead.
- * We verify the request was rejected (not 2xx) as the core invariant.
+ * A forbidden request gets 403 through `netlify dev` too: route parameters
+ * survive its `.html` retry of a 403 (api-hardening 03).
  */
 Then(
   "the request should be forbidden",
   function (this: TestWorld) {
-    const status = this.lastResponse?.statusCode;
-    // In production: 403 Forbidden
-    // In Netlify Dev: may get 401 due to form submission fallback
-    // Core invariant: the request was rejected (not 2xx success)
-    expect(status).to.be.oneOf([401, 403], "Expected request to be rejected with 401 or 403");
+    expect(this.lastResponse?.statusCode).to.equal(403);
   },
 );
 

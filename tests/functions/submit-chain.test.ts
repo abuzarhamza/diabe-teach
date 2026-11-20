@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { createSubmitChainHandler } from "../../netlify/functions/sessions/submit-chain.js";
 import { createTransitionPhaseHandler } from "../../netlify/functions/sessions/transition-phase.js";
 import { FakeCapabilityTokenAdapter } from "../../src/adapters/outbound/fake-capability-token-adapter.js";
+import { InMemoryCurriculumPackRepository } from "../../src/adapters/outbound/in-memory-curriculum-pack-repository.js";
 import { InMemoryGameSessionRepository } from "../../src/adapters/outbound/in-memory-game-session-repository.js";
 import { GameSession } from "../../src/domain/game-session/game-session.js";
 
@@ -417,7 +418,11 @@ describe("repeat Concept Chains from the same participant", () => {
     const { session, sessionRepo, tokenAdapter, aliceToken, submit, storedChains } = await setUp();
     const sessionId = session.sessionId.value;
     const instructorToken = await tokenAdapter.signToken({ role: "instructor", sessionId });
-    const transitionPhase = createTransitionPhaseHandler({ sessionRepo, tokenVerifier: tokenAdapter });
+    const transitionPhase = createTransitionPhaseHandler({
+      sessionRepo,
+      packRepo: new InMemoryCurriculumPackRepository(),
+      tokenVerifier: tokenAdapter,
+    });
     const advance = async () => transitionPhase({
       ...makeEvent(sessionId, 1, { action: "advance" }, { authorization: `Bearer ${instructorToken}` }),
       path: `/api/v1/sessions/${sessionId}/phase`,

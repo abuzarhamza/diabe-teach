@@ -60,4 +60,17 @@ auth:
       apiKey: "api-key-xyz",
     });
   });
+
+  it("reads the Account Token secret separately from the capability secret", () => {
+    const config = EnvYamlConfigLoader.parseYamlString(`
+auth:
+  capability_token_secret: "capability-secret"
+  account_token_secret: "account-secret"
+`);
+
+    const runtimeEnv = EnvYamlConfigLoader.toRuntimeEnvConfig(config);
+
+    expect(runtimeEnv.capabilityTokenSecret).toBe("capability-secret");
+    expect(runtimeEnv.accountTokenSecret).toBe("account-secret");
+  });
 });

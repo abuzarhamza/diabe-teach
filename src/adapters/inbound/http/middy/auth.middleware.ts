@@ -1,6 +1,10 @@
 import type { MiddlewareObj } from "@middy/core";
 import type { APIGatewayProxyEvent } from "aws-lambda";
 import type {
+  AccountTokenVerifierPort,
+  VerifiedAccount,
+} from "../../../../application/ports/account-token.port.js";
+import type {
   CapabilityTokenPort,
   VerifiedCapability,
 } from "../../../../application/ports/capability-token.port.js";
@@ -8,14 +12,36 @@ import { timingSafeEqual } from "node:crypto";
 import { UnauthorizedTokenError } from "../../../../domain/errors/domain-errors.js";
 
 export type AuthenticatedEvent = APIGatewayProxyEvent & {
+  /** The verified Capability Token (`BearerAuth`), or null when none was sent. */
   auth?: VerifiedCapability | null;
+  /** The verified Account Token (`AccountAuth`), or null when none was sent. */
+  account?: VerifiedAccount | null;
   body?: unknown;
 };
 
+/**
+ * Which OpenAPI bearer scheme a route uses: `BearerAuth` takes Capability
+ * Tokens, `AccountAuth` takes Account Tokens. A route accepts exactly one
+ * kind; the other kind is an invalid token there. `none` (sign-up and
+ * sign-in) ignores any Authorization header.
+ */
+export type BearerScheme = "BearerAuth" | "AccountAuth" | "none";
+
 export interface AuthMiddlewareOptions {
   readonly tokenVerifier?: CapabilityTokenPort;
+  /** Defaults to `BearerAuth`. */
+  readonly bearerScheme?: BearerScheme;
+  readonly accountTokenVerifier?: AccountTokenVerifierPort;
   readonly apiKey?: string;
   readonly requireApiKey?: boolean;
+  /**
+   * When true, a request with no Authorization header is refused with 401
+   * here, before the body is read, so a caller without a token learns
+   * nothing about how bodies are parsed.
+   */
+  readonly tokenRequired?: boolean;
+  /** The 401 message when `tokenRequired` and no token was sent. */
+  readonly missingTokenMessage?: string;
 }
 
 /**
@@ -39,6 +65,22 @@ function getHeader(
     }
   }
   return undefined;
+}
+
+const INVALID_ACCOUNT_TOKEN_MESSAGE = "Malformed, invalid, or expired account token.";
+
+/** Fails closed: a present but unverifiable Account Token is a 401. */
+async function verifyAccountToken(
+  verifier: AccountTokenVerifierPort | undefined,
+  token: string,
+): Promise<VerifiedAccount> {
+  const verified = verifier
+    ? await verifier.verifyAccountToken(token)
+    : null;
+  if (!verified) {
+    throw new UnauthorizedTokenError(INVALID_ACCOUNT_TOKEN_MESSAGE);
+  }
+  return verified;
 }
 
 export function authMiddleware(
@@ -81,6 +123,11 @@ export function authMiddleware(
       }
 
       // 2. Validate Authorization Bearer token if present
+      if (options.bearerScheme === "none") {
+        event.auth = null;
+        event.account = null;
+        return;
+      }
       const rawAuth = getHeader(headers, "authorization");
       if (rawAuth) {
         if (typeof rawAuth !== "string") {
@@ -97,6 +144,12 @@ export function authMiddleware(
         }
 
         const token = match[1];
+        if (options.bearerScheme === "AccountAuth") {
+          event.auth = null;
+          event.account = await verifyAccountToken(options.accountTokenVerifier, token);
+          return;
+        }
+
         if (!options.tokenVerifier) {
           throw new UnauthorizedTokenError(
             "Malformed, invalid, or expired capability token.",
@@ -111,9 +164,16 @@ export function authMiddleware(
         }
 
         event.auth = verified;
+        event.account = null;
       }
       else {
+        if (options.tokenRequired === true) {
+          throw new UnauthorizedTokenError(
+            options.missingTokenMessage ?? "Authentication required.",
+          );
+        }
         event.auth = null;
+        event.account = null;
       }
     },
   };

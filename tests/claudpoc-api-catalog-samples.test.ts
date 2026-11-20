@@ -132,10 +132,7 @@ describe("claudPoc Concept Chain live API samples", () => {
     expect(out.request).toEqual({
       path,
       narrativeExplanation: "The story",
-      stepRationales: [
-        { fromCoord: path[0], toCoord: path[1], rationale: "Insulin moves glucose" },
-        { fromCoord: path[1], toCoord: path[2], rationale: "Glucose raises HbA1c" },
-      ],
+      stepRationales: ["Insulin moves glucose", "Glucose raises HbA1c"],
     });
     const chain = out.response?.body.chain as Record<string, unknown>;
     expect(out.response?.status).toBe(201);
@@ -194,6 +191,36 @@ describe("claudPoc Concept Chain live API samples", () => {
     expect(out.request).toBeUndefined();
   });
 
+  it("lists the round's chains with display names, own chains only for a learner during chain-mapping", () => {
+    const voted = demoState();
+    voted.chains[0]!.peerVotes = [
+      {
+        voterParticipantId: "par_amira",
+        decision: "approve",
+        comment: null,
+        votedAt: "2026-11-17T10:01:00.000Z",
+      },
+    ] as never;
+    const teacher = sampleOf("listRoundChains")(voted);
+    expect(teacher.path).toBe("/api/v1/sessions/ses_live1/rounds/2/chains");
+    const chains = teacher.response?.body.chains as Array<Record<string, unknown>>;
+    expect(chains).toHaveLength(1);
+    expect(chains[0]).toMatchObject({
+      chainId: "chn_ben1",
+      participantDisplayName: "Ben",
+      peerVotes: [
+        { voterParticipantId: "par_amira", voterDisplayName: "Amira" },
+      ],
+    });
+    expect(chains[0]).not.toHaveProperty("labels");
+    const reviewing = sampleOf("listRoundChains")(voted, { participantId: "par_amira" });
+    expect(reviewing.response?.body.chains).toHaveLength(1);
+    const mapping = sampleOf("listRoundChains")(demoState("round-2:chain-mapping"), { participantId: "par_amira" });
+    expect(mapping.response?.body.chains).toEqual([]);
+    const own = sampleOf("listRoundChains")(demoState("round-2:chain-mapping"), { participantId: "par_ben" });
+    expect(own.response?.body.chains).toHaveLength(1);
+  });
+
   it("fills session reads, phase changes and standings from the live session", () => {
     const state = demoState();
     expect(sampleOf("getGameSessionState")(state).path).toBe("/api/v1/sessions/ses_live1");
@@ -230,6 +257,143 @@ describe("claudPoc Concept Chain live API samples", () => {
     expect(sampleOf("joinGameSession")(state, { participantId: "par_amira" }).request).toEqual({ roomCode: "ROOM42", displayName: "Amira" });
   });
 
+  /** Game setup's form as the page hands it to the overlay (CCOverlay.setContext). */
+  const setupForm = {
+    packId: "thyroid",
+    creatorDisplayName: "Ms Rahman",
+    mappingMinutes: "7",
+    mappingPaced: false,
+    adjudicationMinutes: "4",
+    adjudicationPaced: true,
+    seed: "seed-k3v9",
+    boardSize: 5,
+    minChainLength: "3",
+  };
+
+  it("builds Game setup's Start game createGameSession request from the form", () => {
+    // No stored session yet (first visit to Game setup): the request comes from the form alone.
+    const out = sampleOf("createGameSession")(null, { setup: setupForm });
+    expect(out.request).toEqual({
+      packId: "thyroid",
+      mode: "classroom",
+      adjudicationMode: "peer-instructor",
+      creatorDisplayName: "Ms Rahman",
+      timerConfig: {
+        pretestSec: null,
+        trialOrientationSec: null,
+        roundMappingSec: 420,
+        roundAdjudicationSec: null,
+        posttestSec: null,
+        feedbackSurveySec: null,
+      },
+      seed: "seed-k3v9",
+    });
+    expect(out.response?.status).toBe(201);
+    expect(out.response?.body.state).toMatchObject({
+      packId: "thyroid",
+      currentPhase: "pretest",
+      phaseEndsAt: null,
+      participantCount: 0,
+    });
+  });
+
+  it("follows the form: both phases timed, and a time outside 1-1440 minutes left as a placeholder", () => {
+    const timed = sampleOf("createGameSession")(demoState(), {
+      setup: { ...setupForm, adjudicationPaced: false, adjudicationMinutes: "1440" },
+    });
+    expect(timed.request?.timerConfig).toMatchObject({ roundMappingSec: 420, roundAdjudicationSec: 86400 });
+    const bad = sampleOf("createGameSession")(null, {
+      setup: { ...setupForm, mappingMinutes: "0" },
+    });
+    expect((bad.request?.timerConfig as Record<string, unknown>).roundMappingSec).toMatch(/^</);
+    const paced = sampleOf("createGameSession")(null, {
+      setup: { ...setupForm, mappingPaced: true, mappingMinutes: "" },
+    });
+    expect(paced.request?.timerConfig).toMatchObject({ roundMappingSec: null, roundAdjudicationSec: null });
+  });
+
+  it("shows the request that created the session on the teacher screen, with its timerConfig and seed", () => {
+    const state = {
+      ...demoState("round-1:round-summary"),
+      settings: {
+        packId: "thyroid",
+        mode: "classroom",
+        adjudicationMode: "peer-instructor",
+        creatorDisplayName: "Ms Rahman",
+        timerConfig: {
+          pretestSec: null,
+          trialOrientationSec: null,
+          roundMappingSec: 120,
+          roundAdjudicationSec: null,
+          posttestSec: null,
+          feedbackSurveySec: null,
+        },
+        seed: "seed-k3v9",
+        boardSize: 5,
+        minChainLength: 3,
+      },
+    };
+    expect(sampleOf("createGameSession")(state).request).toEqual({
+      packId: "thyroid",
+      mode: "classroom",
+      adjudicationMode: "peer-instructor",
+      creatorDisplayName: "Ms Rahman",
+      timerConfig: state.settings.timerConfig,
+      seed: "seed-k3v9",
+    });
+    // Next phase into Round 2 chain mapping uses the session's 120 s, and teacher-paced peer review has no deadline.
+    expect(sampleOf("transitionSessionPhase")(state).response?.body.state).toMatchObject({ currentPhase: "round-2:chain-mapping", phaseEndsAt: "<phaseStartedAt + 120 s>" });
+    const review = {
+      ...state,
+      session: { ...state.session, currentPhase: "round-2:chain-mapping" },
+    };
+    expect(sampleOf("transitionSessionPhase")(review).response?.body.state).toMatchObject({ currentPhase: "round-2:peer-adjudication", phaseEndsAt: null });
+  });
+
+  it("fills the pack operations from Game setup's packs and create-pack editor", () => {
+    const pack = {
+      packId: "thyroid",
+      name: "Thyroid disorders",
+      group: "Clinical medicine",
+      description: "Clinical medicine · built-in pack",
+      keywords: ["TSH", "Iodine", "Goitre", "TRH"],
+      maxBoardSize: 7,
+    };
+    const list = sampleOf("listCurriculumPacks")(null, {
+      packs: [
+        { ...pack, keywordCount: 49 },
+      ],
+    });
+    expect(list.response?.body.packs).toEqual([
+      expect.objectContaining({ id: "thyroid", title: "Thyroid disorders", cardCount: 49 }),
+    ]);
+    const get = sampleOf("getCurriculumPackById")(null, { pack });
+    expect(get.path).toBe("/api/v1/packs/thyroid");
+    expect((get.response?.body.pack as { cards: Array<{ displayLabel: string }> }).cards.map(card => card.displayLabel)).toEqual(["TSH", "Iodine", "Goitre"]);
+    const newPack = {
+      name: "Endocrine review",
+      level: "Year 2",
+      objective: "Explain insulin resistance",
+      keywords: [
+        "Insulin",
+        "Glucose",
+        "HbA1c",
+        "Metformin",
+      ],
+    };
+    const validate = sampleOf("validateCurriculumPack")(null, { newPack, setup: setupForm });
+    expect(validate.request).toMatchObject({
+      id: "endocrine-review",
+      title: "Endocrine review",
+      description: "Year 2 · Explain insulin resistance",
+      boardConfig: { rows: 5, cols: 5, minChainLength: 3 },
+    });
+    const register = sampleOf("registerCurriculumPack")(null, { newPack, setup: setupForm });
+    expect(register.request).toEqual(validate.request);
+    expect(register.response?.body.pack).toMatchObject({ id: "endocrine-review", cardCount: 4 });
+    expect(sampleOf("registerCurriculumPack")(null, {}).request).toBeUndefined();
+  });
+
   it.each(Object.entries(catalog.operations).filter(([, op]) => op.sample))("%s sample is deterministic and does not mutate the session", (_opId, op) => {
     const state = demoState("round-2:chain-mapping");
     const before = JSON.stringify(state);
@@ -243,6 +407,13 @@ describe("claudPoc Concept Chain live API samples", () => {
         ],
         links: ["x"],
         story: "y",
+      },
+      setup: setupForm,
+      newPack: {
+        name: "Pack",
+        level: "",
+        objective: "",
+        keywords: ["A", "B"],
       },
     };
     const first = JSON.stringify(op.sample?.(state, ctx));

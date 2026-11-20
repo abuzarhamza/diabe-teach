@@ -15,8 +15,13 @@ servers:
     description: Local development server
 
 tags:
+  - name: Accounts
+    description: Instructor Account sign-up and sign-in, which issue Account Tokens
   - name: Packs
-    description: Curriculum Pack discovery, validation, and registration
+    description: >-
+      The shared Curriculum Pack library: discovery, plus validation,
+      registration, new Pack Versions, archiving and unarchiving with an
+      Account Token
   - name: Sessions
     description: Game Session creation, classroom room join, phase transitions, and SSE stream
   - name: Chains
@@ -25,14 +30,172 @@ tags:
     description: Pretest/Posttest Assessment Attempts, Likert perception survey, and metacognitive analytics
 
 paths:
+  /api/v1/accounts/sign-up:
+    post:
+      operationId: signUpInstructor
+      tags: [Accounts]
+      summary: Create an Instructor Account with an email and a password, and sign it in
+      description: >-
+        Anyone with an email can sign up: no verification email and no
+        university check in the proof-of-concept phase. The email is trimmed
+        and lower-cased before it is stored, and must be unique. The password
+        must be at least 10 characters; it is stored only as an argon2id hash.
+        Any `Authorization` header is ignored.
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AccountCredentialsRequest"
+      responses:
+        "201":
+          description: Instructor Account created and signed in
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountTokenResponse"
+        "400":
+          description: >-
+            INVALID_REQUEST_BODY. The body is not a JSON object, the email is
+            missing or not shaped like an email, or the password is missing or
+            under 10 characters. `details.field` names the field. Nothing is
+            stored.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "401":
+          description: UNAUTHORIZED_TOKEN. Missing or invalid x-api-key header.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "409":
+          description: >-
+            EMAIL_ALREADY_REGISTERED. An Instructor Account already has this
+            email, compared after trimming and lower-casing.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+
+  /api/v1/accounts/sign-in:
+    post:
+      operationId: signInInstructor
+      tags: [Accounts]
+      summary: Sign in to an Instructor Account and receive a 12-hour Account Token
+      description: >-
+        The email is trimmed and lower-cased before the lookup. Any
+        `Authorization` header is ignored.
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SignInRequest"
+      responses:
+        "200":
+          description: Signed in
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountTokenResponse"
+        "400":
+          description: >-
+            INVALID_REQUEST_BODY. The body is not a JSON object, or `email` or
+            `password` is not a string (or longer than its `maxLength`).
+            `details.field` names the field.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "401":
+          description: >-
+            INVALID_CREDENTIALS with the message "Email or password is
+            incorrect." for an unknown email, a wrong password, or a missing
+            field: the same body every time, so the response never reveals
+            which emails have accounts. (UNAUTHORIZED_TOKEN for a missing or
+            invalid x-api-key header.)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "423":
+          description: >-
+            ACCOUNT_TEMPORARILY_LOCKED. Five wrong passwords in a row lock the
+            Instructor Account for 15 minutes; the fifth wrong password itself
+            gets this response. While locked, every sign-in attempt gets it,
+            even with the right password, and does not extend the lock.
+            `details.lockedUntil` is the ISO 8601 time the lock ends. A
+            successful sign-in resets the wrong-password count. Unknown emails
+            are never locked; they always get 401.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+              example:
+                code: ACCOUNT_TEMPORARILY_LOCKED
+                message: Too many wrong passwords. Sign-in is temporarily locked; try again later.
+                details:
+                  lockedUntil: "2026-11-19T08:15:00.000Z"
+
+  /api/v1/accounts/me:
+    get:
+      operationId: getCurrentInstructorAccount
+      tags: [Accounts]
+      summary: The Instructor Account the Account Token belongs to
+      security:
+        - ApiKeyAuth: []
+          AccountAuth: []
+      responses:
+        "200":
+          description: The signed-in Instructor Account
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InstructorAccountView"
+        "401":
+          description: >-
+            UNAUTHORIZED_TOKEN. No Account Token, or one that is malformed,
+            tampered, expired, or of another kind (a Capability Token is
+            never accepted here).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+
   /api/v1/packs:
     get:
       operationId: listCurriculumPacks
       tags: [Packs]
-      summary: List all registered Curriculum Packs
+      summary: List the shared library's Curriculum Packs
+      description: >-
+        Lists the latest Pack Version of every pack, with the author handle of
+        the teacher who released that version (the part of their email before
+        the @, worked out when the list is read and never stored) and its
+        version, so Game setup can show "by rahman.s · v1.1.0". Packs whose
+        latest version was not released by an Instructor Account (older packs
+        and System Packs) have a null `authorHandle` ("by unknown"). No full
+        email address appears in the response. Archived packs are hidden
+        unless `includeArchived=true`.
+      parameters:
+        - name: includeArchived
+          in: query
+          required: false
+          description: >-
+            `true` also lists packs whose latest version is archived, marked
+            `isArchived: true`, for Game setup's "Show archived". Any other
+            value, or none, hides them.
+          schema:
+            type: boolean
+            default: false
       responses:
         "200":
-          description: List of registered Curriculum Pack summaries
+          description: The latest Pack Version of each listed pack
           content:
             application/json:
               schema:
@@ -42,11 +205,24 @@ paths:
                   packs:
                     type: array
                     items:
-                      $ref: "#/components/schemas/CurriculumPackSummary"
+                      $ref: "#/components/schemas/CurriculumPackListItem"
     post:
       operationId: registerCurriculumPack
       tags: [Packs]
-      summary: Validate and register a new Curriculum Pack
+      summary: Validate and register a Curriculum Pack, or release a new Pack Version of one
+      description: >-
+        Needs a signed-in teacher's Account Token (`AccountAuth`); no Game
+        Session is needed, and an instructor Capability Token is refused.
+        The pack library is shared: any signed-in teacher may register a new
+        pack, or release a new Pack Version of any pack (including a
+        colleague's) by registering the same `id` with a new `version`. Each
+        Pack Version records the releasing account id as `createdBy`. A new
+        version always starts unarchived, so releasing a new version of an
+        archived pack lists it again. System Packs refuse new versions (403),
+        and an existing `id` and `version` is never overwritten (409).
+      security:
+        - ApiKeyAuth: []
+          AccountAuth: []
       requestBody:
         required: true
         content:
@@ -66,14 +242,37 @@ paths:
                     $ref: "#/components/schemas/CurriculumPackSummary"
         "400":
           $ref: "#/components/responses/BadRequestError"
+        "401":
+          description: >-
+            UNAUTHORIZED_TOKEN. No Account Token, or one that is malformed,
+            tampered, expired, or of another kind. An instructor Capability
+            Token is not accepted on pack routes.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "403":
+          description: >-
+            PACK_IS_SYSTEM_PACK. The pack id belongs to a System Pack, which
+            users cannot release new versions of.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
         "409":
-          description: A Curriculum Pack with the given id already exists
+          description: >-
+            PACK_ALREADY_EXISTS. That pack id and version are already
+            registered (by anyone); release a new version instead.
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiErrorResponse"
         "422":
-          description: Curriculum Pack failed structural or topological validation
+          description: >-
+            PACK_VALIDATION_FAILED. The Curriculum Pack failed structural or
+            topological validation; the response lists every issue. This
+            includes INSUFFICIENT_CARDS when the pack has fewer Keyword Cards
+            than its `boardConfig.rows × boardConfig.cols` board.
           content:
             application/json:
               schema:
@@ -84,6 +283,13 @@ paths:
       operationId: validateCurriculumPack
       tags: [Packs]
       summary: Validate a draft Curriculum Pack payload without registering it
+      description: >-
+        Needs a signed-in teacher's Account Token (`AccountAuth`), so packs
+        can be prepared before any Game Session exists. An instructor
+        Capability Token is refused.
+      security:
+        - ApiKeyAuth: []
+          AccountAuth: []
       requestBody:
         required: true
         content:
@@ -105,6 +311,17 @@ paths:
                     type: array
                     items:
                       $ref: "#/components/schemas/PackValidationIssue"
+        "400":
+          $ref: "#/components/responses/BadRequestError"
+        "401":
+          description: >-
+            UNAUTHORIZED_TOKEN. No Account Token, or one that is malformed,
+            tampered, expired, or of another kind. An instructor Capability
+            Token is not accepted on pack routes.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
 
   /api/v1/packs/{packId}:
     get:
@@ -140,11 +357,143 @@ paths:
         "404":
           $ref: "#/components/responses/NotFoundError"
 
+  /api/v1/packs/{packId}/archive:
+    post:
+      operationId: archiveCurriculumPack
+      tags: [Packs]
+      summary: Archive a Curriculum Pack (hides it from the list; nothing is deleted)
+      description: >-
+        Any signed-in teacher may archive any pack except a System Pack,
+        including a colleague's (ADR-0007). Archives the latest Pack Version
+        and records the acting account and the time. Game Sessions already
+        using the pack keep working. There is no delete route.
+      security:
+        - ApiKeyAuth: []
+          AccountAuth: []
+      parameters:
+        - name: packId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: The pack is archived
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [packId, isArchived, archivedAt, archivedBy]
+                properties:
+                  packId:
+                    type: string
+                  isArchived:
+                    type: boolean
+                    const: true
+                  archivedAt:
+                    type: string
+                    format: date-time
+                  archivedBy:
+                    type: string
+                    description: The Instructor Account id that archived the pack.
+        "401":
+          description: >-
+            UNAUTHORIZED_TOKEN. No Account Token, or one that is malformed,
+            tampered, expired, or of another kind. An instructor Capability
+            Token is not accepted on pack routes.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "403":
+          description: PACK_IS_SYSTEM_PACK. System Packs cannot be archived.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+        "409":
+          description: PACK_ALREADY_ARCHIVED. The pack is already archived.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+
+  /api/v1/packs/{packId}/unarchive:
+    post:
+      operationId: unarchiveCurriculumPack
+      tags: [Packs]
+      summary: Unarchive a Curriculum Pack so it is listed again
+      description: >-
+        Any signed-in teacher may unarchive any archived pack (ADR-0007).
+        Records the acting account and the time; the last archive stays on
+        record.
+      security:
+        - ApiKeyAuth: []
+          AccountAuth: []
+      parameters:
+        - name: packId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: The pack is no longer archived
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [packId, isArchived, unarchivedAt, unarchivedBy]
+                properties:
+                  packId:
+                    type: string
+                  isArchived:
+                    type: boolean
+                    const: false
+                  unarchivedAt:
+                    type: string
+                    format: date-time
+                  unarchivedBy:
+                    type: string
+                    description: The Instructor Account id that unarchived the pack.
+        "401":
+          description: >-
+            UNAUTHORIZED_TOKEN. No Account Token, or one that is malformed,
+            tampered, expired, or of another kind. An instructor Capability
+            Token is not accepted on pack routes.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+        "409":
+          description: PACK_NOT_ARCHIVED. The pack is not archived.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+
   /api/v1/sessions:
     post:
       operationId: createGameSession
       tags: [Sessions]
       summary: Create a new Game Session (auto-joins and starts Round 1 when mode is "solo")
+      description: >-
+        A **classroom** (or any non-solo) Game Session needs a signed-in
+        teacher: send an Account Token (`AccountAuth`). The session records
+        that Instructor Account as its owner. A **solo** session needs no
+        Account Token and records no owner. Either way the response returns
+        the per-session `instructorToken` Capability Token, and every in-game
+        route (state, phase transition, adjudication, standings) keeps using
+        it, so the Account Token expiring or the teacher signing out never
+        breaks a running game. `creatorDisplayName` stays a per-game choice.
+      security:
+        - ApiKeyAuth: []
+          AccountAuth: []
+        - ApiKeyAuth: []
       requestBody:
         required: true
         content:
@@ -160,8 +509,30 @@ paths:
                 $ref: "#/components/schemas/CreateSessionResponse"
         "400":
           $ref: "#/components/responses/BadRequestError"
+        "401":
+          description: >-
+            UNAUTHORIZED_TOKEN. A classroom (non-solo) start sent no Account
+            Token, or any start sent one that is malformed, tampered, expired,
+            or of another kind (an instructor Capability Token is never
+            accepted here). No session is created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
         "404":
           $ref: "#/components/responses/NotFoundError"
+        "422":
+          description: >-
+            PACK_VALIDATION_FAILED. The Curriculum Pack has fewer Keyword Cards
+            than its `boardConfig.rows × boardConfig.cols` board, so a Game
+            Session could not deal a full board. This guards packs stored
+            before registration enforced the rule. `details` carries `packId`,
+            `cardCount`, `rows`, `cols` and `requiredCardCount`. No session is
+            created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
 
   /api/v1/sessions/join:
     post:
@@ -181,6 +552,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/JoinSessionResponse"
+        "400":
+          $ref: "#/components/responses/BadRequestError"
         "404":
           $ref: "#/components/responses/NotFoundError"
         "409":
@@ -257,6 +630,8 @@ paths:
                 properties:
                   state:
                     $ref: "#/components/schemas/PublicSessionState"
+        "400":
+          $ref: "#/components/responses/BadRequestError"
         "401":
           $ref: "#/components/responses/UnauthorizedError"
         "403":
@@ -276,6 +651,88 @@ paths:
                 $ref: "#/components/schemas/ApiErrorResponse"
 
   /api/v1/sessions/{sessionId}/rounds/{roundNumber}/chains:
+    get:
+      operationId: listRoundChains
+      tags: [Chains]
+      summary: List the Concept Chains of a Gameplay Round that the caller may see
+      description: >-
+        Returns the Gameplay Round's Concept Chains, each as a
+        `SubmittedChainListItem`: the `SubmittedChain` shape that submit and
+        adjudicate return (path, keywords, narrative, step rationales, status,
+        peer votes, verdict) plus the submitting learner's
+        `participantDisplayName` and each peer vote's `voterDisplayName`
+        (`"Unknown"` if the participant can't be found). Display names are
+        already public to the class through standings; no email address or
+        Account id appears. Chains are sorted by `submittedAt` ascending, then
+        `chainId`. A round with no
+        chains, or one that has not started yet, returns 200 with an empty
+        `chains` list.
+
+
+        Visibility: the session's instructor Capability Token sees every chain
+        of the round, in any phase. A participant Capability Token's view
+        depends on the session's current phase: while that round is in
+        chain-mapping, or before it (pretest, trial-orientation, or any Round 1
+        phase when listing Round 2), the participant sees only their own
+        chains, so nobody can copy a classmate's chain. From that round's
+        peer-adjudication on (peer-adjudication, round-summary, later rounds,
+        posttest, feedback-survey, completed), the participant sees every
+        chain of the round, so they can review and vote.
+
+
+        Teachers call this with the session's instructor Capability Token, not
+        an Account Token (ADR-0007).
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/SessionIdParam"
+        - $ref: "#/components/parameters/RoundNumberParam"
+      responses:
+        "200":
+          description: The round's Concept Chains the caller may see, in submission order
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [roundNumber, chains]
+                properties:
+                  roundNumber:
+                    type: integer
+                    enum: [1, 2]
+                  chains:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/SubmittedChainListItem"
+        "400":
+          description: >-
+            INVALID_REQUEST_BODY. `roundNumber` is not 1 or 2.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "401":
+          description: >-
+            UNAUTHORIZED_TOKEN. No bearer token, or one that is malformed,
+            invalid, expired, or an Account Token instead of a Capability
+            Token.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "403":
+          description: >-
+            FORBIDDEN_ROLE. The Capability Token belongs to another Game
+            Session.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "404":
+          description: SESSION_NOT_FOUND. No Game Session has this id.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
     post:
       operationId: submitConceptChain
       tags: [Chains]
@@ -302,6 +759,8 @@ paths:
                 properties:
                   chain:
                     $ref: "#/components/schemas/SubmittedChain"
+        "400":
+          $ref: "#/components/responses/BadRequestError"
         "401":
           $ref: "#/components/responses/UnauthorizedError"
         "404":
@@ -366,6 +825,8 @@ paths:
                 properties:
                   chain:
                     $ref: "#/components/schemas/SubmittedChain"
+        "400":
+          $ref: "#/components/responses/BadRequestError"
         "401":
           $ref: "#/components/responses/UnauthorizedError"
         "403":
@@ -443,6 +904,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/AssessmentSubmissionResponse"
+        "400":
+          $ref: "#/components/responses/BadRequestError"
         "401":
           $ref: "#/components/responses/UnauthorizedError"
         "404":
@@ -499,6 +962,8 @@ paths:
                   submittedAt:
                     type: string
                     format: date-time
+        "400":
+          $ref: "#/components/responses/BadRequestError"
         "401":
           $ref: "#/components/responses/UnauthorizedError"
         "404":
@@ -556,6 +1021,19 @@ components:
       description: >
         Pass either an `instructorToken` (returned on session creation) or a
         `participantToken` (returned on session join or solo session creation).
+        These Capability Tokens carry `kind: "capability"`; an Account Token
+        sent here is rejected with 401 UNAUTHORIZED_TOKEN.
+    AccountAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: AccountToken
+      description: >
+        An Account Token, returned by `signUpInstructor` and
+        `signInInstructor`: an HS256 JWT signed with its own secret
+        (`ACCOUNT_TOKEN_SECRET`), carrying `kind: "account"`, the account id
+        as `sub` and the email, and expiring 12 hours after issue. Fails
+        closed: a token that is present but malformed, tampered, expired, or
+        a Capability Token gets 401 UNAUTHORIZED_TOKEN.
 
   parameters:
     SessionIdParam:
@@ -574,7 +1052,20 @@ components:
 
   responses:
     BadRequestError:
-      description: Malformed request payload
+      description: >-
+        INVALID_REQUEST_BODY. The body is not valid JSON, was sent without
+        `Content-Type: application/json`, or is not a JSON object (an array,
+        string, number or null), or it breaks the operation's request schema
+        (a missing required field, a wrong type, an unknown enum value, a
+        value out of range). For a schema failure, `details.field` is the path
+        of the first failing field (for example `roomCode`,
+        `timerConfig.pretestSec` or `path[1].row`) and `details.reason` says
+        what is wrong (for example "is required" or "must be one of: advance,
+        jump"). A request with no body is checked as `{}`. Checked for every
+        route after the token, so a request without a valid token gets 401
+        first. Rules beyond the schema keep their own codes (for example 422
+        PACK_VALIDATION_FAILED or CHAIN_TOPOLOGY_INVALID). The response never
+        contains a stack trace or validator internals.
       content:
         application/json:
           schema:
@@ -632,6 +1123,13 @@ components:
         - CONCURRENT_UPDATE_CONFLICT
         - CHAIN_ALREADY_SUBMITTED
         - SURVEY_ALREADY_SUBMITTED
+        - EMAIL_ALREADY_REGISTERED
+        - INVALID_CREDENTIALS
+        - ACCOUNT_TEMPORARILY_LOCKED
+        - PACK_IS_SYSTEM_PACK
+        - PACK_ALREADY_ARCHIVED
+        - PACK_NOT_ARCHIVED
+        - INTERNAL_ERROR
 
     ApiErrorResponse:
       type: object
@@ -644,6 +1142,66 @@ components:
         details:
           type: object
           additionalProperties: true
+
+    AccountCredentialsRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 254
+          example: rahman.s@aku.edu
+        password:
+          type: string
+          minLength: 10
+          maxLength: 1024
+
+    SignInRequest:
+      type: object
+      description: >-
+        Unlike sign-up, nothing is required and no email or password rules
+        apply: a missing field, a malformed email or a short password gets the
+        same 401 INVALID_CREDENTIALS as a wrong password.
+      properties:
+        email:
+          type: string
+          maxLength: 254
+          example: rahman.s@aku.edu
+        password:
+          type: string
+          maxLength: 1024
+
+    AccountTokenResponse:
+      type: object
+      required: [accountId, email, accountToken, expiresAt]
+      properties:
+        accountId:
+          type: string
+        email:
+          type: string
+          description: The normalised (trimmed, lower-cased) email.
+        accountToken:
+          type: string
+          description: >-
+            Send as `Authorization: Bearer <accountToken>` where `AccountAuth`
+            is required.
+        expiresAt:
+          type: string
+          format: date-time
+          description: 12 hours after issue.
+
+    InstructorAccountView:
+      type: object
+      required: [accountId, email, createdAt]
+      properties:
+        accountId:
+          type: string
+        email:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
 
     BoardConfig:
       type: object
@@ -828,6 +1386,26 @@ components:
         hasPerceptionSurvey:
           type: boolean
 
+    CurriculumPackListItem:
+      description: >-
+        A pack in the pack list: the summary of its latest Pack Version, who
+        released that version, and whether the pack is archived.
+      allOf:
+        - $ref: "#/components/schemas/CurriculumPackSummary"
+        - type: object
+          required: [authorHandle, isArchived]
+          properties:
+            authorHandle:
+              type: [string, "null"]
+              description: >-
+                The releasing account's email before the @ (for example
+                `rahman.s`), or null when `createdBy` is not an Instructor
+                Account. Never a full email address.
+              examples: [rahman.s]
+            isArchived:
+              type: boolean
+              description: True only when listed with `includeArchived=true`.
+
     PublicCurriculumPack:
       type: object
       required: [id, title, version, description, boardConfig, domains, cards, adjudicationRubric]
@@ -881,6 +1459,12 @@ components:
           type: string
         rule:
           type: string
+          description: >-
+            The rule that failed, for example REQUIRED_FIELD,
+            INVALID_DOMAIN_REF, DIMENSION_MISMATCH, or INSUFFICIENT_CARDS
+            (reported on `cards`: the pack has fewer Keyword Cards than its
+            `rows × cols` board, so a Game Session could not deal a full
+            board; the message states the shortfall).
         message:
           type: string
 
@@ -963,6 +1547,13 @@ components:
           $ref: "#/components/schemas/SessionTimerConfig"
         seed:
           type: string
+          minLength: 1
+          description: >
+            Seeds Round 1's board, which the server deals when the session
+            enters `round-1:chain-mapping`. The same Curriculum Pack, board
+            size and seed always give the same board. A `seed` sent with that
+            transition overrides it. Without either, the server generates a
+            random seed. Round 2 never uses this seed.
         creatorDisplayName:
           type: string
 
@@ -1020,10 +1611,15 @@ components:
 
     BoardGridView:
       type: object
+      description: >
+        A Gameplay Round's board, dealt by the server from the session's
+        Curriculum Pack when the round's Chain-Mapping phase starts.
+        `cells[row][col]` holds a copy of the Keyword Card placed there.
       required: [seed, rows, cols, cells]
       properties:
         seed:
           type: string
+          description: The seed this board was dealt with; it reproduces the board.
         rows:
           type: integer
         cols:
@@ -1047,6 +1643,7 @@ components:
         - phaseStartedAt
         - phaseEndsAt
         - participantCount
+        - activeBoard
       properties:
         sessionId:
           type: string
@@ -1054,6 +1651,14 @@ components:
           type: string
         packId:
           type: string
+        packVersion:
+          type: [string, "null"]
+          description: >
+            The Pack Version the session started with (the latest version
+            when it was created). The board deal, Pretest, Posttest and
+            perception survey all read this version, even after a newer one
+            is registered. `null` for sessions stored before versions were
+            pinned, which read the pack's latest version.
         mode:
           $ref: "#/components/schemas/SessionMode"
         adjudicationMode:
@@ -1073,6 +1678,12 @@ components:
             When the current phase is scheduled to end. `null` when the
             phase is instructor-driven (its timer is set to `null`).
         activeBoard:
+          description: >
+            The board of the active Gameplay Round, the same through its
+            Chain-Mapping, Peer-Adjudication and Round-Summary phases. `null`
+            outside a Gameplay Round (pretest, trial orientation, posttest,
+            feedback survey, completed), and for a round entered before the
+            server dealt boards.
           oneOf:
             - $ref: "#/components/schemas/BoardGridView"
             - type: "null"
@@ -1091,17 +1702,19 @@ components:
           $ref: "#/components/schemas/PhaseIdentifier"
         seed:
           type: string
+          minLength: 1
+          description: >
+            Seeds the board of the round this transition enters
+            (`round-1:chain-mapping` or `round-2:chain-mapping`), overriding
+            the session's creation seed for Round 1. Without it, Round 1 uses
+            the creation seed and otherwise the server generates a random
+            seed. Ignored for transitions that enter no round.
 
     StepRationale:
-      type: object
-      required: [fromCoord, toCoord, rationale]
-      properties:
-        fromCoord:
-          $ref: "#/components/schemas/GridCoord"
-        toCoord:
-          $ref: "#/components/schemas/GridCoord"
-        rationale:
-          type: string
+      type: string
+      description: >-
+        The learner's reason for one link of the chain, as plain text. Item i
+        of `stepRationales` explains the step from `path[i]` to `path[i + 1]`.
 
     SubmitChainRequest:
       type: object
@@ -1115,6 +1728,14 @@ components:
         narrativeExplanation:
           type: string
           minLength: 1
+        keywordIds:
+          type: array
+          description: >-
+            The keyword ids of the path's cells, in path order. Stored as sent
+            and returned on the chain; the server does not derive them from
+            the board. Defaults to an empty list.
+          items:
+            type: string
         stepRationales:
           type: array
           items:
@@ -1230,7 +1851,37 @@ components:
           type: string
           format: date-time
 
+    SubmittedChainListItem:
+      description: >-
+        A Concept Chain as listed by `listRoundChains`: every `SubmittedChain`
+        field plus the display names a screen needs to label the chain and its
+        peer votes without a learner roster.
+      allOf:
+        - $ref: "#/components/schemas/SubmittedChain"
+        - type: object
+          required: [participantDisplayName, peerVotes]
+          properties:
+            participantDisplayName:
+              type: string
+              description: >-
+                The submitting participant's display name, or "Unknown" if
+                the participant can't be found.
+            peerVotes:
+              type: array
+              items:
+                allOf:
+                  - $ref: "#/components/schemas/PeerVoteRecord"
+                  - type: object
+                    required: [voterDisplayName]
+                    properties:
+                      voterDisplayName:
+                        type: string
+                        description: >-
+                          The voter's display name, or "Unknown" if the
+                          participant can't be found.
+
     AdjudicateChainRequest:
+      type: object
       oneOf:
         - $ref: "#/components/schemas/PeerVoteActionRequest"
         - $ref: "#/components/schemas/AiEvaluateActionRequest"

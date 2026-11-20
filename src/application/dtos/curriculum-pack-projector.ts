@@ -1,5 +1,6 @@
 import type { CurriculumPack } from "../../domain/curriculum-pack/curriculum-pack.js";
 import type {
+  CurriculumPackListItemDto,
   CurriculumPackProjectionOptions,
   CurriculumPackSummaryDto,
   PublicAssessmentQuestionDto,
@@ -18,6 +19,17 @@ export class CurriculumPackProjector {
       domainCount: pack.domains.length,
       hasAssessmentInstrument: pack.assessmentInstrument !== null,
       hasPerceptionSurvey: pack.perceptionSurvey !== null,
+    };
+  }
+
+  public static toListItemDto(
+    pack: CurriculumPack,
+    authorHandle: string | null,
+  ): CurriculumPackListItemDto {
+    return {
+      ...CurriculumPackProjector.toSummaryDto(pack),
+      authorHandle,
+      isArchived: pack.isArchived,
     };
   }
 

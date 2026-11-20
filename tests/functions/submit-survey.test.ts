@@ -124,7 +124,7 @@ function generateWordsString(wordCount: number): string {
   return words.join(" ");
 }
 
-describe("POST /api/v1/sessions/{sessionId}/survey", () => {
+describe("pOST /api/v1/sessions/{sessionId}/survey", () => {
   describe("successful survey submission", () => {
     it("returns 201 with receipt for valid survey during feedback-survey phase", async () => {
       const session = makeFeedbackSurveySession();
@@ -147,7 +147,9 @@ describe("POST /api/v1/sessions/{sessionId}/survey", () => {
 
       const event = makeEvent(
         session.sessionId.value,
-        { responses: makeAllResponses() },
+        {
+          responses: makeAllResponses(),
+        },
         { authorization: `Bearer ${token}` },
       );
 
@@ -181,7 +183,9 @@ describe("POST /api/v1/sessions/{sessionId}/survey", () => {
 
       const event = makeEvent(
         session.sessionId.value,
-        { responses: makePartialResponses() },
+        {
+          responses: makePartialResponses(),
+        },
         { authorization: `Bearer ${token}` },
       );
 
@@ -214,7 +218,10 @@ describe("POST /api/v1/sessions/{sessionId}/survey", () => {
       const comments = "This was a great learning experience!";
       const event = makeEvent(
         session.sessionId.value,
-        { responses: makeAllResponses(), comments },
+        {
+          responses: makeAllResponses(),
+          comments,
+        },
         { authorization: `Bearer ${token}` },
       );
 
@@ -251,7 +258,10 @@ describe("POST /api/v1/sessions/{sessionId}/survey", () => {
       const comments = generateWordsString(1000);
       const event = makeEvent(
         session.sessionId.value,
-        { responses: makeAllResponses(), comments },
+        {
+          responses: makeAllResponses(),
+          comments,
+        },
         { authorization: `Bearer ${token}` },
       );
 
@@ -326,7 +336,10 @@ describe("POST /api/v1/sessions/{sessionId}/survey", () => {
       const comments = generateWordsString(1001);
       const event = makeEvent(
         session.sessionId.value,
-        { responses: makeAllResponses(), comments },
+        {
+          responses: makeAllResponses(),
+          comments,
+        },
         { authorization: `Bearer ${token}` },
       );
 
@@ -337,7 +350,7 @@ describe("POST /api/v1/sessions/{sessionId}/survey", () => {
       expect(body.code).toBe("SURVEY_COMMENTS_TOO_LONG");
     });
 
-    it("returns 422 for invalid Likert value 0", async () => {
+    it("returns 400 naming the item for invalid Likert value 0 (request schema, api-hardening 06)", async () => {
       const session = makeFeedbackSurveySession();
       const participant = session.addParticipant("Grace");
       const sessionRepo = new InMemoryGameSessionRepository([session]);
@@ -368,12 +381,13 @@ describe("POST /api/v1/sessions/{sessionId}/survey", () => {
 
       const response = await handler(event, {} as never);
 
-      expect(response.statusCode).toBe(422);
+      expect(response.statusCode).toBe(400);
       const body = JSON.parse(response.body);
-      expect(body.code).toBe("INVALID_SURVEY_RESPONSE");
+      expect(body.code).toBe("INVALID_REQUEST_BODY");
+      expect(body.details).toEqual({ field: "responses.survey-q1", reason: "must be one of: 1, 2, 3, 4, 5" });
     });
 
-    it("returns 422 for invalid Likert value 6", async () => {
+    it("returns 400 naming the item for invalid Likert value 6 (request schema, api-hardening 06)", async () => {
       const session = makeFeedbackSurveySession();
       const participant = session.addParticipant("Henry");
       const sessionRepo = new InMemoryGameSessionRepository([session]);
@@ -404,12 +418,13 @@ describe("POST /api/v1/sessions/{sessionId}/survey", () => {
 
       const response = await handler(event, {} as never);
 
-      expect(response.statusCode).toBe(422);
+      expect(response.statusCode).toBe(400);
       const body = JSON.parse(response.body);
-      expect(body.code).toBe("INVALID_SURVEY_RESPONSE");
+      expect(body.code).toBe("INVALID_REQUEST_BODY");
+      expect(body.details).toEqual({ field: "responses.survey-q1", reason: "must be one of: 1, 2, 3, 4, 5" });
     });
 
-    it("returns 422 for negative Likert value", async () => {
+    it("returns 400 naming the item for negative Likert value (request schema, api-hardening 06)", async () => {
       const session = makeFeedbackSurveySession();
       const participant = session.addParticipant("Ivy");
       const sessionRepo = new InMemoryGameSessionRepository([session]);
@@ -440,12 +455,13 @@ describe("POST /api/v1/sessions/{sessionId}/survey", () => {
 
       const response = await handler(event, {} as never);
 
-      expect(response.statusCode).toBe(422);
+      expect(response.statusCode).toBe(400);
       const body = JSON.parse(response.body);
-      expect(body.code).toBe("INVALID_SURVEY_RESPONSE");
+      expect(body.code).toBe("INVALID_REQUEST_BODY");
+      expect(body.details).toEqual({ field: "responses.survey-q1", reason: "must be one of: 1, 2, 3, 4, 5" });
     });
 
-    it("returns 422 for string Likert value", async () => {
+    it("returns 400 naming the item for string Likert value (request schema, api-hardening 06)", async () => {
       const session = makeFeedbackSurveySession();
       const participant = session.addParticipant("Jack");
       const sessionRepo = new InMemoryGameSessionRepository([session]);
@@ -476,9 +492,10 @@ describe("POST /api/v1/sessions/{sessionId}/survey", () => {
 
       const response = await handler(event, {} as never);
 
-      expect(response.statusCode).toBe(422);
+      expect(response.statusCode).toBe(400);
       const body = JSON.parse(response.body);
-      expect(body.code).toBe("INVALID_SURVEY_RESPONSE");
+      expect(body.code).toBe("INVALID_REQUEST_BODY");
+      expect(body.details).toEqual({ field: "responses.survey-q1", reason: "must be an integer" });
     });
   });
 
@@ -504,7 +521,9 @@ describe("POST /api/v1/sessions/{sessionId}/survey", () => {
 
       const event = makeEvent(
         session.sessionId.value,
-        { responses: makeAllResponses() },
+        {
+          responses: makeAllResponses(),
+        },
         { authorization: `Bearer ${token}` },
       );
 
@@ -538,7 +557,9 @@ describe("POST /api/v1/sessions/{sessionId}/survey", () => {
 
       const event = makeEvent(
         session.sessionId.value,
-        { responses: makeAllResponses() },
+        {
+          responses: makeAllResponses(),
+        },
         { authorization: `Bearer ${token}` },
       );
 
@@ -627,7 +648,9 @@ describe("POST /api/v1/sessions/{sessionId}/survey", () => {
 
       const event = makeEvent(
         session.sessionId.value,
-        { responses: makeAllResponses() },
+        {
+          responses: makeAllResponses(),
+        },
         {}, // No authorization header
       );
 
@@ -658,7 +681,9 @@ describe("POST /api/v1/sessions/{sessionId}/survey", () => {
 
       const event = makeEvent(
         session.sessionId.value,
-        { responses: makeAllResponses() },
+        {
+          responses: makeAllResponses(),
+        },
         { authorization: `Bearer ${token}` },
       );
 

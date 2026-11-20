@@ -2,18 +2,14 @@ import type { APIGatewayProxyResult } from "aws-lambda";
 import type {
   AuthenticatedEvent,
 } from "../../../src/adapters/inbound/http/middy/auth.middleware.js";
-import type { CapabilityTokenPort } from "../../../src/application/ports/capability-token.port.js";
-import middy from "@middy/core";
-import httpJsonBodyParser from "@middy/http-json-body-parser";
-import { wrapLambdaHandler } from "../../../src/adapters/inbound/http/lambda-to-v2-wrapper.js";
-import { authMiddleware } from "../../../src/adapters/inbound/http/middy/auth.middleware.js";
-import { domainErrorMiddleware } from "../../../src/adapters/inbound/http/middy/domain-error.middleware.js";
+import type { AccountTokenVerifierPort } from "../../../src/application/ports/account-token.port.js";
+import { createApiHandler } from "../../../src/adapters/inbound/http/middy/api-handler.js";
 import { AppRuntime } from "../../../src/app-runtime.js";
 import { ValidateCurriculumPackUseCase } from "../../../src/application/use-cases/validate-curriculum-pack.use-case.js";
-import { ForbiddenRoleError } from "../../../src/domain/errors/domain-errors.js";
+import { UnauthorizedTokenError } from "../../../src/domain/errors/domain-errors.js";
 
 export interface ValidatePackHandlerDependencies {
-  readonly tokenVerifier: CapabilityTokenPort;
+  readonly accountTokenVerifier?: AccountTokenVerifierPort;
   readonly apiKey?: string;
   readonly requireApiKey?: boolean;
 }
@@ -27,10 +23,10 @@ export function createValidatePackHandler(
   const rawHandler = async (
     event: AuthenticatedEvent,
   ): Promise<APIGatewayProxyResult> => {
-    if (event.auth?.role !== "instructor") {
-      throw new ForbiddenRoleError(
-        "Only instructors can validate curriculum packs.",
-      );
+    // Any signed-in teacher may validate a draft pack, with no Game
+    // Session needed (ADR-0007).
+    if (!event.account) {
+      throw new UnauthorizedTokenError("An Account Token is required to validate curriculum packs. Sign in first.");
     }
 
     const pack = (typeof event.body === "object" && event.body !== null)
@@ -48,17 +44,14 @@ export function createValidatePackHandler(
     };
   };
 
-  return middy(rawHandler)
-    .use(httpJsonBodyParser())
-    .use(
-      authMiddleware({
-        tokenVerifier: deps.tokenVerifier,
-        apiKey: deps.apiKey,
-        requireApiKey: deps.requireApiKey,
-      }),
-    )
-    .use(domainErrorMiddleware());
+  return createApiHandler(rawHandler, {
+    bearerScheme: "AccountAuth",
+    accountTokenVerifier: deps.accountTokenVerifier,
+    apiKey: deps.apiKey,
+    requireApiKey: deps.requireApiKey,
+    tokenRequired: true,
+    missingTokenMessage: "An Account Token is required to validate curriculum packs. Sign in first.",
+  }, "validateCurriculumPack");
 }
 
 export const lambdaHandler = createValidatePackHandler();
-export default wrapLambdaHandler(lambdaHandler);

@@ -4,6 +4,7 @@ import type {
   VerifiedCapability,
 } from "../../application/ports/capability-token.port.js";
 import { jwtVerify, SignJWT } from "jose";
+import { CAPABILITY_TOKEN_KIND } from "./token-kinds.js";
 
 export class HmacCapabilityTokenAdapter implements CapabilityTokenPort, CapabilityTokenSignerPort {
   readonly #secretKey: Uint8Array;
@@ -26,6 +27,7 @@ export class HmacCapabilityTokenAdapter implements CapabilityTokenPort, Capabili
 
   public async signToken(capability: VerifiedCapability): Promise<string> {
     return new SignJWT({
+      kind: CAPABILITY_TOKEN_KIND,
       role: capability.role,
       sessionId: capability.sessionId,
       ...(capability.participantId
@@ -42,8 +44,11 @@ export class HmacCapabilityTokenAdapter implements CapabilityTokenPort, Capabili
         algorithms: ["HS256"],
       });
 
+      // Tokens issued before the `kind` claim have none and stay valid; any
+      // other kind (such as an Account Token) is refused.
       if (
-        (payload.role !== "instructor" && payload.role !== "participant")
+        (payload.kind !== undefined && payload.kind !== CAPABILITY_TOKEN_KIND)
+        || (payload.role !== "instructor" && payload.role !== "participant")
         || typeof payload.sessionId !== "string"
         || payload.sessionId.length === 0
       ) {

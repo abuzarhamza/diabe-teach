@@ -1,5 +1,7 @@
 # ADR 0004: Centralized OpenAPI Security Handlers & Standard RFC 7519 JSON Web Tokens (JWT)
 
+> **Superseded in part (2026-11-19):** commit `3c5f131` removed `OpenApiHttpApp` and its `securityHandlers`/`unauthorizedHandler`. Authentication is done by `authMiddleware` (`src/adapters/inbound/http/middy/auth.middleware.ts`) inside the shared `createApiHandler` chain, which sets `event.auth` (Capability Token) or `event.account` (Account Token). Tokens are signed with `jose`, not hand-rolled `node:crypto`. Fail-closed verification and HS256 JWTs still hold. See ADR-0007 and `docs/agents/api-architecture.md`.
+
 ## Status
 Accepted
 
