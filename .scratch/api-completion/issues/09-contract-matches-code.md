@@ -12,9 +12,22 @@ See spec: `.scratch/api-completion/spec.md`.
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] Each point above is reflected in `openapi.yaml`
-- [ ] Request-schema staleness test and catalog drift and sample tests pass
-- [ ] The prototype catalog's deviations for these points are removed or reworded
-- [ ] Typecheck, vitest (`--no-file-parallelism`), BDD (one feature per process), lint (≤ 49) and boundaries (≤ 6) are no worse
+- [x] Each point above is reflected in `openapi.yaml`
+- [x] Request-schema staleness test and catalog drift and sample tests pass
+- [x] The prototype catalog's deviations for these points are removed or reworded
+- [x] Typecheck, vitest (`--no-file-parallelism`), BDD (one feature per process), lint (≤ 49) and boundaries (≤ 6) are no worse
+
+## Resolution (2026-11-20)
+
+Contract-only change; no runtime code changed. Each claim was checked against the code first, and all four held.
+
+- `validateCurriculumPack`: 200 is now `{ valid, errors, warnings }`; `PackValidationIssue` items are `{ path, code, message }` (as `PackValidator` returns). The 400 gets its own description: the body is checked against `CurriculumPackInput` first, so a missing or wrongly typed field is 400 `INVALID_REQUEST_BODY`, not `{ valid: false }`.
+- `getGameSessionState` and `getRoundStandings`: `security: BearerAuth`, 401 and 403 `FORBIDDEN_ROLE` (another session's token); either Capability Token works.
+- `streamGameSessionEvents`: `x-implemented: false`, with a description pointing to polling `getGameSessionState`.
+- `transitionSessionPhase` / `TransitionPhaseRequest`: `jump` must name the next phase (else 409 `INVALID_PHASE_TRANSITION`); ending early is `endGameSession`.
+- Ticket 03's deviation (`phaseEndsAt` equals `phaseStartedAt` on `completed`, and on both round summaries): settled by changing the contract, not the code. `PublicSessionState.phaseEndsAt` now documents it. That was the smaller change: making it `null` would also change round-summary extend behaviour (it would start returning 409 `PHASE_HAS_NO_TIMER`) and need BDD reruns.
+- Request schemas regenerated (descriptions only). Prototype catalog: the matching deviations are removed and moved to notes; the 401/403 errors and participant auth are added; `validateCurriculumPack` is now `implemented` with a real-shaped sample.
+- Not done (out of scope): `ConceptChain (API overlay).html` line 935 still shows the old `{ valid, issues }` shape; the catalog's `activeBoard` deviation is left for the Leftovers work; `jump` without `targetPhase` returns 200 with the state unchanged.
+- Checks: typecheck clean, lint 29, boundaries 6, vitest 877/877 (`--no-file-parallelism`), catalog drift and sample tests and the staleness test green. BDD was not run because no runtime code changed.

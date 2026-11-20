@@ -56,6 +56,10 @@ export class SubmitPerceptionSurveyUseCase implements SubmitPerceptionSurveyUseC
       throw new SessionNotFoundError(command.sessionId);
     }
 
+    // A learner who left is refused before any phase check (the domain
+    // enforces it again on submit).
+    loaded.assertParticipantHasNotLeft(participantId);
+
     // Validate phase is feedback-survey
     this.#validatePhase(loaded);
 

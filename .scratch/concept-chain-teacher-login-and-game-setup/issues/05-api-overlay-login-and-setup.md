@@ -4,7 +4,9 @@
 
 **Blocked by:** 03, 04
 
-**Status:** ready-for-agent
+**Status:** resolved
+
+Resolved 2026-11-20: done in `fe90fcd` (`claudPoc/concept-chain/login.html`, `setup.html`), later wired to the real API in `93dbb3f`; see the Comments below.
 
 - [x] Toggle, outlines, tags and legend work on both new pages and persist across login → setup → teacher screen
 - [x] Every element listed above is tagged with the right step/operation/gap and read/write style

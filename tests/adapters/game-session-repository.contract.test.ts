@@ -1,5 +1,6 @@
 import type { GameSessionRepositoryPort } from "../../src/application/ports/game-session-repository.port.js";
-import type { LikertRating, McqAnswerChoice } from "../../src/domain/game-session/game-session.types.js";
+import type { KeywordCard } from "../../src/domain/curriculum-pack/curriculum-pack.types.js";
+import type { GameSessionSnapshot, LikertRating, McqAnswerChoice } from "../../src/domain/game-session/game-session.types.js";
 import type { RoundBoard } from "../../src/domain/game-session/round-board.types.js";
 import mongoose from "mongoose";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -16,6 +17,8 @@ interface LegacySessionSeed {
   readonly sessionId: string;
   readonly roomCode: string;
   readonly phaseStartedAt: Date;
+  /** Learners stored before they could leave: no `leftAt` field. */
+  readonly participants?: readonly { participantId: string; displayName: string; joinedAt: Date }[];
 }
 
 interface RepositoryHarness {
@@ -61,6 +64,152 @@ function firstAnswer(choice: McqAnswerChoice): ReadonlyMap<string, McqAnswerChoi
   return new Map<string, McqAnswerChoice>().set("dm-mcq-01", choice);
 }
 
+/** A card with every field set, aliases included. */
+function populatedCard(id: string): KeywordCard {
+  return {
+    id,
+    verbatimLabel: `Verbatim ${id}`,
+    displayLabel: `Display ${id}`,
+    aliases: [
+      `alias-${id}`,
+    ],
+    domainId: "domain-a",
+    summary: `Summary of ${id}`,
+  };
+}
+
+/**
+ * A session snapshot with every field, and every optional field nested in
+ * it, set to a non-empty value. Typed as the domain snapshot, so a field
+ * added to the snapshot must be added here too.
+ */
+function fullyPopulatedSnapshot(sessionId: string, roomCode: string): GameSessionSnapshot {
+  return {
+    sessionId,
+    roomCode,
+    packId: "diabe-teach",
+    packVersion: "1.2.0",
+    ownerAccountId: "account-owner-1",
+    mode: "classroom",
+    adjudicationMode: "hybrid",
+    timerConfig: {
+      pretestSec: 600,
+      trialOrientationSec: 300,
+      roundMappingSec: 1200,
+      roundAdjudicationSec: 480,
+      posttestSec: 700,
+      feedbackSurveySec: 200,
+    },
+    currentPhase: "round-2:peer-adjudication",
+    phaseStartedAt: new Date("2026-03-01T10:00:00.000Z"),
+    extendedPhaseEndsAt: new Date("2026-03-01T10:30:00.000Z"),
+    participants: [
+      {
+        participantId: "p-alice",
+        displayName: "Alice",
+        joinedAt: new Date("2026-03-01T09:01:00.000Z"),
+        leftAt: new Date("2026-03-01T09:50:00.000Z"),
+      },
+    ],
+    activeRoundNumber: 2,
+    createdAt: new Date("2026-03-01T09:00:00.000Z"),
+    creationSeed: "creation-seed",
+    chains: [
+      {
+        chainId: "chain-1",
+        participantId: "p-alice",
+        roundNumber: 1,
+        path: [
+          { row: 0, col: 0 },
+          { row: 0, col: 1 },
+          { row: 1, col: 1 },
+        ],
+        keywordIds: [
+          "card-0",
+          "card-1",
+          "card-4",
+        ],
+        narrativeExplanation: "Insulin lowers glucose.",
+        stepRationales: [
+          "first step",
+          "second step",
+        ],
+        status: "approved",
+        peerVotes: [
+          {
+            voterParticipantId: "p-bob",
+            decision: "approve",
+            comment: "Nice link",
+            votedAt: new Date("2026-03-01T09:40:00.000Z"),
+          },
+        ],
+        verdict: {
+          isApproved: true,
+          isLocked: true,
+          feedback: "Well argued",
+          qualityScore: 4,
+          decidedBy: "instructor",
+          decidedAt: new Date("2026-03-01T09:45:00.000Z"),
+        },
+        submittedAt: new Date("2026-03-01T09:30:00.000Z"),
+      },
+    ],
+    assessments: [
+      {
+        participantId: "p-alice",
+        stage: "pretest",
+        answers: firstAnswer(2),
+        submittedAt: new Date("2026-03-01T09:05:00.000Z"),
+      },
+    ],
+    surveyResponses: [
+      {
+        participantId: "p-alice",
+        responses: new Map<string, LikertRating>().set("survey-q1", 4),
+        comments: "Loved it",
+        submittedAt: new Date("2026-03-01T09:48:00.000Z"),
+      },
+    ],
+    roundBoards: [1, 2].map(roundNumber => ({
+      roundNumber: roundNumber as 1 | 2,
+      seed: `round-${roundNumber}-seed`,
+      rows: 2,
+      cols: 3,
+      cells: [
+        [0, 1, 2].map(i => populatedCard(`card-${i}`)),
+        [3, 4, 5].map(i => populatedCard(`card-${i}`)),
+      ],
+    })),
+    version: 0,
+  };
+}
+
+/** Fails, naming the path, on any null, undefined, empty list or empty map anywhere in `value`. */
+function expectFullyPopulated(value: unknown, path = "session"): void {
+  expect(value, `${path} is set`).not.toBeNull();
+  expect(value, `${path} is set`).not.toBeUndefined();
+  if (value instanceof Date) {
+    return;
+  }
+  if (value instanceof Map) {
+    expect(value.size, `${path} is not empty`).toBeGreaterThan(0);
+    for (const [key, entry] of value) {
+      expectFullyPopulated(entry, `${path}.${String(key)}`);
+    }
+    return;
+  }
+  if (Array.isArray(value)) {
+    expect(value.length, `${path} is not empty`).toBeGreaterThan(0);
+    value.forEach((entry, index) => expectFullyPopulated(entry, `${path}[${index}]`));
+    return;
+  }
+  if (typeof value === "object") {
+    for (const [key, entry] of Object.entries(value as object)) {
+      expectFullyPopulated(entry, `${path}.${key}`);
+    }
+  }
+}
+
 function defineGameSessionRepositoryContract(
   name: string,
   setup: () => Promise<RepositoryHarness>,
@@ -75,6 +224,22 @@ function defineGameSessionRepositoryContract(
 
     afterAll(async () => {
       await teardown();
+    });
+
+    it("keeps every field of a fully populated session across a save and load", async () => {
+      const snapshot = fullyPopulatedSnapshot(`full-${name}`, "FULL01");
+      expectFullyPopulated(snapshot);
+      await harness.repo.create(GameSession.fromSnapshot(snapshot));
+
+      const loaded = await harness.repo.findById(SessionId.from(snapshot.sessionId));
+      expect(loaded?.toSnapshot()).toEqual(snapshot);
+      await harness.repo.update(loaded!);
+
+      const reloaded = await harness.repo.findByRoomCode(loaded!.roomCode);
+      expect(reloaded?.toSnapshot()).toEqual({
+        ...snapshot,
+        version: 1,
+      });
     });
 
     it("stores a new session at version 0", async () => {
@@ -246,6 +411,26 @@ function defineGameSessionRepositoryContract(
       expect(reloaded?.activeBoard).toEqual(round2Board);
     });
 
+    it("round-trips the seed of a board dealt from a transition seed", async () => {
+      const session = GameSession.create({
+        packId: "diabe-teach",
+        mode: "classroom",
+        adjudicationMode: "peer-instructor",
+      });
+      await harness.repo.create(session);
+      const board = boardOf(1, "transition-seed", 3);
+
+      const loaded = await harness.repo.findById(session.sessionId);
+      loaded!.transitionTo("trial-orientation", new Date("2026-03-01T09:10:00.000Z"));
+      loaded!.transitionTo("round-1:chain-mapping", new Date("2026-03-01T09:20:00.000Z"), board);
+      await harness.repo.update(loaded!);
+
+      const reloaded = await harness.repo.findById(session.sessionId);
+      expect(reloaded?.creationSeed).toBeNull();
+      expect(reloaded?.boardForRound(1)?.seed).toBe("transition-seed");
+      expect(reloaded?.activeBoard).toEqual(board);
+    });
+
     it("round-trips the pinned Pack Version across an update", async () => {
       const session = GameSession.create({
         packId: "diabe-teach",
@@ -278,6 +463,67 @@ function defineGameSessionRepositoryContract(
       await harness.repo.update(loaded!);
 
       expect((await harness.repo.findById(session.sessionId))?.ownerAccountId).toBe("account-owner-1");
+    });
+
+    it("round-trips an extended phase deadline across an update", async () => {
+      const session = GameSession.create({
+        packId: "diabe-teach",
+        mode: "classroom",
+        adjudicationMode: "peer-instructor",
+        phaseStartedAt: new Date("2026-03-01T09:00:00.000Z"),
+        timerConfig: { pretestSec: 60 },
+      });
+      await harness.repo.create(session);
+
+      const loaded = await harness.repo.findById(session.sessionId);
+      expect(loaded?.extendedPhaseEndsAt).toBeNull();
+      loaded!.extendPhase(30, new Date("2026-03-01T09:00:10.000Z"));
+      await harness.repo.update(loaded!);
+
+      const reloaded = await harness.repo.findById(session.sessionId);
+      expect(reloaded?.phaseEndsAt).toEqual(new Date("2026-03-01T09:01:30.000Z"));
+    });
+
+    it("round-trips a learner's leftAt across an update", async () => {
+      const session = newSession();
+      const alice = session.addParticipant("Alice");
+      const bob = session.addParticipant("Bob");
+      await harness.repo.create(session);
+
+      const loaded = await harness.repo.findById(session.sessionId);
+      expect(loaded?.participants.map(p => p.leftAt)).toEqual([null, null]);
+      loaded!.leave(alice.participantId, new Date("2026-03-01T09:05:00.000Z"));
+      await harness.repo.update(loaded!);
+
+      const reloaded = await harness.repo.findById(session.sessionId);
+      expect(reloaded?.getParticipant(alice.participantId)?.leftAt).toEqual(new Date("2026-03-01T09:05:00.000Z"));
+      expect(reloaded?.getParticipant(bob.participantId)?.leftAt).toBeNull();
+      expect(reloaded?.participantCount).toBe(1);
+    });
+
+    it("loads a participant stored before learners could leave with leftAt null", async () => {
+      const joinedAt = new Date("2026-03-01T09:01:00.000Z");
+      const seed: LegacySessionSeed = {
+        sessionId: `legacy-participant-${name}`,
+        roomCode: "LGCY02",
+        phaseStartedAt: new Date("2026-03-01T09:00:00.000Z"),
+        participants: [
+          { participantId: "legacy-alice", displayName: "Alice", joinedAt },
+        ],
+      };
+      await harness.seedLegacySession(seed);
+
+      const loaded = await harness.repo.findById(SessionId.from(seed.sessionId));
+
+      expect(loaded?.participants).toEqual([
+        {
+          participantId: "legacy-alice",
+          displayName: "Alice",
+          joinedAt,
+          leftAt: null,
+        },
+      ]);
+      expect(loaded?.participantCount).toBe(1);
     });
 
     it("stores a solo session with no owner", async () => {
@@ -340,6 +586,7 @@ defineGameSessionRepositoryContract("inMemoryGameSessionRepository", async () =>
         timerConfig: LEGACY_TIMER_CONFIG,
         currentPhase: "pretest",
         phaseStartedAt: seed.phaseStartedAt,
+        participants: (seed.participants ?? []).map(p => ({ ...p, leftAt: null })),
         createdAt: seed.phaseStartedAt,
       }));
     },
@@ -365,7 +612,9 @@ defineGameSessionRepositoryContract(
             timerConfig: LEGACY_TIMER_CONFIG,
             currentPhase: "pretest",
             phaseStartedAt: seed.phaseStartedAt,
-            participants: [],
+            participants: [
+              ...(seed.participants ?? []),
+            ],
             activeRoundNumber: null,
             chains: [],
             assessments: [],

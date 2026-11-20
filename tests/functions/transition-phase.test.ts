@@ -131,6 +131,35 @@ describe("post /api/v1/sessions/{sessionId}/phase", () => {
     expect(body.code).toBe("INVALID_PHASE_TRANSITION");
   });
 
+  it("returns 400 for a jump without targetPhase and leaves the phase unchanged", async () => {
+    const session = makeSession();
+    const sessionRepo = new InMemoryGameSessionRepository([session]);
+    const tokenAdapter = new FakeCapabilityTokenAdapter();
+
+    const token = await tokenAdapter.signToken({
+      role: "instructor",
+      sessionId: session.sessionId.value,
+    });
+
+    const handler = createTransitionPhaseHandler({
+      sessionRepo,
+      packRepo: new InMemoryCurriculumPackRepository(),
+      tokenVerifier: tokenAdapter,
+    });
+
+    const response = await handler(
+      makeEvent(session.sessionId.value, { action: "jump" }, { authorization: `Bearer ${token}` }),
+      {} as any,
+    );
+
+    expect(response.statusCode).toBe(400);
+    const body = JSON.parse(response.body);
+    expect(body.code).toBe("INVALID_REQUEST_BODY");
+    expect(body.details).toMatchObject({ field: "targetPhase" });
+    const stored = await sessionRepo.findById(session.sessionId);
+    expect(stored?.currentPhase).toBe(session.currentPhase);
+  });
+
   it("returns 403 when participant tries to transition", async () => {
     const session = makeSession();
     const sessionRepo = new InMemoryGameSessionRepository([session]);

@@ -1,10 +1,12 @@
 import type { APIGatewayProxyEvent } from "aws-lambda";
 import type { AssessmentStageSummary, PosttestSubmissionResult, QuestionReviewItem } from "../../src/application/ports/submit-assessment.port.js";
+import type { RoundBoard } from "../../src/domain/game-session/round-board.types.js";
 import { describe, expect, it } from "vitest";
 import { createSubmitAssessmentHandler } from "../../netlify/functions/sessions/submit-assessment.js";
 import { FakeCapabilityTokenAdapter } from "../../src/adapters/outbound/fake-capability-token-adapter.js";
 import { InMemoryCurriculumPackRepository } from "../../src/adapters/outbound/in-memory-curriculum-pack-repository.js";
 import { InMemoryGameSessionRepository } from "../../src/adapters/outbound/in-memory-game-session-repository.js";
+import { DIABE_TEACH_PACK } from "../../src/domain/curriculum-pack/diabe-teach-pack.js";
 import { GameSession } from "../../src/domain/game-session/game-session.js";
 
 function makeEvent(
@@ -162,7 +164,7 @@ function makeMixedAnswers(): Record<string, 0 | 1 | 2 | 3 | "I_DONT_KNOW"> {
   };
 }
 
-describe("POST /api/v1/sessions/{sessionId}/assessments/{stage}", () => {
+describe("submitAssessmentAttempt: POST /api/v1/sessions/{sessionId}/assessments/{stage}", () => {
   describe("pretest submission", () => {
     it("returns ungraded receipt for pretest", async () => {
       const session = makePretestSession();
@@ -186,7 +188,9 @@ describe("POST /api/v1/sessions/{sessionId}/assessments/{stage}", () => {
       const event = makeEvent(
         session.sessionId.value,
         "pretest",
-        { answers: makeAllIdkAnswers() },
+        {
+          answers: makeAllIdkAnswers(),
+        },
         { authorization: `Bearer ${token}` },
       );
 
@@ -225,7 +229,9 @@ describe("POST /api/v1/sessions/{sessionId}/assessments/{stage}", () => {
       const event = makeEvent(
         session.sessionId.value,
         "pretest",
-        { answers: makeAllIdkAnswers() },
+        {
+          answers: makeAllIdkAnswers(),
+        },
         { authorization: `Bearer ${token}` },
       );
 
@@ -303,7 +309,9 @@ describe("POST /api/v1/sessions/{sessionId}/assessments/{stage}", () => {
       const event = makeEvent(
         session.sessionId.value,
         "posttest",
-        { answers: makeAllCorrectAnswers() },
+        {
+          answers: makeAllCorrectAnswers(),
+        },
         { authorization: `Bearer ${token}` },
       );
 
@@ -341,7 +349,9 @@ describe("POST /api/v1/sessions/{sessionId}/assessments/{stage}", () => {
       const event = makeEvent(
         session.sessionId.value,
         "posttest",
-        { answers: makeAllCorrectAnswers() },
+        {
+          answers: makeAllCorrectAnswers(),
+        },
         { authorization: `Bearer ${token}` },
       );
 
@@ -383,7 +393,9 @@ describe("POST /api/v1/sessions/{sessionId}/assessments/{stage}", () => {
       const event = makeEvent(
         session.sessionId.value,
         "posttest",
-        { answers: makeAllWrongGuessAnswers() },
+        {
+          answers: makeAllWrongGuessAnswers(),
+        },
         { authorization: `Bearer ${token}` },
       );
 
@@ -423,7 +435,9 @@ describe("POST /api/v1/sessions/{sessionId}/assessments/{stage}", () => {
       const event = makeEvent(
         session.sessionId.value,
         "posttest",
-        { answers: makeAllIdkAnswers() },
+        {
+          answers: makeAllIdkAnswers(),
+        },
         { authorization: `Bearer ${token}` },
       );
 
@@ -463,7 +477,9 @@ describe("POST /api/v1/sessions/{sessionId}/assessments/{stage}", () => {
       const event = makeEvent(
         session.sessionId.value,
         "posttest",
-        { answers: makeMixedAnswers() },
+        {
+          answers: makeMixedAnswers(),
+        },
         { authorization: `Bearer ${token}` },
       );
 
@@ -505,7 +521,9 @@ describe("POST /api/v1/sessions/{sessionId}/assessments/{stage}", () => {
       const pretestEvent = makeEvent(
         session.sessionId.value,
         "pretest",
-        { answers: makeAllIdkAnswers() },
+        {
+          answers: makeAllIdkAnswers(),
+        },
         { authorization: `Bearer ${token}` },
       );
 
@@ -528,7 +546,9 @@ describe("POST /api/v1/sessions/{sessionId}/assessments/{stage}", () => {
       const posttestEvent = makeEvent(
         session.sessionId.value,
         "posttest",
-        { answers: makeAllCorrectAnswers() },
+        {
+          answers: makeAllCorrectAnswers(),
+        },
         { authorization: `Bearer ${token}` },
       );
 
@@ -570,7 +590,9 @@ describe("POST /api/v1/sessions/{sessionId}/assessments/{stage}", () => {
       const pretestEvent = makeEvent(
         session.sessionId.value,
         "pretest",
-        { answers: makeAllWrongGuessAnswers() },
+        {
+          answers: makeAllWrongGuessAnswers(),
+        },
         { authorization: `Bearer ${token}` },
       );
 
@@ -593,7 +615,9 @@ describe("POST /api/v1/sessions/{sessionId}/assessments/{stage}", () => {
       const posttestEvent = makeEvent(
         session.sessionId.value,
         "posttest",
-        { answers: makeAllCorrectAnswers() },
+        {
+          answers: makeAllCorrectAnswers(),
+        },
         { authorization: `Bearer ${token}` },
       );
 
@@ -626,7 +650,9 @@ describe("POST /api/v1/sessions/{sessionId}/assessments/{stage}", () => {
       const event = makeEvent(
         session.sessionId.value,
         "posttest",
-        { answers: makeAllCorrectAnswers() },
+        {
+          answers: makeAllCorrectAnswers(),
+        },
         { authorization: `Bearer ${token}` },
       );
 
@@ -707,7 +733,6 @@ describe("POST /api/v1/sessions/{sessionId}/assessments/{stage}", () => {
       expect(q2Review!.pretestChoice).toBe("I_DONT_KNOW");
       expect(q2Review!.posttestChoice).toBe(1);
     });
-
   });
 
   describe("chain diversity and neglected keywords", () => {
@@ -734,7 +759,9 @@ describe("POST /api/v1/sessions/{sessionId}/assessments/{stage}", () => {
       const event = makeEvent(
         session.sessionId.value,
         "posttest",
-        { answers: makeAllCorrectAnswers() },
+        {
+          answers: makeAllCorrectAnswers(),
+        },
         { authorization: `Bearer ${token}` },
       );
 
@@ -744,13 +771,39 @@ describe("POST /api/v1/sessions/{sessionId}/assessments/{stage}", () => {
       // With 0 chains, chainDiversityIndex should be 0
       expect(body.report.chainDiversityIndex).toBe(0);
 
-      // All 49 keywords should be neglected since no chains were submitted
-      expect(body.report.neglectedKeywordIds.length).toBe(49);
+      // No round board was dealt in this session, so no card was neglected
+      expect(body.report.neglectedKeywordIds).toEqual([]);
     });
 
-    it("returns all pack keywords as neglected when no chains submitted", async () => {
+    it("returns every card on the dealt boards as neglected when no chains submitted", async () => {
       const participantId = "oscar-uuid";
-      const session = makePosttestSessionWithPretest(participantId);
+      const session = GameSession.create({
+        packId: "diabe-teach",
+        mode: "classroom",
+        adjudicationMode: "peer-instructor",
+      });
+      session.submitAssessment(participantId, "pretest", new Map(Object.entries(makeAllIdkAnswers())));
+      // Round 1 deals all 49 cards on a 7 × 7 board; round 2 has no board
+      const cards = DIABE_TEACH_PACK.cards;
+      const board: RoundBoard = {
+        roundNumber: 1,
+        seed: "test-seed",
+        rows: 7,
+        cols: 7,
+        cells: Array.from({ length: 7 }, (_, row) => cards.slice(row * 7, row * 7 + 7)),
+      };
+      session.transitionTo("trial-orientation", new Date());
+      session.transitionTo("round-1:chain-mapping", new Date(), board);
+      for (const phase of [
+        "round-1:peer-adjudication",
+        "round-1:round-summary",
+        "round-2:chain-mapping",
+        "round-2:peer-adjudication",
+        "round-2:round-summary",
+        "posttest",
+      ] as const) {
+        session.transitionTo(phase, new Date());
+      }
       const sessionRepo = new InMemoryGameSessionRepository([session]);
       const packRepo = new InMemoryCurriculumPackRepository();
       const tokenAdapter = new FakeCapabilityTokenAdapter();
@@ -770,7 +823,9 @@ describe("POST /api/v1/sessions/{sessionId}/assessments/{stage}", () => {
       const event = makeEvent(
         session.sessionId.value,
         "posttest",
-        { answers: makeAllCorrectAnswers() },
+        {
+          answers: makeAllCorrectAnswers(),
+        },
         { authorization: `Bearer ${token}` },
       );
 
@@ -805,7 +860,9 @@ describe("POST /api/v1/sessions/{sessionId}/assessments/{stage}", () => {
       const event = makeEvent(
         session.sessionId.value,
         "pretest",
-        { answers: makeAllIdkAnswers() },
+        {
+          answers: makeAllIdkAnswers(),
+        },
         { authorization: `Bearer ${token}` },
       );
 
@@ -842,7 +899,9 @@ describe("POST /api/v1/sessions/{sessionId}/assessments/{stage}", () => {
       const event = makeEvent(
         session.sessionId.value,
         "posttest",
-        { answers: makeAllCorrectAnswers() },
+        {
+          answers: makeAllCorrectAnswers(),
+        },
         { authorization: `Bearer ${token}` },
       );
 
@@ -989,7 +1048,9 @@ describe("POST /api/v1/sessions/{sessionId}/assessments/{stage}", () => {
       const event = makeEvent(
         session.sessionId.value,
         "pretest",
-        { answers: makeAllIdkAnswers() },
+        {
+          answers: makeAllIdkAnswers(),
+        },
         {}, // No authorization header
       );
 
@@ -1019,7 +1080,9 @@ describe("POST /api/v1/sessions/{sessionId}/assessments/{stage}", () => {
       const event = makeEvent(
         session.sessionId.value,
         "pretest",
-        { answers: makeAllIdkAnswers() },
+        {
+          answers: makeAllIdkAnswers(),
+        },
         { authorization: `Bearer ${token}` },
       );
 

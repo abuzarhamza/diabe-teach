@@ -4,7 +4,9 @@
 
 **Blocked by:** 02
 
-**Status:** ready-for-agent
+**Status:** resolved
+
+Resolved 2026-11-20: done in `fe90fcd` (`claudPoc/concept-chain/login.html`, `setup.html`), later wired to the real API in `93dbb3f`; see the Comments below.
 
 - [x] Preview renders with the shared board renderer and matches the chosen pack and size
 - [x] Shuffle changes the layout; changing pack or size re-deals

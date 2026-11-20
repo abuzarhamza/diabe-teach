@@ -8,6 +8,7 @@ import { createUnarchivePackHandler } from "../../netlify/functions/packs/unarch
 import { createValidatePackHandler } from "../../netlify/functions/packs/validate-pack.js";
 import { FakeCapabilityTokenAdapter } from "../../src/adapters/outbound/fake-capability-token-adapter.js";
 import { InMemoryCurriculumPackRepository } from "../../src/adapters/outbound/in-memory-curriculum-pack-repository.js";
+import { InMemoryInstructorAccountRepository } from "../../src/adapters/outbound/in-memory-instructor-account-repository.js";
 import { DIABE_TEACH_PACK } from "../../src/domain/curriculum-pack/diabe-teach-pack.js";
 import { PackId } from "../../src/domain/curriculum-pack/pack-id.js";
 import { OTHER_TEACHER, SignedInTeachers, TEST_TEACHER } from "./support/signed-in-teacher.js";
@@ -129,7 +130,12 @@ function library(initialPacks = [DIABE_TEACH_PACK]) {
     register: createRegisterPackHandler(deps) as Handler,
     archive: createArchivePackHandler(deps) as Handler,
     unarchive: createUnarchivePackHandler(deps) as Handler,
-    list: createListPacksHandler({ packRepo, apiKey: API_KEY, requireApiKey: true }) as Handler,
+    list: createListPacksHandler({
+      packRepo,
+      accountRepo: new InMemoryInstructorAccountRepository(),
+      apiKey: API_KEY,
+      requireApiKey: true,
+    }) as Handler,
   };
 
   return {

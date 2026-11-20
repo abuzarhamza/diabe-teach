@@ -4,7 +4,9 @@
 
 **Blocked by:** 01-game-session-aggregate, 02-create-session-endpoint
 
-**Status:** ready-for-agent
+**Status:** resolved
+
+Resolved 2026-11-20: route `GET /api/v1/sessions/{sessionId}` (`netlify/functions/get-session.ts`), added in `b368e85`, with handler tests under `tests/functions/`.
 
 - [ ] `GetGameSessionStateUseCase` in `src/application/use-cases/`
 - [ ] Port definition with `GetSessionStateQuery` and `PublicSessionState` DTO

@@ -6,6 +6,7 @@ import { authMiddleware } from "./auth.middleware.js";
 import { domainErrorMiddleware } from "./domain-error.middleware.js";
 import { jsonObjectBodyMiddleware } from "./json-object-body.middleware.js";
 import { requestBodySchemaMiddleware } from "./request-body-schema.middleware.js";
+import { requestSizeLimitMiddleware } from "./request-size-limit.middleware.js";
 import { unexpectedErrorMiddleware } from "./unexpected-error.middleware.js";
 
 /**
@@ -15,15 +16,17 @@ import { unexpectedErrorMiddleware } from "./unexpected-error.middleware.js";
  * 1. `authMiddleware`: x-api-key and bearer token. A route with
  *    `tokenRequired` refuses a missing token here, so a caller without a
  *    valid token gets 401 whatever its body.
- * 2. `jsonObjectBodyMiddleware`: `@middy/http-json-body-parser`, then "must
+ * 2. `requestSizeLimitMiddleware`: a raw body over 256 KB (bytes, not
+ *    characters) is 413 `PAYLOAD_TOO_LARGE`, before anything parses it.
+ * 3. `jsonObjectBodyMiddleware`: `@middy/http-json-body-parser`, then "must
  *    be a JSON object". Anything else is 400 `INVALID_REQUEST_BODY`.
- * 3. `requestBodySchemaMiddleware`: the body against the request schema of
+ * 4. `requestBodySchemaMiddleware`: the body against the request schema of
  *    the route's `operationId`, generated from docs/api/openapi.yaml. A
  *    missing field, wrong type or unknown enum value is 400
  *    `INVALID_REQUEST_BODY` naming the field. Skipped for operations with no
  *    request body.
- * 4. `domainErrorMiddleware` (onError): DomainError to its status code.
- * 5. `unexpectedErrorMiddleware` (onError, last): anything else is a generic
+ * 5. `domainErrorMiddleware` (onError): DomainError to its status code.
+ * 6. `unexpectedErrorMiddleware` (onError, last): anything else is a generic
  *    500; the stack is only logged.
  *
  * Every route passes the OpenAPI `operationId` it implements, so a new
@@ -38,6 +41,7 @@ export function createApiHandler<TEvent extends APIGatewayProxyEvent>(
     .use(unexpectedErrorMiddleware())
     .use(domainErrorMiddleware())
     .use(authMiddleware(authOptions))
+    .use(requestSizeLimitMiddleware())
     .use(jsonObjectBodyMiddleware())
     .use(requestBodySchemaMiddleware(operationId));
 }

@@ -37,6 +37,24 @@ export interface ConceptChainProps {
   readonly submittedAt?: Date;
 }
 
+/**
+ * Every field of a Concept Chain as plain data: what persistence stores and
+ * what `ConceptChain.fromSnapshot` restores.
+ */
+export interface ConceptChainSnapshot {
+  readonly chainId: string;
+  readonly participantId: string;
+  readonly roundNumber: 1 | 2;
+  readonly path: readonly GridCoord[];
+  readonly keywordIds: readonly string[];
+  readonly narrativeExplanation: string;
+  readonly stepRationales: readonly string[];
+  readonly status: ChainStatus;
+  readonly peerVotes: readonly PeerVote[];
+  readonly verdict: ChainVerdict | null;
+  readonly submittedAt: Date;
+}
+
 export class ConceptChain {
   readonly #chainId: string;
   readonly #participantId: string;
@@ -69,6 +87,48 @@ export class ConceptChain {
 
   public static create(props: ConceptChainProps): ConceptChain {
     return new ConceptChain(props);
+  }
+
+  /** Restores a chain exactly as `toSnapshot` captured it. */
+  public static fromSnapshot(snapshot: ConceptChainSnapshot): ConceptChain {
+    return new ConceptChain(snapshot);
+  }
+
+  /** Every field of this chain as plain data, with its own copies of the lists. */
+  public toSnapshot(): ConceptChainSnapshot {
+    return {
+      chainId: this.#chainId,
+      participantId: this.#participantId,
+      roundNumber: this.#roundNumber,
+      path: this.#path.map(coord => ({ ...coord })),
+      keywordIds: [...this.#keywordIds],
+      narrativeExplanation: this.#narrativeExplanation,
+      stepRationales: [...this.#stepRationales],
+      status: this.#status,
+      peerVotes: this.#peerVotes.map(vote => ({ ...vote })),
+      verdict: this.#verdict,
+      submittedAt: this.#submittedAt,
+    };
+  }
+
+  /**
+   * A copy of this chain naming `keywordIds` as its Keyword Cards; every
+   * other field, including the chain id and submission time, is kept.
+   */
+  public withKeywordIds(keywordIds: readonly string[]): ConceptChain {
+    return new ConceptChain({
+      chainId: this.#chainId,
+      participantId: this.#participantId,
+      roundNumber: this.#roundNumber,
+      path: this.#path,
+      keywordIds,
+      narrativeExplanation: this.#narrativeExplanation,
+      stepRationales: this.#stepRationales,
+      status: this.#status,
+      peerVotes: this.#peerVotes,
+      verdict: this.#verdict,
+      submittedAt: this.#submittedAt,
+    });
   }
 
   public get chainId(): string {

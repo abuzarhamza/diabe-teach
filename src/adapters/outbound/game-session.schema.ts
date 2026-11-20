@@ -1,4 +1,5 @@
 import { Schema } from "mongoose";
+import { PHASE_ORDER } from "../../domain/game-session/game-session.types.js";
 
 export const GAME_SESSION_MODEL_NAME = "GameSession";
 export const GAME_SESSIONS_COLLECTION = "game_sessions";
@@ -119,6 +120,7 @@ const participantSchema = new Schema(
     participantId: { type: String, required: true },
     displayName: { type: String, required: true },
     joinedAt: { type: Date, required: true },
+    leftAt: { type: Date, default: null },
   },
   { _id: false },
 );
@@ -190,22 +192,13 @@ export const gameSessionSchema = new Schema(
     timerConfig: { type: timerConfigSchema, required: true },
     currentPhase: {
       type: String,
-      enum: [
-        "pretest",
-        "trial-orientation",
-        "round-1:chain-mapping",
-        "round-1:peer-adjudication",
-        "round-1:round-summary",
-        "round-2:chain-mapping",
-        "round-2:peer-adjudication",
-        "round-2:round-summary",
-        "posttest",
-        "feedback-survey",
-        "completed",
-      ],
+      enum: [...PHASE_ORDER],
       default: "pretest",
     },
     phaseStartedAt: { type: Date, required: true },
+    // The current phase's deadline after an instructor extension; absent on
+    // sessions stored before extensions (loaded as null).
+    extendedPhaseEndsAt: { type: Date, default: null },
     participants: {
       type: [participantSchema],
       default: [],

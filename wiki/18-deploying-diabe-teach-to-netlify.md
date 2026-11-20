@@ -90,7 +90,7 @@ Before deploying, configure the following environment variables in the Netlify D
 | `MONGODB_DB_NAME` | No | `diabe_teach` | Database name within the MongoDB cluster. |
 | `CAPABILITY_TOKEN_SECRET` | **Yes** | `c2VjcmV0LWtleS0zMi1jaGFyYWN0ZXJzLWxvbmctZXhhbXBsZQ==` | High-entropy secret for HMAC-SHA256 signature and verification of `instructorToken` and `participantToken`. |
 | `API_KEY` | Recommended | `prod-client-api-key-9b7a4f` | Shared client secret validated against the `x-api-key` header (`ApiKeyAuth` security scheme). |
-| `NODE_VERSION` | Recommended | `20` or `22` | Node.js runtime version for the Netlify build container and Lambda execution environment. |
+| `NODE_VERSION` | Recommended | `24` | Node.js runtime version for the Netlify build container and Lambda execution environment. Already pinned to `24` in `netlify.toml` (and `.nvmrc`, `package.json` `engines`). |
 
 > [!IMPORTANT]
 > **Fail-Closed Security**: If `API_KEY` is set, all incoming requests without a valid `x-api-key` header are rejected with `401 UNAUTHORIZED_TOKEN` before reaching use-case handlers. If `MONGODB_URI` is omitted, attempts to query packs or mutate sessions fail fast with an explicit error.
@@ -154,7 +154,7 @@ This writes the complete 49-card, 7-domain `DIABE_TEACH_PACK` into the `curricul
      - `MONGODB_DB_NAME` (`diabe_teach`)
      - `CAPABILITY_TOKEN_SECRET`
      - `API_KEY`
-     - `NODE_VERSION` (`20`)
+     - `NODE_VERSION` (`24`)
 
 5. **Deploy**:
    - Click **Deploy diabe-teach**. Netlify will run `npm run typecheck`, bundle [`netlify/functions/api.ts`](file:///Users/abuzarhamza/Desktop/workspaceGithub/diabe-teach/netlify/functions/api.ts) with `esbuild`, include `docs/api/openapi.yaml`, and publish your live endpoint.
@@ -182,7 +182,7 @@ If deploying from a terminal or CI pipeline without linking GitHub:
    netlify env:set MONGODB_DB_NAME "diabe_teach"
    netlify env:set CAPABILITY_TOKEN_SECRET "your-long-secure-secret-here"
    netlify env:set API_KEY "your-production-api-key"
-   netlify env:set NODE_VERSION "20"
+   netlify env:set NODE_VERSION "24"
    ```
 
 4. **Deploy Directly to Production**:

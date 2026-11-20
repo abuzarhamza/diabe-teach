@@ -153,7 +153,11 @@ describe("session writes that lose a concurrent-update race", () => {
   it("rejects a chain that raced the instructor ending Chain-Mapping, and keeps the new phase", async () => {
     const { session, sessionId, store, tokenAdapter, aliceToken, instructorToken } = await setUpChainMappingSession();
     const sessionRepo = new RaceBeforeFirstSaveSessionRepository(store);
-    const submitChain = createSubmitChainHandler({ sessionRepo, tokenVerifier: tokenAdapter });
+    const submitChain = createSubmitChainHandler({
+      packRepo: new InMemoryCurriculumPackRepository(),
+      sessionRepo,
+      tokenVerifier: tokenAdapter,
+    });
     const transitionPhase = createTransitionPhaseHandler({
       sessionRepo,
       packRepo: new InMemoryCurriculumPackRepository(),
@@ -176,7 +180,11 @@ describe("session writes that lose a concurrent-update race", () => {
   it("records both of two chains submitted at the same moment", async () => {
     const { session, sessionId, store, tokenAdapter, alice, bob, aliceToken, bobToken } = await setUpChainMappingSession();
     const sessionRepo = new RaceBeforeFirstSaveSessionRepository(store);
-    const submitChain = createSubmitChainHandler({ sessionRepo, tokenVerifier: tokenAdapter });
+    const submitChain = createSubmitChainHandler({
+      packRepo: new InMemoryCurriculumPackRepository(),
+      sessionRepo,
+      tokenVerifier: tokenAdapter,
+    });
     sessionRepo.raceWith(async () => {
       const bobsSubmission = await submitChain(makeChainEvent(sessionId, bobToken), {} as never);
       expect(bobsSubmission.statusCode).toBe(201);
@@ -192,7 +200,11 @@ describe("session writes that lose a concurrent-update race", () => {
   it("records exactly one chain when one participant submits the same chain twice at the same moment", async () => {
     const { session, sessionId, store, tokenAdapter, alice, aliceToken } = await setUpChainMappingSession();
     const sessionRepo = new RaceBeforeFirstSaveSessionRepository(store);
-    const submitChain = createSubmitChainHandler({ sessionRepo, tokenVerifier: tokenAdapter });
+    const submitChain = createSubmitChainHandler({
+      packRepo: new InMemoryCurriculumPackRepository(),
+      sessionRepo,
+      tokenVerifier: tokenAdapter,
+    });
     sessionRepo.raceWith(async () => {
       const competing = await submitChain(makeChainEvent(sessionId, aliceToken), {} as never);
       expect(competing.statusCode).toBe(201);
@@ -209,7 +221,11 @@ describe("session writes that lose a concurrent-update race", () => {
   it("does not retry a request rejected for a reason other than a conflict", async () => {
     const { sessionId, store, tokenAdapter, aliceToken } = await setUpChainMappingSession();
     const sessionRepo = new CountingSessionRepository(store);
-    const handler = createSubmitChainHandler({ sessionRepo, tokenVerifier: tokenAdapter });
+    const handler = createSubmitChainHandler({
+      packRepo: new InMemoryCurriculumPackRepository(),
+      sessionRepo,
+      tokenVerifier: tokenAdapter,
+    });
 
     const response = await handler(makeChainEvent(sessionId, aliceToken, {
       ...CHAIN_BODY,
@@ -225,7 +241,11 @@ describe("session writes that lose a concurrent-update race", () => {
   it("returns 409 CONCURRENT_UPDATE_CONFLICT after exactly 3 save attempts, and records nothing", async () => {
     const { session, sessionId, store, tokenAdapter, aliceToken } = await setUpChainMappingSession();
     const sessionRepo = new AlwaysConflictingSessionRepository(store);
-    const handler = createSubmitChainHandler({ sessionRepo, tokenVerifier: tokenAdapter });
+    const handler = createSubmitChainHandler({
+      packRepo: new InMemoryCurriculumPackRepository(),
+      sessionRepo,
+      tokenVerifier: tokenAdapter,
+    });
 
     const response = await handler(makeChainEvent(sessionId, aliceToken), {} as never);
 

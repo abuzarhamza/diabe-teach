@@ -4,7 +4,9 @@
 
 **Blocked by:** 05-posttest-handler
 
-**Status:** ready-for-agent
+**Status:** resolved
+
+Resolved 2026-11-20: done in `3e37faf` (route `POST /api/v1/sessions/{sessionId}/assessments/{stage}`, `netlify/functions/submit-assessment.ts`; tests `tests/functions/submit-assessment.test.ts`, `assessment-journey.feature`).
 
 - [ ] Create `tests/functions/submit-assessment.test.ts`
 - [ ] Test: pretest submission during pretest phase → 201 with receipt

@@ -14,4 +14,12 @@ export interface InstructorAccountRepositoryPort {
    * lock-until time). Nothing else about the account changes.
    */
   saveSignInCounters: (account: InstructorAccount) => Promise<void>;
+  /**
+   * Records one wrong password at `now` as a single atomic update on the
+   * stored account (the aggregate's rule: the fifth in a row locks it for 15
+   * minutes and restarts the count). Does nothing while a lock is in force at
+   * `now`, so concurrent attempts are never lost and never lock twice.
+   * Returns the account as stored afterwards, or null when there is none.
+   */
+  recordFailedSignIn: (accountId: string, now: Date) => Promise<InstructorAccount | null>;
 }

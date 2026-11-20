@@ -1,3 +1,4 @@
+import type { WrapLambdaHandlerOptions } from "./adapters/inbound/http/lambda-to-v2-wrapper.types.js";
 import type {
   ProductionDependencies,
   RuntimeEnvConfig,
@@ -14,6 +15,7 @@ import {
   DEFAULT_MONGODB_DB_NAME,
   MongoCurriculumPackRepository,
 } from "./adapters/outbound/mongo-curriculum-pack-repository.js";
+import { MongoDevWorkerRelease } from "./adapters/outbound/mongo-dev-worker-release.js";
 import { MongoGameSessionRepository } from "./adapters/outbound/mongo-game-session-repository.js";
 import { MongoInstructorAccountRepository } from "./adapters/outbound/mongo-instructor-account-repository.js";
 import { SeedrandomSeededRandom } from "./adapters/outbound/seedrandom-seeded-random.js";
@@ -25,6 +27,15 @@ export interface LoadEnvConfigOptions {
 
 export class AppRuntime {
   static #cachedProductionDependencies: ProductionDependencies | null = null;
+
+  /**
+   * Passed by every route to `wrapLambdaHandler`. Under `netlify dev`, the
+   * Mongo connections are closed after each invocation so the worker thread
+   * netlify-cli started for it can exit (see `MongoDevWorkerRelease`).
+   */
+  public static readonly invocationOptions: WrapLambdaHandlerOptions = {
+    afterInvocation: async () => MongoDevWorkerRelease.afterInvocation(),
+  };
 
   public static loadEnvConfig(
     env: NodeJS.ProcessEnv = process.env,

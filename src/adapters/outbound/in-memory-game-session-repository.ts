@@ -2,7 +2,6 @@ import type { GameSessionRepositoryPort } from "../../application/ports/game-ses
 import type { RoomCode } from "../../domain/game-session/room-code.js";
 import type { SessionId } from "../../domain/game-session/session-id.js";
 import { ConcurrentUpdateConflictError } from "../../domain/errors/domain-errors.js";
-import { ConceptChain } from "../../domain/game-session/concept-chain.js";
 import { GameSession } from "../../domain/game-session/game-session.js";
 
 /**
@@ -58,39 +57,11 @@ implements GameSessionRepositoryPort {
     this.#sessionIdsByRoomCode.set(session.roomCode.value, session.sessionId.value);
   }
 
+  /** Copies through the domain's snapshot and restore, the same path the Mongo repository uses. */
   static #copy(session: GameSession, version: number): GameSession {
-    return GameSession.rehydrate({
-      sessionId: session.sessionId,
-      roomCode: session.roomCode,
-      packId: session.packId,
-      packVersion: session.packVersion,
-      ownerAccountId: session.ownerAccountId,
-      mode: session.mode,
-      adjudicationMode: session.adjudicationMode,
-      timerConfig: session.timerConfig,
-      currentPhase: session.currentPhase,
-      phaseStartedAt: session.phaseStartedAt,
-      participants: session.participants,
-      activeRoundNumber: session.activeRoundNumber,
-      createdAt: session.createdAt,
-      creationSeed: session.creationSeed,
+    return GameSession.fromSnapshot({
+      ...session.toSnapshot(),
       version,
-      _chains: session.chains.map(chain => ConceptChain.create({
-        chainId: chain.chainId,
-        participantId: chain.participantId,
-        roundNumber: chain.roundNumber,
-        path: chain.path,
-        keywordIds: chain.keywordIds,
-        narrativeExplanation: chain.narrativeExplanation,
-        stepRationales: chain.stepRationales,
-        status: chain.status,
-        peerVotes: chain.peerVotes,
-        verdict: chain.verdict,
-        submittedAt: chain.submittedAt,
-      })),
-      _assessments: session.assessmentAttempts,
-      _surveyResponses: session.surveyResponses,
-      _roundBoards: session.roundBoards,
     });
   }
 }

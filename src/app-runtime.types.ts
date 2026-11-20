@@ -25,7 +25,7 @@ export interface ProductionDependencies {
   readonly clock?: ClockPort;
   readonly seededRandom?: SeededRandomPort;
   readonly seedGenerator?: BoardSeedGeneratorPort;
-  readonly accountRepo?: InstructorAccountRepositoryPort;
+  readonly accountRepo: InstructorAccountRepositoryPort;
   readonly passwordHasher?: PasswordHasherPort;
   readonly accountTokenSigner?: AccountTokenSignerPort;
   readonly accountTokenVerifier?: AccountTokenVerifierPort;

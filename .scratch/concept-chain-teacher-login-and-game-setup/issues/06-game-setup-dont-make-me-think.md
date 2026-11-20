@@ -4,7 +4,9 @@
 
 **Blocked by:** 02, 03, 04, 05
 
-**Status:** ready-for-agent
+**Status:** resolved
+
+Resolved 2026-11-20: done in `fe90fcd` (`claudPoc/concept-chain/login.html`, `setup.html`), later wired to the real API in `93dbb3f`; see the Comments below.
 
 - [x] "Start game" is visible without scrolling at 1366×850 and stays on screen while scrolling
 - [x] Steps are numbered 1 Pick a topic, 2 How long?, 3 Start

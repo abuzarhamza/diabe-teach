@@ -74,6 +74,7 @@ implements AdjudicateConceptChainUseCasePort {
       if (!participantId) {
         throw new ForbiddenRoleError("Participant ID is required.");
       }
+      session.assertParticipantHasNotLeft(participantId);
       chain.addPeerVote({
         voterParticipantId: participantId,
         decision: action === "peer-approve"

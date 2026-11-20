@@ -4,7 +4,9 @@
 
 **Blocked by:** 01-game-session-aggregate, 02-create-session-endpoint, 05-transition-phase-endpoint
 
-**Status:** ready-for-agent
+**Status:** resolved
+
+Resolved 2026-11-20: route `POST /api/v1/sessions/{sessionId}/rounds/{roundNumber}/chains` (`netlify/functions/submit-chain.ts`), added in `b368e85`, with handler tests under `tests/functions/`.
 
 - [ ] `ConceptChain` entity in `src/domain/game-session/` with path, keywordIds, narrative, status, verdict, peerVotes
 - [ ] `SubmitConceptChainUseCase` in `src/application/use-cases/`

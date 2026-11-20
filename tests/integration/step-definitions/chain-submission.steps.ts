@@ -135,6 +135,37 @@ When(
 );
 
 When(
+  "participant {string} submits a chain that runs off the bottom of the board",
+  async function (this: TestWorld, displayName: string) {
+    if (!this.currentSessionId) {
+      throw new Error("No session available.");
+    }
+
+    const token = this.participantTokens.get(displayName);
+    if (!token) {
+      throw new Error(`No token found for participant '${displayName}'.`);
+    }
+
+    // Adjacent, distinct cells; the last one is one row past a 7×7 board.
+    this.lastResponse = await submitChain(
+      this.currentSessionId,
+      1,
+      token,
+      {
+        path: [
+          { row: 4, col: 0 },
+          { row: 5, col: 0 },
+          { row: 6, col: 0 },
+          { row: 7, col: 0 },
+        ],
+        narrativeExplanation: "A chain that leaves the board.",
+      },
+    );
+    this.parseLastResponse();
+  },
+);
+
+When(
   "participant {string} submits a chain that is too short",
   async function (this: TestWorld, displayName: string) {
     if (!this.currentSessionId) {

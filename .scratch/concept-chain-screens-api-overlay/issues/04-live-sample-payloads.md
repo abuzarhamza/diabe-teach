@@ -4,7 +4,9 @@
 
 **Blocked by:** 02, 03
 
-**Status:** ready-for-agent
+**Status:** resolved
+
+Resolved 2026-11-20: done in PR #4 (merge `2976821`: `d4ac9da`, `2433b0f`, `df1b44f`, `b6dda6e`, `72345f9`); see the Comments below.
 
 - [x] Every step A–H card uses live values where the mock has them, and fixed examples otherwise
 - [x] Building a chain and then hovering "Submit chain" shows that exact path and rationales in the request

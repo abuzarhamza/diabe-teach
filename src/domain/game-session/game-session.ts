@@ -1,10 +1,11 @@
-import type { ConceptChain, GridCoord } from "./concept-chain.js";
+import type { GridCoord } from "./concept-chain.js";
 import type {
   AdjudicationMode,
   AssessmentAttempt,
   AssessmentStage,
   ChainViewer,
   GameSessionProps,
+  GameSessionSnapshot,
   LikertRating,
   McqAnswerChoice,
   Participant,
@@ -18,14 +19,22 @@ import { randomUUID } from "node:crypto";
 import {
   AssessmentAlreadySubmittedError,
   ChainAlreadySubmittedError,
+  ChainTopologyInvalidError,
+  ForbiddenRoleError,
+  InvalidPhaseExtensionError,
   InvalidPhaseTransitionError,
   InvalidTimerConfigError,
+  ParticipantHasLeftError,
   PhaseClosedForSubmissionsError,
+  PhaseHasNoTimerError,
+  SessionAlreadyCompletedError,
   SurveyAlreadySubmittedError,
 } from "../errors/domain-errors.js";
 import { BoardDealer } from "./board-dealer.js";
+import { ConceptChain } from "./concept-chain.js";
 import {
   DEFAULT_TIMER_CONFIG,
+  MAX_PHASE_EXTENSION_SEC,
   MAX_TIMER_DURATION_SEC,
   PHASE_GAMEPLAY_ROUND,
   PHASE_ORDER,
@@ -60,6 +69,8 @@ export class GameSession {
 
   #currentPhase: PhaseIdentifier;
   #phaseStartedAt: Date;
+  /** The current phase's deadline after an instructor extended it; reset on every transition. */
+  #extendedPhaseEndsAt: Date | null;
   #activeRoundNumber: 1 | 2 | null;
 
   private constructor(props: GameSessionProps) {
@@ -83,6 +94,7 @@ export class GameSession {
     this.#timerConfig = GameSession.#resolveTimerConfig(props.timerConfig);
     this.#currentPhase = props.currentPhase ?? "pretest";
     this.#phaseStartedAt = props.phaseStartedAt ?? new Date();
+    this.#extendedPhaseEndsAt = props.extendedPhaseEndsAt ?? null;
     this.#participants = props.participants
       ? [...props.participants]
       : [];
@@ -126,6 +138,64 @@ export class GameSession {
    */
   public static rehydrate(props: GameSessionProps): GameSession {
     return new GameSession(props);
+  }
+
+  /**
+   * Restores a session exactly as `toSnapshot` captured it, without
+   * create-time validation. The one path every repository loads through.
+   */
+  public static fromSnapshot(snapshot: GameSessionSnapshot): GameSession {
+    return new GameSession({
+      sessionId: snapshot.sessionId,
+      roomCode: snapshot.roomCode,
+      packId: snapshot.packId,
+      packVersion: snapshot.packVersion,
+      ownerAccountId: snapshot.ownerAccountId,
+      mode: snapshot.mode,
+      adjudicationMode: snapshot.adjudicationMode,
+      timerConfig: snapshot.timerConfig,
+      currentPhase: snapshot.currentPhase,
+      phaseStartedAt: snapshot.phaseStartedAt,
+      extendedPhaseEndsAt: snapshot.extendedPhaseEndsAt,
+      participants: snapshot.participants.map(p => ({ ...p })),
+      activeRoundNumber: snapshot.activeRoundNumber,
+      createdAt: snapshot.createdAt,
+      creationSeed: snapshot.creationSeed,
+      version: snapshot.version,
+      _chains: snapshot.chains.map(chain => ConceptChain.fromSnapshot(chain)),
+      _assessments: snapshot.assessments,
+      _surveyResponses: snapshot.surveyResponses,
+      _roundBoards: snapshot.roundBoards,
+    });
+  }
+
+  /**
+   * Every field of this session as plain data, with its own copies of the
+   * mutable parts. The one path every repository saves through.
+   */
+  public toSnapshot(): GameSessionSnapshot {
+    return {
+      sessionId: this.#sessionId.value,
+      roomCode: this.#roomCode.value,
+      packId: this.#packId,
+      packVersion: this.#packVersion,
+      ownerAccountId: this.#ownerAccountId,
+      mode: this.#mode,
+      adjudicationMode: this.#adjudicationMode,
+      timerConfig: { ...this.#timerConfig },
+      currentPhase: this.#currentPhase,
+      phaseStartedAt: this.#phaseStartedAt,
+      extendedPhaseEndsAt: this.#extendedPhaseEndsAt,
+      participants: this.#participants.map(p => ({ ...p })),
+      activeRoundNumber: this.#activeRoundNumber,
+      createdAt: this.#createdAt,
+      creationSeed: this.#creationSeed,
+      chains: this.#chains.map(chain => chain.toSnapshot()),
+      assessments: this.assessmentAttempts,
+      surveyResponses: this.surveyResponses,
+      roundBoards: this.roundBoards,
+      version: this.#version,
+    };
   }
 
   public get sessionId(): SessionId {
@@ -179,8 +249,12 @@ export class GameSession {
    * own timer config. Phases without a configured duration (round summaries,
    * completed) end the moment they start. `null` means the phase is
    * instructor-driven (its timer is set to `null`) and has no deadline.
+   * An instructor's extension (see `extendPhase`) replaces the scheduled end.
    */
   public get phaseEndsAt(): Date | null {
+    if (this.#extendedPhaseEndsAt !== null) {
+      return this.#extendedPhaseEndsAt;
+    }
     const durationSec = this.#currentPhaseDurationSec();
     if (durationSec === null) {
       return null;
@@ -188,10 +262,43 @@ export class GameSession {
     return new Date(this.#phaseStartedAt.getTime() + durationSec * 1000);
   }
 
-  public get participantCount(): number {
-    return this.#participants.length;
+  /**
+   * The current phase's deadline as set by `extendPhase`, or `null` when the
+   * phase keeps its scheduled end. Stored so an extension survives reloads.
+   */
+  public get extendedPhaseEndsAt(): Date | null {
+    return this.#extendedPhaseEndsAt;
   }
 
+  /**
+   * Gives a timed phase `seconds` more: the new deadline is
+   * `max(phaseEndsAt, now) + seconds`, so a phase whose time (and submission
+   * grace period) has run out reopens. A completed session refuses with
+   * SessionAlreadyCompletedError; an instructor-driven phase (no deadline)
+   * with PhaseHasNoTimerError. `seconds` must be a whole number from 1 to
+   * MAX_PHASE_EXTENSION_SEC.
+   */
+  public extendPhase(seconds: number, now: Date): void {
+    if (!Number.isInteger(seconds) || seconds < 1 || seconds > MAX_PHASE_EXTENSION_SEC) {
+      throw new InvalidPhaseExtensionError(seconds);
+    }
+    if (this.#currentPhase === "completed") {
+      throw new SessionAlreadyCompletedError(this.#sessionId.value);
+    }
+    const phaseEndsAt = this.phaseEndsAt;
+    if (phaseEndsAt === null) {
+      throw new PhaseHasNoTimerError(this.#currentPhase);
+    }
+    const fromMs = Math.max(phaseEndsAt.getTime(), now.getTime());
+    this.#extendedPhaseEndsAt = new Date(fromMs + seconds * 1000);
+  }
+
+  /** The learners still in the session (those who left are not counted). */
+  public get participantCount(): number {
+    return this.#participants.filter(p => p.leftAt === null).length;
+  }
+
+  /** Every learner who joined, in join order, including those who left. */
   public get participants(): readonly Participant[] {
     return this.#participants;
   }
@@ -277,6 +384,7 @@ export class GameSession {
 
     this.#currentPhase = targetPhase;
     this.#phaseStartedAt = now;
+    this.#extendedPhaseEndsAt = null;
 
     if (enteredRound !== null) {
       this.#activeRoundNumber = enteredRound;
@@ -286,15 +394,63 @@ export class GameSession {
     }
   }
 
+  /**
+   * Ends the session early: moves from any phase straight to `completed`,
+   * the one exception to "next phase only" (`transitionTo`). Any instructor
+   * extension of the current phase is dropped, and `completed` has no timer
+   * of its own. An already completed session refuses with
+   * SessionAlreadyCompletedError.
+   */
+  public endSession(now: Date): void {
+    if (this.#currentPhase === "completed") {
+      throw new SessionAlreadyCompletedError(this.#sessionId.value);
+    }
+    this.#currentPhase = "completed";
+    this.#phaseStartedAt = now;
+    this.#extendedPhaseEndsAt = null;
+  }
+
   public addParticipant(displayName: string): Participant {
     const participant: Participant = {
       participantId: randomUUID(),
       displayName,
       joinedAt: new Date(),
+      leftAt: null,
     };
 
     this.#participants.push(participant);
     return participant;
+  }
+
+  /**
+   * Records that a learner left the session at `now`. Leaving again is a
+   * no-op that keeps the first `leftAt`. Their chains, votes, assessments and
+   * survey response are kept. A participant id unknown to the session is
+   * refused with ForbiddenRoleError.
+   */
+  public leave(participantId: string, now: Date): Participant {
+    const index = this.#participants.findIndex(p => p.participantId === participantId);
+    const participant = this.#participants[index];
+    if (participant === undefined) {
+      throw new ForbiddenRoleError("Only a participant of this session can leave it.");
+    }
+    if (participant.leftAt !== null) {
+      return participant;
+    }
+    const left: Participant = { ...participant, leftAt: now };
+    this.#participants[index] = left;
+    return left;
+  }
+
+  /**
+   * The single rule for learners who left: they may still read, but every
+   * write (chain submission, peer vote, assessment, survey) is refused with
+   * ParticipantHasLeftError (403 PARTICIPANT_HAS_LEFT).
+   */
+  public assertParticipantHasNotLeft(participantId: string): void {
+    if (this.getParticipant(participantId)?.leftAt) {
+      throw new ParticipantHasLeftError(participantId);
+    }
   }
 
   public getParticipant(participantId: string): Participant | undefined {
@@ -311,8 +467,14 @@ export class GameSession {
    * grace period. An expired phase stays current (closed) until the
    * instructor transitions it. An instructor-driven phase (no `phaseEndsAt`)
    * accepts chains until then.
+   *
+   * When the round has a dealt board, every path cell must lie on it, and the
+   * recorded chain names the Keyword Cards at its path cells (any keyword ids
+   * on `chain` are replaced). A round without a board (legacy sessions) keeps
+   * the chain's own keyword ids. Returns the chain as recorded.
    */
-  public addChain(chain: ConceptChain, now: Date): void {
+  public addChain(chain: ConceptChain, now: Date): ConceptChain {
+    this.assertParticipantHasNotLeft(chain.participantId);
     if (!this.isChainMappingPhase()) {
       throw new PhaseClosedForSubmissionsError(this.#currentPhase);
     }
@@ -323,18 +485,18 @@ export class GameSession {
       });
     }
     const phaseEndsAt = this.phaseEndsAt;
-    if (phaseEndsAt === null) {
-      this.#recordChain(chain);
-      return;
+    if (phaseEndsAt !== null) {
+      const closesAtMs = phaseEndsAt.getTime() + SUBMISSION_GRACE_PERIOD_SEC * 1000;
+      if (now.getTime() > closesAtMs) {
+        throw new PhaseClosedForSubmissionsError(this.#currentPhase, {
+          phaseEndsAt,
+          gracePeriodSec: SUBMISSION_GRACE_PERIOD_SEC,
+        });
+      }
     }
-    const closesAtMs = phaseEndsAt.getTime() + SUBMISSION_GRACE_PERIOD_SEC * 1000;
-    if (now.getTime() > closesAtMs) {
-      throw new PhaseClosedForSubmissionsError(this.#currentPhase, {
-        phaseEndsAt,
-        gracePeriodSec: SUBMISSION_GRACE_PERIOD_SEC,
-      });
-    }
-    this.#recordChain(chain);
+    const placed = this.#placeOnBoard(chain);
+    this.#recordChain(placed);
+    return placed;
   }
 
   public getChain(chainId: string): ConceptChain | undefined {
@@ -409,6 +571,7 @@ export class GameSession {
     stage: AssessmentStage,
     answers: ReadonlyMap<string, McqAnswerChoice>,
   ): AssessmentAttempt {
+    this.assertParticipantHasNotLeft(participantId);
     if (this.getAssessment(participantId, stage)) {
       throw new AssessmentAlreadySubmittedError(participantId, stage);
     }
@@ -450,6 +613,7 @@ export class GameSession {
     responses: ReadonlyMap<string, LikertRating>,
     comments?: string,
   ): SurveyResponse {
+    this.assertParticipantHasNotLeft(participantId);
     if (this.#surveyResponses.has(participantId)) {
       throw new SurveyAlreadySubmittedError(participantId, this.#sessionId.value);
     }
@@ -518,6 +682,33 @@ export class GameSession {
       return 0;
     }
     return this.#timerConfig[field];
+  }
+
+  /**
+   * Checks a chain's path against its round's board and returns the chain
+   * naming the Keyword Cards at its path cells. Throws
+   * ChainTopologyInvalidError for a cell outside the board. A round without a
+   * board returns the chain unchanged.
+   */
+  #placeOnBoard(chain: ConceptChain): ConceptChain {
+    const board = this.boardForRound(chain.roundNumber);
+    if (board === null) {
+      return chain;
+    }
+    const keywordIds = chain.path.map((cell, index) => {
+      const card = Number.isInteger(cell.row) && Number.isInteger(cell.col)
+        && cell.row >= 0 && cell.row < board.rows
+        && cell.col >= 0 && cell.col < board.cols
+        ? board.cells[cell.row]?.[cell.col]
+        : undefined;
+      if (card === undefined) {
+        throw new ChainTopologyInvalidError(
+          `Cell at position ${index} (row ${cell.row}, col ${cell.col}) is outside the ${board.rows}×${board.cols} board`,
+        );
+      }
+      return card.id;
+    });
+    return chain.withKeywordIds(keywordIds);
   }
 
   /**

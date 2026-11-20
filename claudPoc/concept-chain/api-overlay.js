@@ -4,7 +4,7 @@
 // Pages opt in by marking elements, nothing else:
 //   data-api="D"            step letter from CC_API_CATALOG.steps
 //   data-api="G.reject"     finer key: CC_API_CATALOG.targets["G.reject"] if present, else step "G"
-//   data-api="gap.extend"   UI element with no API: CC_API_CATALOG.gaps.extend
+//   data-api="gap.packMeta" UI element with no API: CC_API_CATALOG.gaps.packMeta
 //   data-api="nav.setup"    control that only navigates: CC_API_CATALOG.nav.setup (points at the step on that page)
 //   data-api-io="write"     sends a request (dashed outline); "read" shows API data (solid outline)
 //   data-api-toggle         optional extra place for the toggle (e.g. a view with no header.top);

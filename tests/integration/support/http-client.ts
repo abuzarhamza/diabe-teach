@@ -61,6 +61,15 @@ export async function getSession(sessionId: string, token: string) {
   return toApiGatewayResult(res);
 }
 
+export async function getSessionAnalytics(sessionId: string, token: string) {
+  const res = await request(BASE_URL)
+    .get(`/api/v1/sessions/${sessionId}/analytics`)
+    .set("x-api-key", API_KEY)
+    .set("Authorization", `Bearer ${token}`);
+
+  return toApiGatewayResult(res);
+}
+
 export async function transitionPhase(
   sessionId: string,
   token: string,
@@ -80,13 +89,46 @@ export async function transitionPhase(
   return toApiGatewayResult(res);
 }
 
+export async function extendPhase(
+  sessionId: string,
+  token: string,
+  body: { seconds?: number } = {},
+) {
+  const res = await request(BASE_URL)
+    .post(`/api/v1/sessions/${sessionId}/phase/extend`)
+    .set("Content-Type", "application/json")
+    .set("x-api-key", API_KEY)
+    .set("Authorization", `Bearer ${token}`)
+    .send(body);
+
+  return toApiGatewayResult(res);
+}
+
+export async function endSession(sessionId: string, token: string) {
+  const res = await request(BASE_URL)
+    .post(`/api/v1/sessions/${sessionId}/end`)
+    .set("x-api-key", API_KEY)
+    .set("Authorization", `Bearer ${token}`);
+
+  return toApiGatewayResult(res);
+}
+
+export async function leaveSession(sessionId: string, token: string) {
+  const res = await request(BASE_URL)
+    .post(`/api/v1/sessions/${sessionId}/leave`)
+    .set("x-api-key", API_KEY)
+    .set("Authorization", `Bearer ${token}`);
+
+  return toApiGatewayResult(res);
+}
+
 export async function submitChain(
   sessionId: string,
   roundNumber: number,
   token: string,
   body: {
     path: Array<{ row: number; col: number }>;
-    keywordIds: string[];
+    keywordIds?: string[];
     narrativeExplanation: string;
     stepRationales?: string[];
   },

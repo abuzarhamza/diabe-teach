@@ -1,6 +1,6 @@
 import type { Context } from "@netlify/functions";
 import type { APIGatewayProxyEvent, APIGatewayProxyResult, Context as LambdaContext } from "aws-lambda";
-import type { RouteConfig } from "./lambda-to-v2-wrapper.types.js";
+import type { RouteConfig, WrapLambdaHandlerOptions } from "./lambda-to-v2-wrapper.types.js";
 import { match } from "path-to-regexp";
 
 /**
@@ -169,9 +169,11 @@ type LambdaHandler = (event: APIGatewayProxyEvent, context: LambdaContext) => Pr
 /**
  * Wraps a Lambda-style handler to work with Netlify v2 runtime. `config` is the
  * route file's own `export const config` (declared once); its `path` is matched
- * against the request URL to fill `event.pathParameters`.
+ * against the request URL to fill `event.pathParameters`. `options.afterInvocation`
+ * (from `AppRuntime.invocationOptions`) runs after every invocation, whether
+ * the handler answered or threw.
  */
-export function wrapLambdaHandler(handler: LambdaHandler, config: RouteConfig) {
+export function wrapLambdaHandler(handler: LambdaHandler, config: RouteConfig, options: WrapLambdaHandlerOptions = {}) {
   return async (request: Request, context: Context): Promise<Response> => {
     const event = await requestToLambdaEvent(request, context, config);
 
@@ -191,7 +193,12 @@ export function wrapLambdaHandler(handler: LambdaHandler, config: RouteConfig) {
       succeed: () => {},
     };
 
-    const result = await handler(event, lambdaContext);
-    return lambdaResultToResponse(result);
+    try {
+      const result = await handler(event, lambdaContext);
+      return lambdaResultToResponse(result);
+    }
+    finally {
+      await options.afterInvocation?.();
+    }
   };
 }

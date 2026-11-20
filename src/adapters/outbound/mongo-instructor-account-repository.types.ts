@@ -17,6 +17,15 @@ export interface InstructorAccountCollectionLike {
     accountId: string,
     counters: Pick<InstructorAccountDocument, "failedSignInCount" | "lockedUntil">,
   ) => Promise<void>;
+  /**
+   * Applies `update` (an aggregation pipeline) to the one account matching
+   * `filter`, atomically, and returns it as stored afterwards (null when
+   * nothing matched).
+   */
+  findOneAndUpdatePipeline: (
+    filter: Record<string, unknown>,
+    update: ReadonlyArray<Record<string, unknown>>,
+  ) => Promise<InstructorAccountDocument | null>;
 }
 
 export interface MongoInstructorAccountRepositoryOptions {

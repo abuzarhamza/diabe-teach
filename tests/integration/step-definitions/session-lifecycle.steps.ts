@@ -76,6 +76,13 @@ When(
 );
 
 When(
+  "the instructor creates a classroom session with pack {string} and a {int}-second chain-mapping phase",
+  async function (this: TestWorld, packId: string, seconds: number) {
+    await createClassroomSession(this, packId, { roundMappingSec: seconds });
+  },
+);
+
+When(
   "someone who has not signed in tries to create a classroom session with pack {string}",
   async function (this: TestWorld, packId: string) {
     this.lastResponse = await createSession({
