@@ -450,13 +450,12 @@
           "This call issues the per-session instructor Capability Token, which every in-game call uses, so the Account Token expiring never breaks a running game. Keep `instructorToken` for every teacher call (D, G, and the reads in C and H).",
           "Share `roomCode` with learners; they join with it (step B).",
           "`timerConfig` durations are whole seconds 1-86400; `null` makes that phase teacher-paced (no deadline). Omitted fields use the API defaults (15 min pretest, trial, post-test and survey; 20 min mapping; 10 min peer review), so Game setup sends all six: its chain-building and peer-review minutes × 60 (or `null` when teacher-paced), and `null` for the phases the prototype keeps teacher-paced.",
-          "`seed` is the board preview's seed, so Round 1 would be dealt exactly as previewed (see the deviation: the backend ignores it today).",
+          "`seed` is the board preview's seed. The server deals Round 1 from it on entering `round-1:chain-mapping` (unless that transition sends its own `seed`): the same pack, Pack Version and seed always give the same board. The server's shuffle and board size (the pack's `boardConfig`) differ from the browser preview, so its board won't match the preview.",
           "\"Start game\" on Game setup creates a brand-new Game Session with a new room code; \"Reset session\" and \"Start a new session\" on the teacher screen only go back to Game setup. Nothing ends the old session.",
           "Board size and shortest chain have no field here: they come from the pack's `boardConfig` (see the Game setup gaps).",
         ],
         deviations: [
           "Every session starts in `pretest`, including solo mode (the spec summary says solo auto-starts Round 1; it only auto-joins the creator).",
-          "`state` has no `activeBoard` key and no board is dealt; `seed` is ignored, so the previewed board can't be reproduced server-side.",
           "`creatorDisplayName` (Game setup's \"name shown to your class\") is only used in solo mode (as the auto-joined learner's name); in classroom mode it is dropped.",
         ],
       },
@@ -767,9 +766,9 @@
           "The server never auto-advances: a phase changes only when the teacher calls this.",
           "It only moves to the next phase in the Game Session order; there is no skipping or going back.",
           "A write conflict is retried up to 3 times; a 409 CONCURRENT_UPDATE_CONFLICT is safe to retry.",
+          "Entering `round-1:chain-mapping` or `round-2:chain-mapping` deals that round's board (`state.activeBoard`). Its seed is this request's `seed`, else (Round 1 only) the creation seed, else one the server generates; `activeBoard.seed` reports it. The same pack, Pack Version and seed always give the same board, so a Study RCT can replay a board by sending its seed.",
         ],
         deviations: [
-          "No Keyword Card board is shuffled on Round 1 or Round 2 entry, and `seed` is ignored; `activeBoard` is never returned.",
           "`jump` is accepted but can only target the next phase (otherwise 409 INVALID_PHASE_TRANSITION).",
           "Advancing from `completed` returns 200 with the unchanged state instead of 409.",
           "Round Summary and Completed report `phaseEndsAt` equal to `phaseStartedAt` instead of null.",
@@ -874,7 +873,7 @@
       },
       boardPreview: {
         title: "Board preview",
-        note: "Dealt in the browser from the pack, board size and preview seed. No API deals or returns a board yet: `state.activeBoard` is in the spec but never returned, and createGameSession ignores `seed`.",
+        note: "Dealt in the browser from the pack, board size and preview seed. The API deals Round 1 from the same `seed` (`state.activeBoard`), but with its own shuffle and the pack's `boardConfig` size, so the server's board won't match this preview.",
       },
     },
 
@@ -948,7 +947,7 @@
         note: "Chain-building and peer-review minutes become createGameSession's `timerConfig.roundMappingSec` / `roundAdjudicationSec` (minutes × 60, 1-86400 s); teacher-paced sends `null` (no deadline). Both Gameplay Rounds use them.",
       },
       "A.seed": {
-        note: "Shuffle picks a new board preview seed, sent as createGameSession's `seed` so Round 1 matches the preview. Partial: the backend ignores `seed` and deals no board, so a previewed board can't be reproduced server-side yet.",
+        note: "Shuffle picks a new board preview seed, sent as createGameSession's `seed` so Round 1 matches the preview. The server deals Round 1 reproducibly from it (same pack, Pack Version and seed, same board), but with its own shuffle, so its board won't match the browser preview.",
       },
       "A.roomCode": {
         note: "Shows `roomCode` from the createGameSession response (also in every `state`).",

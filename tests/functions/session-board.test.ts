@@ -292,6 +292,42 @@ describe("server-dealt round board (activeBoard)", () => {
     expect(round1.activeBoard!.seed).toBe("generated-1");
   });
 
+  it("gives two sessions on the same pack and version the same board for the same transition seed, and different boards for different seeds", async () => {
+    const seedGenerator = new CountingSeedGenerator();
+    const handlers = makeHandlers({ seedGenerator });
+    const first = await createSession(handlers);
+    const second = await createSession(handlers);
+    const other = await createSession(handlers);
+    expect(second.created.state.packVersion).toBe(first.created.state.packVersion);
+    expect(other.created.state.packVersion).toBe(first.created.state.packVersion);
+
+    const enterRound = async (session: Awaited<ReturnType<typeof createSession>>, phase: string, seed: string) => {
+      const state = await session.transition({ action: "advance", seed });
+      expect(state.currentPhase).toBe(phase);
+      return state.activeBoard;
+    };
+    const roundsFor = async (session: Awaited<ReturnType<typeof createSession>>, seed: string) => {
+      await session.advanceTo("trial-orientation");
+      const round1 = await enterRound(session, "round-1:chain-mapping", seed);
+      await session.advanceTo("round-1:round-summary");
+      const round2 = await enterRound(session, "round-2:chain-mapping", seed);
+      return { round1, round2 };
+    };
+
+    const firstBoards = await roundsFor(first, "study-arm-a");
+    const secondBoards = await roundsFor(second, "study-arm-a");
+    const otherBoards = await roundsFor(other, "study-arm-b");
+
+    expect(firstBoards.round1!.seed).toBe("study-arm-a");
+    expect(firstBoards.round2!.seed).toBe("study-arm-a");
+    expect(secondBoards.round1).toEqual(firstBoards.round1);
+    expect(secondBoards.round2).toEqual(firstBoards.round2);
+    expect(otherBoards.round1!.seed).toBe("study-arm-b");
+    expect(cardIds(otherBoards.round1)).not.toEqual(cardIds(firstBoards.round1));
+    expect(cardIds(otherBoards.round2)).not.toEqual(cardIds(firstBoards.round2));
+    expect(seedGenerator.calls).toBe(0);
+  });
+
   it("reproduces a known board from a transition seed, which overrides the creation seed", async () => {
     const handlers = makeHandlers();
     const known = await createSession(handlers, "known-board");

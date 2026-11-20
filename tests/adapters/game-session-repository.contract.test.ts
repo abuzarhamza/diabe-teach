@@ -248,6 +248,26 @@ function defineGameSessionRepositoryContract(
       expect(reloaded?.activeBoard).toEqual(round2Board);
     });
 
+    it("round-trips the seed of a board dealt from a transition seed", async () => {
+      const session = GameSession.create({
+        packId: "diabe-teach",
+        mode: "classroom",
+        adjudicationMode: "peer-instructor",
+      });
+      await harness.repo.create(session);
+      const board = boardOf(1, "transition-seed", 3);
+
+      const loaded = await harness.repo.findById(session.sessionId);
+      loaded!.transitionTo("trial-orientation", new Date("2026-03-01T09:10:00.000Z"));
+      loaded!.transitionTo("round-1:chain-mapping", new Date("2026-03-01T09:20:00.000Z"), board);
+      await harness.repo.update(loaded!);
+
+      const reloaded = await harness.repo.findById(session.sessionId);
+      expect(reloaded?.creationSeed).toBeNull();
+      expect(reloaded?.boardForRound(1)?.seed).toBe("transition-seed");
+      expect(reloaded?.activeBoard).toEqual(board);
+    });
+
     it("round-trips the pinned Pack Version across an update", async () => {
       const session = GameSession.create({
         packId: "diabe-teach",
