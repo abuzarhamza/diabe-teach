@@ -83,6 +83,19 @@ Then(
   },
 );
 
+/** A learner who left keeps their roster entry, with `leftAt` set (api-completion 04). */
+Then(
+  "the session state should list participant {string} who has left",
+  function (this: TestWorld, displayName: string) {
+    const body = this.lastResponseBody as {
+      state?: { participants?: Array<{ displayName: string; leftAt: string | null }> };
+    };
+    const entry = (body.state?.participants ?? []).find(p => p.displayName === displayName);
+    expect(entry !== undefined, `no participant named ${displayName}`).to.equal(true);
+    expect(Number.isNaN(Date.parse(entry?.leftAt ?? ""))).to.equal(false);
+  },
+);
+
 /** The roster comes from the session state (api-completion 01). */
 Then(
   "the session state should list participant {string} who has not left",

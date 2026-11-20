@@ -194,6 +194,7 @@ export class MongoGameSessionRepository implements GameSessionRepositoryPort {
         participantId: p.participantId,
         displayName: p.displayName,
         joinedAt: p.joinedAt,
+        leftAt: p.leftAt ?? null,
       })),
       activeRoundNumber: doc.activeRoundNumber,
       createdAt: doc.createdAt,
@@ -241,6 +242,7 @@ export class MongoGameSessionRepository implements GameSessionRepositoryPort {
         participantId: p.participantId,
         displayName: p.displayName,
         joinedAt: p.joinedAt,
+        leftAt: p.leftAt,
       })),
       activeRoundNumber: session.activeRoundNumber,
       chains: session.chains.map(c =>

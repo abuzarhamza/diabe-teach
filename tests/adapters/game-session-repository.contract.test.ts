@@ -16,6 +16,8 @@ interface LegacySessionSeed {
   readonly sessionId: string;
   readonly roomCode: string;
   readonly phaseStartedAt: Date;
+  /** Learners stored before they could leave: no `leftAt` field. */
+  readonly participants?: readonly { participantId: string; displayName: string; joinedAt: Date }[];
 }
 
 interface RepositoryHarness {
@@ -299,6 +301,48 @@ function defineGameSessionRepositoryContract(
       expect(reloaded?.phaseEndsAt).toEqual(new Date("2026-03-01T09:01:30.000Z"));
     });
 
+    it("round-trips a learner's leftAt across an update", async () => {
+      const session = newSession();
+      const alice = session.addParticipant("Alice");
+      const bob = session.addParticipant("Bob");
+      await harness.repo.create(session);
+
+      const loaded = await harness.repo.findById(session.sessionId);
+      expect(loaded?.participants.map(p => p.leftAt)).toEqual([null, null]);
+      loaded!.leave(alice.participantId, new Date("2026-03-01T09:05:00.000Z"));
+      await harness.repo.update(loaded!);
+
+      const reloaded = await harness.repo.findById(session.sessionId);
+      expect(reloaded?.getParticipant(alice.participantId)?.leftAt).toEqual(new Date("2026-03-01T09:05:00.000Z"));
+      expect(reloaded?.getParticipant(bob.participantId)?.leftAt).toBeNull();
+      expect(reloaded?.participantCount).toBe(1);
+    });
+
+    it("loads a participant stored before learners could leave with leftAt null", async () => {
+      const joinedAt = new Date("2026-03-01T09:01:00.000Z");
+      const seed: LegacySessionSeed = {
+        sessionId: `legacy-participant-${name}`,
+        roomCode: "LGCY02",
+        phaseStartedAt: new Date("2026-03-01T09:00:00.000Z"),
+        participants: [
+          { participantId: "legacy-alice", displayName: "Alice", joinedAt },
+        ],
+      };
+      await harness.seedLegacySession(seed);
+
+      const loaded = await harness.repo.findById(SessionId.from(seed.sessionId));
+
+      expect(loaded?.participants).toEqual([
+        {
+          participantId: "legacy-alice",
+          displayName: "Alice",
+          joinedAt,
+          leftAt: null,
+        },
+      ]);
+      expect(loaded?.participantCount).toBe(1);
+    });
+
     it("stores a solo session with no owner", async () => {
       const session = GameSession.create({
         packId: "diabe-teach",
@@ -359,6 +403,7 @@ defineGameSessionRepositoryContract("inMemoryGameSessionRepository", async () =>
         timerConfig: LEGACY_TIMER_CONFIG,
         currentPhase: "pretest",
         phaseStartedAt: seed.phaseStartedAt,
+        participants: (seed.participants ?? []).map(p => ({ ...p, leftAt: null })),
         createdAt: seed.phaseStartedAt,
       }));
     },
@@ -384,7 +429,9 @@ defineGameSessionRepositoryContract(
             timerConfig: LEGACY_TIMER_CONFIG,
             currentPhase: "pretest",
             phaseStartedAt: seed.phaseStartedAt,
-            participants: [],
+            participants: [
+              ...(seed.participants ?? []),
+            ],
             activeRoundNumber: null,
             chains: [],
             assessments: [],

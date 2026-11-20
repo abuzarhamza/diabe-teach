@@ -19,9 +19,11 @@ import {
   AssessmentAlreadySubmittedError,
   ChainAlreadySubmittedError,
   ChainTopologyInvalidError,
+  ForbiddenRoleError,
   InvalidPhaseExtensionError,
   InvalidPhaseTransitionError,
   InvalidTimerConfigError,
+  ParticipantHasLeftError,
   PhaseClosedForSubmissionsError,
   PhaseHasNoTimerError,
   SessionAlreadyCompletedError,
@@ -231,10 +233,12 @@ export class GameSession {
     this.#extendedPhaseEndsAt = new Date(fromMs + seconds * 1000);
   }
 
+  /** The learners still in the session (those who left are not counted). */
   public get participantCount(): number {
-    return this.#participants.length;
+    return this.#participants.filter(p => p.leftAt === null).length;
   }
 
+  /** Every learner who joined, in join order, including those who left. */
   public get participants(): readonly Participant[] {
     return this.#participants;
   }
@@ -351,10 +355,42 @@ export class GameSession {
       participantId: randomUUID(),
       displayName,
       joinedAt: new Date(),
+      leftAt: null,
     };
 
     this.#participants.push(participant);
     return participant;
+  }
+
+  /**
+   * Records that a learner left the session at `now`. Leaving again is a
+   * no-op that keeps the first `leftAt`. Their chains, votes, assessments and
+   * survey response are kept. A participant id unknown to the session is
+   * refused with ForbiddenRoleError.
+   */
+  public leave(participantId: string, now: Date): Participant {
+    const index = this.#participants.findIndex(p => p.participantId === participantId);
+    const participant = this.#participants[index];
+    if (participant === undefined) {
+      throw new ForbiddenRoleError("Only a participant of this session can leave it.");
+    }
+    if (participant.leftAt !== null) {
+      return participant;
+    }
+    const left: Participant = { ...participant, leftAt: now };
+    this.#participants[index] = left;
+    return left;
+  }
+
+  /**
+   * The single rule for learners who left: they may still read, but every
+   * write (chain submission, peer vote, assessment, survey) is refused with
+   * ParticipantHasLeftError (403 PARTICIPANT_HAS_LEFT).
+   */
+  public assertParticipantHasNotLeft(participantId: string): void {
+    if (this.getParticipant(participantId)?.leftAt) {
+      throw new ParticipantHasLeftError(participantId);
+    }
   }
 
   public getParticipant(participantId: string): Participant | undefined {
@@ -378,6 +414,7 @@ export class GameSession {
    * the chain's own keyword ids. Returns the chain as recorded.
    */
   public addChain(chain: ConceptChain, now: Date): ConceptChain {
+    this.assertParticipantHasNotLeft(chain.participantId);
     if (!this.isChainMappingPhase()) {
       throw new PhaseClosedForSubmissionsError(this.#currentPhase);
     }
@@ -474,6 +511,7 @@ export class GameSession {
     stage: AssessmentStage,
     answers: ReadonlyMap<string, McqAnswerChoice>,
   ): AssessmentAttempt {
+    this.assertParticipantHasNotLeft(participantId);
     if (this.getAssessment(participantId, stage)) {
       throw new AssessmentAlreadySubmittedError(participantId, stage);
     }
@@ -515,6 +553,7 @@ export class GameSession {
     responses: ReadonlyMap<string, LikertRating>,
     comments?: string,
   ): SurveyResponse {
+    this.assertParticipantHasNotLeft(participantId);
     if (this.#surveyResponses.has(participantId)) {
       throw new SurveyAlreadySubmittedError(participantId, this.#sessionId.value);
     }

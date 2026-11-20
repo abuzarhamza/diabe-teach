@@ -1,7 +1,7 @@
 import type { TestWorld } from "../support/world.js";
 import { Then, When } from "@cucumber/cucumber";
 import { expect } from "chai";
-import { endSession, extendPhase, getSession, transitionPhase } from "../support/http-client.js";
+import { endSession, extendPhase, getSession, leaveSession, transitionPhase } from "../support/http-client.js";
 
 /** Seconds a Chain-Mapping phase still accepts chains after `phaseEndsAt`. */
 const SUBMISSION_GRACE_PERIOD_SEC = 5;
@@ -140,6 +140,22 @@ When(
     }
 
     this.lastResponse = await endSession(this.currentSessionId, this.instructorToken);
+    this.parseLastResponse();
+  },
+);
+
+When(
+  "participant {string} leaves the session",
+  async function (this: TestWorld, displayName: string) {
+    if (!this.currentSessionId) {
+      throw new Error("No session available.");
+    }
+    const token = this.participantTokens.get(displayName);
+    if (!token) {
+      throw new Error(`No token found for participant '${displayName}'.`);
+    }
+
+    this.lastResponse = await leaveSession(this.currentSessionId, token);
     this.parseLastResponse();
   },
 );

@@ -49,6 +49,17 @@ export class SessionAlreadyCompletedError extends DomainError {
   }
 }
 
+export class ParticipantHasLeftError extends DomainError {
+  public readonly code = "PARTICIPANT_HAS_LEFT" as const;
+
+  public constructor(participantId: string) {
+    super(
+      `Participant '${participantId}' has left the session and can no longer submit.`,
+      { participantId },
+    );
+  }
+}
+
 export class PhaseHasNoTimerError extends DomainError {
   public readonly code = "PHASE_HAS_NO_TIMER" as const;
 

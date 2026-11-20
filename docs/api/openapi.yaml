@@ -750,6 +750,57 @@ paths:
               schema:
                 $ref: "#/components/schemas/ApiErrorResponse"
 
+  /api/v1/sessions/{sessionId}/leave:
+    post:
+      operationId: leaveGameSession
+      tags: [Sessions]
+      summary: Leave the Game Session (participant only)
+      description: >-
+        Records that the calling learner left: their entry in `participants`
+        gets a `leftAt` time and `participantCount` drops by one. Leaving
+        again is a no-op 200 that keeps the first `leftAt`. Their chains,
+        votes, assessments, survey response and standings are kept, and read
+        routes keep working for them, but every write (chain submission, peer
+        vote, assessment, survey) is refused afterwards with 403
+        PARTICIPANT_HAS_LEFT. Takes no request body. Participant Capability
+        Token only.
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/SessionIdParam"
+      responses:
+        "200":
+          description: The learner has left (or had already left); the updated public state.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [state]
+                properties:
+                  state:
+                    $ref: "#/components/schemas/PublicSessionState"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "403":
+          description: >-
+            FORBIDDEN_ROLE. The token is an instructor's, belongs to another
+            session, or names no participant of this session.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+        "409":
+          description: >-
+            CONCURRENT_UPDATE_CONFLICT. Other requests kept changing the Game
+            Session while this one was being saved, and it still conflicted
+            after 3 attempts. Nothing was recorded. Safe to retry.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+
   /api/v1/sessions/{sessionId}/rounds/{roundNumber}/chains:
     get:
       operationId: listRoundChains
@@ -865,6 +916,8 @@ paths:
           $ref: "#/components/responses/BadRequestError"
         "401":
           $ref: "#/components/responses/UnauthorizedError"
+        "403":
+          $ref: "#/components/responses/ParticipantWriteForbiddenError"
         "404":
           $ref: "#/components/responses/NotFoundError"
         "409":
@@ -937,7 +990,7 @@ paths:
         "401":
           $ref: "#/components/responses/UnauthorizedError"
         "403":
-          $ref: "#/components/responses/ForbiddenError"
+          $ref: "#/components/responses/ParticipantWriteForbiddenError"
         "404":
           $ref: "#/components/responses/NotFoundError"
         "409":
@@ -1015,6 +1068,8 @@ paths:
           $ref: "#/components/responses/BadRequestError"
         "401":
           $ref: "#/components/responses/UnauthorizedError"
+        "403":
+          $ref: "#/components/responses/ParticipantWriteForbiddenError"
         "404":
           $ref: "#/components/responses/NotFoundError"
         "409":
@@ -1073,6 +1128,8 @@ paths:
           $ref: "#/components/responses/BadRequestError"
         "401":
           $ref: "#/components/responses/UnauthorizedError"
+        "403":
+          $ref: "#/components/responses/ParticipantWriteForbiddenError"
         "404":
           $ref: "#/components/responses/NotFoundError"
         "409":
@@ -1189,6 +1246,19 @@ components:
         application/json:
           schema:
             $ref: "#/components/schemas/ApiErrorResponse"
+    ParticipantWriteForbiddenError:
+      description: >-
+        FORBIDDEN_ROLE. The token's role may not perform this action, or it
+        belongs to another session.
+
+        PARTICIPANT_HAS_LEFT. The learner left the Game Session
+        (`leaveGameSession`) and can no longer submit chains, cast peer votes,
+        or submit assessments or the survey. Nothing was recorded. Read
+        routes still work for them.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiErrorResponse"
     NotFoundError:
       description: Requested resource was not found
       content:
@@ -1238,6 +1308,7 @@ components:
         - PACK_NOT_ARCHIVED
         - SESSION_ALREADY_COMPLETED
         - PHASE_HAS_NO_TIMER
+        - PARTICIPANT_HAS_LEFT
         - INTERNAL_ERROR
 
     ApiErrorResponse:

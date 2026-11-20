@@ -61,6 +61,10 @@ export class SubmitAssessmentUseCase implements SubmitAssessmentUseCasePort {
       throw new SessionNotFoundError(command.sessionId);
     }
 
+    // A learner who left is refused before any phase check (the domain
+    // enforces it again on submit).
+    loaded.assertParticipantHasNotLeft(participantId);
+
     // Validate phase matches stage (and pretest prerequisite for posttest)
     this.#validatePhaseForStage(loaded, command.stage, participantId);
 

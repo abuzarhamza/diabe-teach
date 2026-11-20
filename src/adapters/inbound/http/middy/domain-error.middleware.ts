@@ -28,6 +28,7 @@ import {
   PackNotArchivedError,
   PackNotFoundError,
   PackValidationFailedError,
+  ParticipantHasLeftError,
   PhaseClosedForSubmissionsError,
   PhaseHasNoTimerError,
   RoomCodeNotFoundError,
@@ -88,6 +89,7 @@ export function domainErrorMiddleware(): MiddlewareObj<any, any> {
         else if (
           error instanceof ForbiddenRoleError
           || error instanceof PackIsSystemPackError
+          || error instanceof ParticipantHasLeftError
         ) {
           statusCode = 403;
         }

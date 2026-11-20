@@ -104,6 +104,15 @@ export async function endSession(sessionId: string, token: string) {
   return toApiGatewayResult(res);
 }
 
+export async function leaveSession(sessionId: string, token: string) {
+  const res = await request(BASE_URL)
+    .post(`/api/v1/sessions/${sessionId}/leave`)
+    .set("x-api-key", API_KEY)
+    .set("Authorization", `Bearer ${token}`);
+
+  return toApiGatewayResult(res);
+}
+
 export async function submitChain(
   sessionId: string,
   roundNumber: number,

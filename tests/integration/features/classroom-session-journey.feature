@@ -217,6 +217,27 @@ Feature: Classroom Game Session Journey
     Then the response status should be 409
     And the response error code should be "SESSION_ALREADY_COMPLETED"
 
+  @leave-session
+  Scenario: A learner leaves mid-round and their next chain submission is refused
+    When the instructor creates a classroom session with pack "diabe-teach"
+    And participants "Alice" and "Bob" join using the room code
+    And the instructor advances the phase 2 times
+    Then the session phase should be "round-1:chain-mapping"
+    When participant "Alice" leaves the session
+    Then the response status should be 200
+    And the session state should list participant "Alice" who has left
+    And the session state should list participant "Bob" who has not left
+    And the participant count should be 1
+    When participant "Alice" leaves the session
+    Then the response status should be 200
+    When participant "Alice" submits a concept chain for round 1
+    Then the response status should be 403
+    And the response error code should be "PARTICIPANT_HAS_LEFT"
+    When participant "Alice" retrieves the session state
+    Then the response status should be 200
+    When participant "Bob" submits a concept chain for round 1
+    Then the response status should be 201
+
   @board @shared-board
   Scenario: Instructor and participant see the same server-dealt round 1 board and chains are checked against it
     When the instructor creates a classroom session with pack "diabe-teach"

@@ -1048,6 +1048,7 @@ export const apiOperationIds = [
   "transitionSessionPhase",
   "extendSessionPhase",
   "endGameSession",
+  "leaveGameSession",
   "listRoundChains",
   "submitConceptChain",
   "adjudicateConceptChain",

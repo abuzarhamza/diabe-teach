@@ -71,7 +71,8 @@ implements GameSessionRepositoryPort {
       currentPhase: session.currentPhase,
       phaseStartedAt: session.phaseStartedAt,
       extendedPhaseEndsAt: session.extendedPhaseEndsAt,
-      participants: session.participants,
+      // Copies each participant, `leftAt` included.
+      participants: session.participants.map(p => ({ ...p })),
       activeRoundNumber: session.activeRoundNumber,
       createdAt: session.createdAt,
       creationSeed: session.creationSeed,

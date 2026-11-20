@@ -57,6 +57,8 @@ export interface Participant {
   readonly participantId: string;
   readonly displayName: string;
   readonly joinedAt: Date;
+  /** When the learner left the session; `null` while they are still in it. */
+  readonly leftAt: Date | null;
 }
 
 /**

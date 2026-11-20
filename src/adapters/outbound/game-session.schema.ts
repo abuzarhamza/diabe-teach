@@ -119,6 +119,7 @@ const participantSchema = new Schema(
     participantId: { type: String, required: true },
     displayName: { type: String, required: true },
     joinedAt: { type: Date, required: true },
+    leftAt: { type: Date, default: null },
   },
   { _id: false },
 );

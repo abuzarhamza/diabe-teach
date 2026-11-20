@@ -18,6 +18,8 @@ export interface ParticipantDocument {
   participantId: string;
   displayName: string;
   joinedAt: Date;
+  /** Absent on participants stored before learners could leave. */
+  leftAt?: Date | null;
 }
 
 export interface AssessmentAttemptDocument {

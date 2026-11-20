@@ -29,8 +29,7 @@ export class PublicSessionStateProjector {
       participantId: participant.participantId,
       displayName: participant.displayName,
       joinedAt: participant.joinedAt.toISOString(),
-      // Learners can't leave yet (api-completion ticket 04 adds it).
-      leftAt: null,
+      leftAt: participant.leftAt?.toISOString() ?? null,
     };
   }
 
