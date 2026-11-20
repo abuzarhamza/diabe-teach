@@ -298,21 +298,39 @@ paths:
               $ref: "#/components/schemas/CurriculumPackInput"
       responses:
         "200":
-          description: Validation result with any structural or topological issues
+          description: >-
+            Validation result. `valid` is true when `errors` is empty;
+            `warnings` (for example OPTIONAL_FIELD_MISSING) never make a pack
+            invalid.
           content:
             application/json:
               schema:
                 type: object
-                required: [valid, issues]
+                required: [valid, errors, warnings]
                 properties:
                   valid:
                     type: boolean
-                  issues:
+                  errors:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/PackValidationIssue"
+                  warnings:
                     type: array
                     items:
                       $ref: "#/components/schemas/PackValidationIssue"
         "400":
-          $ref: "#/components/responses/BadRequestError"
+          description: >-
+            INVALID_REQUEST_BODY. The body is checked against
+            `CurriculumPackInput` before the pack validator runs, so a pack
+            with a missing required field or a wrongly typed field is refused
+            here (with `details.field` and `details.reason`) rather than
+            returned as `{ valid: false }`. Also returned when the body is not
+            a JSON object. Only a body that passes the schema reaches the
+            validator and gets a 200.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
         "401":
           description: >-
             UNAUTHORIZED_TOKEN. No Account Token, or one that is malformed,
@@ -571,6 +589,13 @@ paths:
       operationId: getGameSessionState
       tags: [Sessions]
       summary: Get current Game Session state snapshot
+      description: >-
+        Either Capability Token for this Game Session works: the instructor
+        token or a participant token (including a learner who left). Screens
+        poll this route for live updates, since `streamGameSessionEvents` is
+        not implemented.
+      security:
+        - BearerAuth: []
       parameters:
         - $ref: "#/components/parameters/SessionIdParam"
       responses:
@@ -584,6 +609,15 @@ paths:
                 properties:
                   state:
                     $ref: "#/components/schemas/PublicSessionState"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "403":
+          description: >-
+            FORBIDDEN_ROLE. The token belongs to another Game Session.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
         "404":
           $ref: "#/components/responses/NotFoundError"
 
@@ -592,6 +626,12 @@ paths:
       operationId: streamGameSessionEvents
       tags: [Sessions]
       summary: Subscribe to real-time Server-Sent Events (SSE) for a Game Session
+      description: >-
+        Not implemented: no function serves this route. The design is kept
+        for later. Until then, poll
+        `getGameSessionState` (and `listRoundChains` or `getRoundStandings`
+        for round data).
+      x-implemented: false
       parameters:
         - $ref: "#/components/parameters/SessionIdParam"
       responses:
@@ -609,6 +649,10 @@ paths:
       operationId: transitionSessionPhase
       tags: [Sessions]
       summary: Advance or transition the Game Session phase (shuffles a fresh board on Round 1 & Round 2 entry)
+      description: >-
+        Moves the Game Session to the next phase only. `jump` names that
+        next phase in `targetPhase`; it cannot skip phases. Ending a Game
+        Session early goes through `endGameSession`.
       security:
         - BearerAuth: []
       parameters:
@@ -1010,6 +1054,11 @@ paths:
       operationId: getRoundStandings
       tags: [Chains]
       summary: Get ranked round standings (longest approved chain primary, total distinct approved chains tie-breaker)
+      description: >-
+        Either Capability Token for this Game Session works: the instructor
+        token or a participant token.
+      security:
+        - BearerAuth: []
       parameters:
         - $ref: "#/components/parameters/SessionIdParam"
         - $ref: "#/components/parameters/RoundNumberParam"
@@ -1031,6 +1080,15 @@ paths:
                     type: array
                     items:
                       $ref: "#/components/schemas/PlayerRoundStanding"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "403":
+          description: >-
+            FORBIDDEN_ROLE. The token belongs to another Game Session.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
         "404":
           $ref: "#/components/responses/NotFoundError"
 
@@ -1650,11 +1708,14 @@ components:
 
     PackValidationIssue:
       type: object
-      required: [jsonPointer, rule, message]
+      required: [path, code, message]
       properties:
-        jsonPointer:
+        path:
           type: string
-        rule:
+          description: >-
+            Dotted path of the offending field, for example
+            `boardConfig.rows` or `cards`.
+        code:
           type: string
           description: >-
             The rule that failed, for example REQUIRED_FIELD,
@@ -1874,7 +1935,10 @@ components:
           format: date-time
           description: >
             When the current phase is scheduled to end. `null` when the
-            phase is instructor-driven (its timer is set to `null`).
+            phase is instructor-driven (its timer is set to `null`). Phases
+            that have no timer setting at all (`round-1:round-summary`,
+            `round-2:round-summary` and `completed`) report `phaseEndsAt`
+            equal to `phaseStartedAt`: they have no deadline still to come.
         activeBoard:
           description: >
             The board of the active Gameplay Round, the same through its
@@ -1928,8 +1992,18 @@ components:
           type: string
           enum: [advance, jump]
           default: advance
+          description: >
+            `advance` moves to the next phase in the Game Session order.
+            `jump` moves to `targetPhase`, which must be that same next
+            phase: there is no skipping ahead or going back, and any other
+            `targetPhase` gets 409 INVALID_PHASE_TRANSITION. To finish a
+            Game Session early, use `endGameSession` (`POST
+            /api/v1/sessions/{sessionId}/end`), not `jump`.
         targetPhase:
           $ref: "#/components/schemas/PhaseIdentifier"
+          description: >
+            Used with `jump` only: the phase to move to, which must be the
+            next phase.
         seed:
           type: string
           minLength: 1

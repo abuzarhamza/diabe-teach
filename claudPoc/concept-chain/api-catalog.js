@@ -331,20 +331,20 @@
         request: samplePackInput,
         response: {
           status: 200,
-          body: { valid: false, issues: [{ jsonPointer: "/adjudicationRubric/chainContinuityCriteria", rule: "minItems", message: "At least one chain continuity criterion is required." }] },
+          body: { valid: false, errors: [{ path: "cards", code: "INSUFFICIENT_CARDS", message: "Pack has 20 Keyword Cards but its 5×5 board needs at least 25 (5 short)." }], warnings: [] },
         },
         errors: [
           { status: 400, code: "INVALID_REQUEST_BODY" },
           { status: 401, code: "UNAUTHORIZED_TOKEN" },
         ],
-        status: "partial",
+        status: "implemented",
         notes: [
           "Checks a draft CurriculumPackInput without saving it, with the teacher's Account Token. Game setup doesn't call it: registerCurriculumPack runs the same checks and returns them as 422.",
+          "Returns `{ valid, errors, warnings }`, each item `{ path, code, message }`. Warnings (such as OPTIONAL_FIELD_MISSING) never make the pack invalid.",
+          "A missing or wrongly typed field is refused first with 400 INVALID_REQUEST_BODY (the body is checked against CurriculumPackInput), so only a well-formed pack gets a 200.",
           "Learner level and learning objective have no field: the closest is the pack `description`.",
         ],
-        deviations: [
-          "Returns `{ valid, errors, warnings }` with `{ path, code, message }` items, not the spec's `{ valid, issues }` with `{ jsonPointer, rule, message }`.",
-        ],
+        deviations: [],
       },
 
       registerCurriculumPack: {
@@ -535,19 +535,22 @@
         method: "GET",
         path: "/api/v1/sessions/{sessionId}",
         pathParams: { sessionId: "Game Session id (from createGameSession)" },
-        auth: ["apiKey", "instructor"],
+        auth: ["apiKey", "instructor", "participant"],
         request: null,
         response: { status: 200, body: { state: sampleState } },
-        errors: [{ status: 404, code: "SESSION_NOT_FOUND" }],
+        errors: [
+          { status: 401, code: "UNAUTHORIZED_TOKEN" },
+          { status: 403, code: "FORBIDDEN_ROLE" },
+          { status: 404, code: "SESSION_NOT_FOUND" },
+        ],
         status: "partial",
         notes: [
           "Poll this while the stream (streamGameSessionEvents) is not implemented.",
-          "Either Capability Token works: the teacher's instructor token or a learner's participant token for this Game Session.",
+          "Either Capability Token works: the teacher's instructor token or a learner's participant token for this Game Session. Another session's token gets 403 FORBIDDEN_ROLE.",
+          "Round Summary and Completed have no timer, so they report `phaseEndsAt` equal to `phaseStartedAt` (no deadline to come).",
         ],
         deviations: [
-          "Requires a Bearer token for this Game Session (401 UNAUTHORIZED_TOKEN without one, 403 FORBIDDEN_ROLE for another session's token); the spec declares no security and only 404.",
           "`activeBoard` is in the spec but never returned: the board can't come from the server yet.",
-          "Round Summary and Completed report `phaseEndsAt` equal to `phaseStartedAt` instead of null.",
         ],
       },
 
@@ -566,10 +569,9 @@
         notes: [
           "text/event-stream of `{ event, data }` envelopes: session.snapshot, participant.joined, phase.changed, chain.submitted, chain.adjudicated, standings.updated.",
           "The spec does not define the `data` payload of each event.",
+          "Not implemented (the spec marks it `x-implemented: false`): there is no Netlify function for this route, so screens poll getGameSessionState.",
         ],
-        deviations: [
-          "Not implemented: there is no Netlify function for this route, so screens must poll getGameSessionState.",
-        ],
+        deviations: [],
       },
 
       listRoundChains: {
@@ -715,7 +717,7 @@
         method: "GET",
         path: "/api/v1/sessions/{sessionId}/rounds/{roundNumber}/standings",
         pathParams: { sessionId: "Game Session id", roundNumber: "1 or 2" },
-        auth: ["apiKey", "instructor"],
+        auth: ["apiKey", "instructor", "participant"],
         request: null,
         response: {
           status: 200,
@@ -727,16 +729,19 @@
             ],
           },
         },
-        errors: [{ status: 404, code: "SESSION_NOT_FOUND" }],
+        errors: [
+          { status: 401, code: "UNAUTHORIZED_TOKEN" },
+          { status: 403, code: "FORBIDDEN_ROLE" },
+          { status: 404, code: "SESSION_NOT_FOUND" },
+        ],
         status: "partial",
         notes: [
           "Ranked by longest approved Concept Chain, then number of approved chains.",
           "`isFinalized` turns true once the round reaches its Round Summary (or any later phase).",
-          "Either Capability Token works (instructor or participant of this Game Session).",
+          "Either Capability Token works (instructor or participant of this Game Session); another session's token gets 403 FORBIDDEN_ROLE.",
           "Equal results get consecutive ranks (list order); there is no shared rank.",
         ],
         deviations: [
-          "Requires a Bearer token for this Game Session (401 / 403); the spec declares no security and only 404.",
           "Learners with no approved chain are left out; the screen lists every learner, so it must merge with its own roster.",
           "No `cumulativeRationaleScore` is returned, and identical paths are not deduplicated.",
           "There is no pending-review count: the \"To check\" column has no API field.",
@@ -764,14 +769,12 @@
         status: "partial",
         notes: [
           "The server never auto-advances: a phase changes only when the teacher calls this.",
-          "It only moves to the next phase in the Game Session order; there is no skipping or going back.",
+          "It only moves to the next phase in the Game Session order; there is no skipping or going back. `jump` must name that next phase as `targetPhase` (otherwise 409 INVALID_PHASE_TRANSITION). Ending early uses endGameSession.",
           "A write conflict is retried up to 3 times; a 409 CONCURRENT_UPDATE_CONFLICT is safe to retry.",
           "Entering `round-1:chain-mapping` or `round-2:chain-mapping` deals that round's board (`state.activeBoard`). Its seed is this request's `seed`, else (Round 1 only) the creation seed, else one the server generates; `activeBoard.seed` reports it. The same pack, Pack Version and seed always give the same board, so a Study RCT can replay a board by sending its seed.",
         ],
         deviations: [
-          "`jump` is accepted but can only target the next phase (otherwise 409 INVALID_PHASE_TRANSITION).",
           "Advancing from `completed` returns 200 with the unchanged state instead of 409.",
-          "Round Summary and Completed report `phaseEndsAt` equal to `phaseStartedAt` instead of null.",
           "Only the instructor token is accepted (a participant gets 403 FORBIDDEN_ROLE).",
           "x-api-key is checked when the server has API_KEY set, but the spec does not declare it here.",
         ],

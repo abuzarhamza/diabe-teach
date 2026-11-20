@@ -806,9 +806,11 @@ export const requestBodySchemas = {
             "advance",
             "jump"
           ],
-          "default": "advance"
+          "default": "advance",
+          "description": "`advance` moves to the next phase in the Game Session order. `jump` moves to `targetPhase`, which must be that same next phase: there is no skipping ahead or going back, and any other `targetPhase` gets 409 INVALID_PHASE_TRANSITION. To finish a Game Session early, use `endGameSession` (`POST /api/v1/sessions/{sessionId}/end`), not `jump`.\n"
         },
         "targetPhase": {
+          "description": "Used with `jump` only: the phase to move to, which must be the next phase.\n",
           "type": "string",
           "enum": [
             "pretest",
