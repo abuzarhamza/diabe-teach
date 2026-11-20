@@ -579,17 +579,35 @@
         method: "GET",
         path: "/api/v1/sessions/{sessionId}/rounds/{roundNumber}/chains",
         pathParams: { sessionId: "Game Session id", roundNumber: "1 or 2" },
-        auth: ["apiKey", "instructor"],
+        auth: ["apiKey", "instructor", "participant"],
         request: null,
-        response: { status: 200, body: { roundNumber: 1, chains: [sampleChain] } },
-        errors: [],
-        status: "missing",
+        response: {
+          status: 200,
+          body: {
+            roundNumber: 1,
+            chains: [{
+              ...sampleChain,
+              participantDisplayName: "Amira",
+              peerVotes: sampleChain.peerVotes.map((v) => ({ ...v, voterDisplayName: "Ben" })),
+            }],
+          },
+        },
+        errors: [
+          { status: 400, code: "INVALID_REQUEST_BODY" },
+          { status: 401, code: "UNAUTHORIZED_TOKEN" },
+          { status: 403, code: "FORBIDDEN_ROLE" },
+          { status: 404, code: "SESSION_NOT_FOUND" },
+        ],
+        status: "implemented",
         notes: [
-          "Proposed endpoint: the same path with GET, returning every SubmittedChain of the Gameplay Round (with peer votes and verdict).",
+          "Each chain is a SubmittedChain (path, keywords, narrative, step rationales, status, peer votes, verdict) plus the learner's `participantDisplayName` and each peer vote's `voterDisplayName` (\"Unknown\" if the participant can't be found). No email or Account id.",
+          "Sorted by `submittedAt`, then `chainId`. A round with no chains, or one not started yet, returns 200 with `chains: []`.",
+          "Instructor Capability Token: every chain of the round, in any phase. Participant Capability Token: only their own chains while that round is in chain-mapping (or before it); every chain of the round from its peer-adjudication on (round summary, later rounds, posttest, survey, completed).",
+          "`roundNumber` other than 1 or 2 → 400. A token for another Game Session → 403; no, bad or expired token, or an Account Token → 401 (ADR-0007).",
+          "No stream: screens poll this route alongside `state` to stay fresh.",
+          "The prototype screens don't call it yet: their chain lists still come from the browser fake.",
         ],
-        deviations: [
-          "Neither the spec nor the backend has a way to list a round's Concept Chains. The teacher's review list (and per-learner chain counts) can only be built from the specced-only chain.submitted / chain.adjudicated stream events.",
-        ],
+        deviations: [],
       },
 
       adjudicateConceptChain: {
@@ -923,11 +941,11 @@
       },
       "C.roster": {
         ops: ["getGameSessionState", "streamGameSessionEvents", "listRoundChains"],
-        note: "No endpoint lists the participants: `state` has only `participantCount`, and names would arrive via the specced-only `participant.joined` stream event. The per-learner chain counts need the missing list-round-chains endpoint.",
+        note: "Per-learner chain counts (and display names of learners who submitted) come from list-round-chains (polled). Still a gap: no endpoint lists the participants, so learners with no chain yet are unknown; `state` has only `participantCount`, and `participant.joined` is a specced-only stream event.",
       },
       "C.review": {
         ops: ["listRoundChains", "streamGameSessionEvents"],
-        note: "Needs a missing endpoint: nothing lists a Gameplay Round's Concept Chains. Proposed: GET /api/v1/sessions/{sessionId}/rounds/{roundNumber}/chains, then keep it fresh from `chain.submitted` / `chain.adjudicated` stream events.",
+        note: "The review list comes from list-round-chains with the instructor Capability Token: every chain of the round, with the learner's and voters' display names, peer votes and verdict. No stream yet (`chain.submitted` / `chain.adjudicated` are specced only), so the screen polls.",
       },
       "C.classmates": {
         ops: ["getGameSessionState", "streamGameSessionEvents"],
@@ -939,11 +957,11 @@
       },
       "C.classChains": {
         ops: ["listRoundChains", "streamGameSessionEvents"],
-        note: "Classmates' Concept Chains to review need a missing endpoint: nothing lists a Gameplay Round's chains. Proposed: GET /api/v1/sessions/{sessionId}/rounds/{roundNumber}/chains, kept fresh from `chain.submitted` / `chain.adjudicated` stream events.",
+        note: "Classmates' Concept Chains come from list-round-chains with the learner's Capability Token. During that round's chain-mapping it returns only the learner's own chains; from peer-adjudication on, every chain of the round (filter out your own). No stream yet, so the screen polls.",
       },
       "C.myChains": {
         ops: ["listRoundChains", "streamGameSessionEvents"],
-        note: "Each chain the learner submitted comes back in the step E response, but later peer votes and the Instructor Final Ruling on it can only arrive from the missing list-round-chains endpoint or `chain.adjudicated` stream events.",
+        note: "The learner's chains come from list-round-chains (filter by your `participantId`), with later peer votes (and voter names) and the Instructor Final Ruling. No stream yet (`chain.adjudicated` is specced only), so the screen polls.",
       },
       "E.builder": {
         note: "Builds the submitConceptChain body: tapped Keyword Cards → `path` (GridCoord), each link's reason → `stepRationales`, the story → `narrativeExplanation`.",
@@ -1201,12 +1219,22 @@
     return out;
   };
 
-  ops.listRoundChains.sample = (state) => {
+  // ctx.participantId set = a learner's view: own chains only up to that round's chain-mapping, then every chain.
+  ops.listRoundChains.sample = (state, ctx = {}) => {
     const round = roundOf(state, null);
     if (round === null) return { path: fillPath(ops.listRoundChains.path, sid(state)) };
+    const nameOf = (id) => state.participants.find((p) => p.participantId === id)?.displayName ?? "Unknown";
+    const ownOnly = !!ctx.participantId && PHASES.indexOf(state.session.currentPhase) <= PHASES.indexOf(`round-${round}:chain-mapping`);
+    const chains = state.chains
+      .filter((c) => c.roundNumber === round && (!ownOnly || c.participantId === ctx.participantId))
+      .sort((a, b) => String(a.submittedAt).localeCompare(String(b.submittedAt)) || String(a.chainId).localeCompare(String(b.chainId)))
+      .map((c) => {
+        const base = publicChain(c);
+        return { ...base, participantDisplayName: nameOf(c.participantId), peerVotes: base.peerVotes.map((v) => ({ ...v, voterDisplayName: nameOf(v.voterParticipantId) })) };
+      });
     return {
       path: fillPath(ops.listRoundChains.path, { ...sid(state), roundNumber: round }),
-      response: { status: 200, body: { roundNumber: round, chains: state.chains.filter((c) => c.roundNumber === round).map(publicChain) } },
+      response: { status: 200, body: { roundNumber: round, chains } },
     };
   };
 

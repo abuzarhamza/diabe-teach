@@ -194,6 +194,36 @@ describe("claudPoc Concept Chain live API samples", () => {
     expect(out.request).toBeUndefined();
   });
 
+  it("lists the round's chains with display names, own chains only for a learner during chain-mapping", () => {
+    const voted = demoState();
+    voted.chains[0]!.peerVotes = [
+      {
+        voterParticipantId: "par_amira",
+        decision: "approve",
+        comment: null,
+        votedAt: "2026-11-17T10:01:00.000Z",
+      },
+    ] as never;
+    const teacher = sampleOf("listRoundChains")(voted);
+    expect(teacher.path).toBe("/api/v1/sessions/ses_live1/rounds/2/chains");
+    const chains = teacher.response?.body.chains as Array<Record<string, unknown>>;
+    expect(chains).toHaveLength(1);
+    expect(chains[0]).toMatchObject({
+      chainId: "chn_ben1",
+      participantDisplayName: "Ben",
+      peerVotes: [
+        { voterParticipantId: "par_amira", voterDisplayName: "Amira" },
+      ],
+    });
+    expect(chains[0]).not.toHaveProperty("labels");
+    const reviewing = sampleOf("listRoundChains")(voted, { participantId: "par_amira" });
+    expect(reviewing.response?.body.chains).toHaveLength(1);
+    const mapping = sampleOf("listRoundChains")(demoState("round-2:chain-mapping"), { participantId: "par_amira" });
+    expect(mapping.response?.body.chains).toEqual([]);
+    const own = sampleOf("listRoundChains")(demoState("round-2:chain-mapping"), { participantId: "par_ben" });
+    expect(own.response?.body.chains).toHaveLength(1);
+  });
+
   it("fills session reads, phase changes and standings from the live session", () => {
     const state = demoState();
     expect(sampleOf("getGameSessionState")(state).path).toBe("/api/v1/sessions/ses_live1");
