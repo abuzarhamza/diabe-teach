@@ -130,3 +130,4 @@
   - a `jump` without `targetPhase` is now 400 `INVALID_REQUEST_BODY`, with a new test.
 
   Tracker: 39 stale tickets were resolved with dated pointers, and middy-simplification 01–03 were set to wontfix (superseded by `3c5f131`). Still open: teacher-login 09. Unverifiable, for the user to decide: conceptchain-api-overlay 01–06, whose deliverables don't exist, so they are probably superseded. The agent reported vitest 908, all 5 BDD features passing, lint 29, boundaries 6. **All 15 api-completion tickets and server-owned-board 03 are done.**
+- **2026-11-20:** Pushed `feat/api-completion` and opened [PR #7](https://github.com/abuzarhamza/diabe-teach/pull/7), stacked on PR #6 (base `feat/netlify-v2-local-dev-compatibility`, 19 commits). Checked first: the secrets guard passes 3/3, no env or key files are in the diff, and a full vitest run gives 908/908. Neither PR is merged; that is the user's call. Merge #6 first.
