@@ -143,6 +143,7 @@ const ROUTES: readonly Route[] = [
       const token = await tokens.signToken({ role: "participant", sessionId: SESSION_ID, participantId: "p-1" });
       return {
         handler: createSubmitChainHandler({
+          packRepo: new InMemoryCurriculumPackRepository(),
           sessionRepo: new InMemoryGameSessionRepository(),
           tokenVerifier: tokens,
         }) as unknown as Handler,
@@ -277,7 +278,11 @@ describe("an unexpected server error returns a generic 500 (api-hardening 01)", 
       findByRoomCode: async () => null,
       update: async () => {},
     } as unknown as GameSessionRepositoryPort;
-    const handler = createSubmitChainHandler({ sessionRepo: brokenRepo, tokenVerifier: tokens }) as unknown as Handler;
+    const handler = createSubmitChainHandler({
+      packRepo: new InMemoryCurriculumPackRepository(),
+      sessionRepo: brokenRepo,
+      tokenVerifier: tokens,
+    }) as unknown as Handler;
 
     const res = await call(handler, makeEvent({
       path: `/api/v1/sessions/${session.sessionId.value}/rounds/1/chains`,

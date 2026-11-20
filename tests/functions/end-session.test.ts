@@ -7,6 +7,7 @@ import { createJoinSessionHandler } from "../../netlify/functions/sessions/join-
 import { createSubmitChainHandler } from "../../netlify/functions/sessions/submit-chain.js";
 import { FakeCapabilityTokenAdapter } from "../../src/adapters/outbound/fake-capability-token-adapter.js";
 import { FakeClock } from "../../src/adapters/outbound/fake-clock.js";
+import { InMemoryCurriculumPackRepository } from "../../src/adapters/outbound/in-memory-curriculum-pack-repository.js";
 import { InMemoryGameSessionRepository } from "../../src/adapters/outbound/in-memory-game-session-repository.js";
 import { GameSession } from "../../src/domain/game-session/game-session.js";
 import { PHASE_ORDER } from "../../src/domain/game-session/game-session.types.js";
@@ -77,7 +78,12 @@ async function sessionIn(phase: PhaseIdentifier) {
     end: createEndSessionHandler({ sessionRepo, tokenVerifier: tokenAdapter, clock }),
     get: createGetSessionHandler({ sessionRepo, tokenVerifier: tokenAdapter }),
     join: createJoinSessionHandler({ sessionRepo, tokenSigner: tokenAdapter }),
-    submitChain: createSubmitChainHandler({ sessionRepo, tokenVerifier: tokenAdapter, clock }),
+    submitChain: createSubmitChainHandler({
+      packRepo: new InMemoryCurriculumPackRepository(),
+      sessionRepo,
+      tokenVerifier: tokenAdapter,
+      clock,
+    }),
   };
   const sessionPath = `/api/v1/sessions/${sessionId}`;
 

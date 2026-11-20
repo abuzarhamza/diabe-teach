@@ -524,9 +524,9 @@
           "`path` is the tapped Keyword Cards as GridCoord `{ row, col }` in order; each cell must touch the previous one (sideways, up/down or diagonal) and no cell may repeat, else 422 CHAIN_TOPOLOGY_INVALID.",
           "409 PHASE_CLOSED_FOR_SUBMISSIONS: not in Chain-Mapping, not the active round, or more than 5 s (grace period) after `phaseEndsAt`.",
           "409 CHAIN_ALREADY_SUBMITTED: this learner already sent the same cells in this round (same or reversed order). Learners may submit several different chains.",
+          "A chain needs at least the Curriculum Pack's `boardConfig.minChainLength` cells (read from the Game Session's pinned Pack Version; 4 if the pack sets none), else 422 CHAIN_TOPOLOGY_INVALID. Under 2 cells is a 400 schema error.",
         ],
         deviations: [
-          "A chain needs at least 4 cells (fixed, not read from the Curriculum Pack); the spec says `minItems: 2` and the demo accepts 2.",
           "The returned chain has no `sessionId`, `stepRationales`, `peerVotes` or `verdict`, and adds `chainLength` and `keywordIds`.",
           "An instructor token, or a token for another Game Session, gets 403 FORBIDDEN_ROLE, which the spec doesn't declare for this route.",
         ],
@@ -870,7 +870,7 @@
       },
       minChain: {
         title: "Shortest chain allowed",
-        note: "Not enforced by the API: createGameSession has no field for it, and submitConceptChain uses a fixed 4 cells (422 CHAIN_TOPOLOGY_INVALID below that), not the pack's `boardConfig.minChainLength`. Only the demo enforces the number set here.",
+        note: "Not settable per Game Session: createGameSession has no field for it. submitConceptChain enforces the pack's `boardConfig.minChainLength` (4 if the pack sets none; 422 CHAIN_TOPOLOGY_INVALID below that), so the number set here only matches the API when the pack uses the same minimum.",
       },
       boardPreview: {
         title: "Board preview",

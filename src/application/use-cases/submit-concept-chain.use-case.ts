@@ -1,5 +1,6 @@
 import type { GridCoord } from "../../domain/game-session/concept-chain.js";
 import type { ClockPort } from "../ports/clock.port.js";
+import type { GameSessionRepositoryPort } from "../ports/game-session-repository.port.js";
 import type {
   SubmitConceptChainCommand,
   SubmitConceptChainDependencies,
@@ -10,21 +11,26 @@ import type {
 import {
   ChainTopologyInvalidError,
   ForbiddenRoleError,
+  SessionNotFoundError,
 } from "../../domain/errors/domain-errors.js";
 import { ConceptChain } from "../../domain/game-session/concept-chain.js";
 import { SessionId } from "../../domain/game-session/session-id.js";
 import { GameSessionUpdateRetrier } from "../services/game-session-update-retrier.js";
+import { SessionPackLoader } from "../services/session-pack-loader.js";
 
 export class SubmitConceptChainUseCase
 implements SubmitConceptChainUseCasePort {
+  readonly #sessionRepo: GameSessionRepositoryPort;
   readonly #sessionUpdates: GameSessionUpdateRetrier;
+  /** Reads the session's pinned Pack Version (or the latest, for legacy sessions). */
+  readonly #packs: SessionPackLoader;
   readonly #clock: ClockPort;
-  readonly #minChainLength: number;
 
   public constructor(deps: SubmitConceptChainDependencies) {
+    this.#sessionRepo = deps.sessionRepo;
     this.#sessionUpdates = new GameSessionUpdateRetrier(deps.sessionRepo);
+    this.#packs = new SessionPackLoader(deps.packRepo);
     this.#clock = deps.clock;
-    this.#minChainLength = deps.minChainLength ?? 4;
   }
 
   public async execute(
@@ -42,12 +48,23 @@ implements SubmitConceptChainUseCasePort {
       throw new ForbiddenRoleError("Participant ID is required.");
     }
 
+    // The minimum chain length comes from the session's Curriculum Pack. The
+    // update below runs synchronously, so the pack is loaded first (its first
+    // attempt reuses this session); a session's pack and version never
+    // change, so a retry needs no pack reload.
+    const sessionId = SessionId.from(command.sessionId);
+    const loaded = await this.#sessionRepo.findById(sessionId);
+    if (!loaded) {
+      throw new SessionNotFoundError(command.sessionId);
+    }
+    const minChainLength = (await this.#packs.load(loaded)).minChainLength;
+
     // Built once, so a retry keeps the same chain id and submission time.
     let built: ConceptChain | undefined;
     const chain = await this.#sessionUpdates.run(
-      SessionId.from(command.sessionId),
+      sessionId,
       (session) => {
-        this.#validateChainTopology(command.path);
+        this.#validateChainTopology(command.path, minChainLength);
 
         built ??= ConceptChain.create({
           participantId,
@@ -60,6 +77,7 @@ implements SubmitConceptChainUseCasePort {
 
         return session.addChain(built, receivedAt);
       },
+      loaded,
     );
 
     const chainDto: SubmittedChainDto = {
@@ -77,10 +95,10 @@ implements SubmitConceptChainUseCasePort {
     return { chain: chainDto };
   }
 
-  #validateChainTopology(path: readonly GridCoord[]): void {
-    if (path.length < this.#minChainLength) {
+  #validateChainTopology(path: readonly GridCoord[], minChainLength: number): void {
+    if (path.length < minChainLength) {
       throw new ChainTopologyInvalidError(
-        `Chain must have at least ${this.#minChainLength} cells`,
+        `Chain must have at least ${minChainLength} cells`,
       );
     }
 

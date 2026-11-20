@@ -288,6 +288,7 @@ const ROUTES: readonly Route[] = [
       const { tokens, authorization } = await capabilityRoute("participant");
       return {
         handler: createSubmitChainHandler({
+          packRepo: new InMemoryCurriculumPackRepository(),
           sessionRepo: new InMemoryGameSessionRepository(),
           tokenVerifier: tokens,
         }) as unknown as Handler,

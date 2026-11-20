@@ -97,7 +97,12 @@ async function classroomWithTwoLearners() {
     leave: createLeaveSessionHandler({ sessionRepo, tokenVerifier: tokenAdapter, clock }),
     get: createGetSessionHandler({ sessionRepo, tokenVerifier: tokenAdapter }),
     join: createJoinSessionHandler({ sessionRepo, tokenSigner: tokenAdapter }),
-    submitChain: createSubmitChainHandler({ sessionRepo, tokenVerifier: tokenAdapter, clock }),
+    submitChain: createSubmitChainHandler({
+      packRepo: new InMemoryCurriculumPackRepository(),
+      sessionRepo,
+      tokenVerifier: tokenAdapter,
+      clock,
+    }),
     adjudicate: createAdjudicateChainHandler({ sessionRepo, tokenVerifier: tokenAdapter }),
     listChains: createListRoundChainsHandler({ sessionRepo, tokenVerifier: tokenAdapter }),
     standings: createGetStandingsHandler({ sessionRepo, tokenVerifier: tokenAdapter }),

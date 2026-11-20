@@ -80,7 +80,12 @@ async function startRound(timerConfig: Record<string, number | null>) {
       clock,
     }),
     extend: createExtendPhaseHandler({ sessionRepo, tokenVerifier: tokenAdapter, clock }),
-    submitChain: createSubmitChainHandler({ sessionRepo, tokenVerifier: tokenAdapter, clock }),
+    submitChain: createSubmitChainHandler({
+      packRepo: new InMemoryCurriculumPackRepository(),
+      sessionRepo,
+      tokenVerifier: tokenAdapter,
+      clock,
+    }),
   };
 
   const created = await invoke(handlers.create, makeEvent("POST", "/api/v1/sessions", {

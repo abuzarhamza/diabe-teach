@@ -1,12 +1,14 @@
 import type { GridCoord } from "../../domain/game-session/concept-chain.js";
 import type { VerifiedCapability } from "./capability-token.port.js";
 import type { ClockPort } from "./clock.port.js";
+import type { CurriculumPackRepositoryPort } from "./curriculum-pack-repository.port.js";
 import type { GameSessionRepositoryPort } from "./game-session-repository.port.js";
 
 export interface SubmitConceptChainDependencies {
   readonly sessionRepo: GameSessionRepositoryPort;
+  /** Supplies the minimum chain length, from the session's pinned Pack Version. */
+  readonly packRepo: CurriculumPackRepositoryPort;
   readonly clock: ClockPort;
-  readonly minChainLength?: number;
 }
 
 export interface SubmitConceptChainCommand {

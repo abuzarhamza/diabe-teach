@@ -136,7 +136,11 @@ function makeHandlers(options: {
     create: createSignedInCreateSessionHandler({ packRepo, sessionRepo, tokenSigner: tokenAdapter }),
     join: createJoinSessionHandler({ sessionRepo, tokenSigner: tokenAdapter }),
     get: createGetSessionHandler({ sessionRepo, tokenVerifier: tokenAdapter }),
-    submit: createSubmitChainHandler({ sessionRepo, tokenVerifier: tokenAdapter }),
+    submit: createSubmitChainHandler({
+      packRepo: new InMemoryCurriculumPackRepository(),
+      sessionRepo,
+      tokenVerifier: tokenAdapter,
+    }),
     transition: createTransitionPhaseHandler({
       packRepo,
       sessionRepo,
@@ -515,7 +519,11 @@ describe("concept Chains checked against the round's board", () => {
       sessionId: legacy.sessionId.value,
       participantId: participant.participantId,
     });
-    const submit = createSubmitChainHandler({ sessionRepo, tokenVerifier: tokenAdapter });
+    const submit = createSubmitChainHandler({
+      packRepo: new InMemoryCurriculumPackRepository(),
+      sessionRepo,
+      tokenVerifier: tokenAdapter,
+    });
     const farAway = [
       { row: 50, col: 3 },
       { row: 51, col: 4 },
