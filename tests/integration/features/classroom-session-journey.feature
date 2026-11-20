@@ -199,6 +199,24 @@ Feature: Classroom Game Session Journey
     Then the response status should be 409
     And the response error code should be "PHASE_HAS_NO_TIMER"
 
+  @end-session
+  Scenario: Teacher ends the session mid-round and the learner sees it completed
+    When the instructor creates a classroom session with pack "diabe-teach"
+    And participant "Alice" joins using the room code
+    And the instructor advances the phase 2 times
+    Then the session phase should be "round-1:chain-mapping"
+    When the instructor ends the session
+    Then the response status should be 200
+    And the session phase should be "completed"
+    When participant "Alice" retrieves the session state
+    Then the session phase should be "completed"
+    When participant "Alice" submits a concept chain for round 1
+    Then the response status should be 409
+    And the response error code should be "PHASE_CLOSED_FOR_SUBMISSIONS"
+    When the instructor ends the session
+    Then the response status should be 409
+    And the response error code should be "SESSION_ALREADY_COMPLETED"
+
   @board @shared-board
   Scenario: Instructor and participant see the same server-dealt round 1 board and chains are checked against it
     When the instructor creates a classroom session with pack "diabe-teach"

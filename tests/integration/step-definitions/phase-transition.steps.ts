@@ -1,7 +1,7 @@
 import type { TestWorld } from "../support/world.js";
 import { Then, When } from "@cucumber/cucumber";
 import { expect } from "chai";
-import { extendPhase, getSession, transitionPhase } from "../support/http-client.js";
+import { endSession, extendPhase, getSession, transitionPhase } from "../support/http-client.js";
 
 /** Seconds a Chain-Mapping phase still accepts chains after `phaseEndsAt`. */
 const SUBMISSION_GRACE_PERIOD_SEC = 5;
@@ -128,6 +128,18 @@ When(
       this.instructorToken,
       { seconds },
     );
+    this.parseLastResponse();
+  },
+);
+
+When(
+  "the instructor ends the session",
+  async function (this: TestWorld) {
+    if (!this.currentSessionId || !this.instructorToken) {
+      throw new Error("No session or instructor token available.");
+    }
+
+    this.lastResponse = await endSession(this.currentSessionId, this.instructorToken);
     this.parseLastResponse();
   },
 );

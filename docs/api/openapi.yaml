@@ -705,6 +705,51 @@ paths:
               schema:
                 $ref: "#/components/schemas/ApiErrorResponse"
 
+  /api/v1/sessions/{sessionId}/end:
+    post:
+      operationId: endGameSession
+      tags: [Sessions]
+      summary: End the Game Session early (instructor only)
+      description: >-
+        Moves the Game Session from any phase straight to `completed`. This is
+        the one exception to "next phase only" (`transitionSessionPhase`). Any
+        extension of the current phase is dropped; `completed` has no timer.
+        Learners see `currentPhase: completed` on their next state poll, and
+        chain submissions are refused with 409 PHASE_CLOSED_FOR_SUBMISSIONS.
+        Takes no request body. Instructor Capability Token only.
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/SessionIdParam"
+      responses:
+        "200":
+          description: Session ended; the updated public state.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [state]
+                properties:
+                  state:
+                    $ref: "#/components/schemas/PublicSessionState"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "403":
+          $ref: "#/components/responses/ForbiddenError"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+        "409":
+          description: >-
+            SESSION_ALREADY_COMPLETED. The session has already ended.
+
+            CONCURRENT_UPDATE_CONFLICT. Other requests kept changing the Game
+            Session while this one was being saved, and it still conflicted
+            after 3 attempts. Nothing was recorded. Safe to retry.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+
   /api/v1/sessions/{sessionId}/rounds/{roundNumber}/chains:
     get:
       operationId: listRoundChains

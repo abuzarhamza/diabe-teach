@@ -1047,6 +1047,7 @@ export const apiOperationIds = [
   "streamGameSessionEvents",
   "transitionSessionPhase",
   "extendSessionPhase",
+  "endGameSession",
   "listRoundChains",
   "submitConceptChain",
   "adjudicateConceptChain",

@@ -330,6 +330,22 @@ export class GameSession {
     }
   }
 
+  /**
+   * Ends the session early: moves from any phase straight to `completed`,
+   * the one exception to "next phase only" (`transitionTo`). Any instructor
+   * extension of the current phase is dropped, and `completed` has no timer
+   * of its own. An already completed session refuses with
+   * SessionAlreadyCompletedError.
+   */
+  public endSession(now: Date): void {
+    if (this.#currentPhase === "completed") {
+      throw new SessionAlreadyCompletedError(this.#sessionId.value);
+    }
+    this.#currentPhase = "completed";
+    this.#phaseStartedAt = now;
+    this.#extendedPhaseEndsAt = null;
+  }
+
   public addParticipant(displayName: string): Participant {
     const participant: Participant = {
       participantId: randomUUID(),
