@@ -6,10 +6,14 @@ Prefer one schema-driven check (ADR-0005: a well-known validator, ideally fed by
 
 **Blocked by:** None (api-hardening 01, `bcab708`, is done)
 
-**Status:** ready-for-agent
+**Status:** wontfix (superseded by 05 and 06, 2026-11-19)
 
 - [ ] Handler test: join with no `roomCode`, or a non-string one, returns 400 naming `roomCode`
 - [ ] Handler tests: create-session with an unknown `mode` or `adjudicationMode`, and transition or adjudicate with a missing or unknown `action`, return 400 naming the field
 - [ ] No route returns 500 for any body that is valid JSON but breaks its OpenAPI request schema (a parameterised test over the documented write routes)
 - [ ] The API overlay catalog's matching deviation lines are removed
 - [ ] Typecheck, vitest, BDD, lint (96) and boundaries (6) are no worse
+
+## Comments
+
+**2026-11-19 (Claude).** Superseded by `.scratch/api-hardening/spec.md`: tickets 05 (generated request schemas) and 06 (body validation).
