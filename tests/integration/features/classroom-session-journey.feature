@@ -32,6 +32,15 @@ Feature: Classroom Game Session Journey
     Then the response status should be 200
     And the participant count should be 2
 
+  @participant-join @roster
+  Scenario: The teacher's session state lists the learner who joined
+    When the instructor creates a classroom session with pack "diabe-teach"
+    And participant "Alice" joins using the room code
+    And the instructor retrieves the session state
+    Then the response status should be 200
+    And the session state should list participant "Alice" who has not left
+    And the participant count should be 1
+
   @error-handling @validation
   Scenario: Invalid room code returns 404
     When someone attempts to join with invalid room code "XXXXXX"

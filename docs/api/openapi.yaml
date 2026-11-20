@@ -1650,6 +1650,7 @@ components:
         - phaseStartedAt
         - phaseEndsAt
         - participantCount
+        - participants
         - activeBoard
       properties:
         sessionId:
@@ -1696,6 +1697,38 @@ components:
             - type: "null"
         participantCount:
           type: integer
+          description: >
+            The number of learners in `participants` whose `leftAt` is
+            `null`.
+        participants:
+          type: array
+          description: >
+            Every learner who joined, in join order, including those who
+            left. Both the instructor and participants receive it, so the
+            teacher's roster and a learner's classmate list come from the
+            state the screens already poll.
+          items:
+            $ref: "#/components/schemas/SessionParticipantView"
+
+    SessionParticipantView:
+      type: object
+      description: >
+        One learner in a Game Session. Carries no email or account id.
+      required: [participantId, displayName, joinedAt, leftAt]
+      properties:
+        participantId:
+          type: string
+        displayName:
+          type: string
+        joinedAt:
+          type: string
+          format: date-time
+        leftAt:
+          type: [string, "null"]
+          format: date-time
+          description: >
+            When the learner left the session; `null` while they are still
+            in it.
 
     TransitionPhaseRequest:
       type: object

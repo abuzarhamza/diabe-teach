@@ -83,6 +83,35 @@ Then(
   },
 );
 
+/** The roster comes from the session state (api-completion 01). */
+Then(
+  "the session state should list participant {string} who has not left",
+  function (this: TestWorld, displayName: string) {
+    const body = this.lastResponseBody as {
+      state?: {
+        participants?: Array<{
+          participantId: string;
+          displayName: string;
+          joinedAt: string;
+          leftAt: string | null;
+        }>;
+      };
+    };
+    const participants = body.state?.participants ?? [];
+    const entry = participants.find(p => p.displayName === displayName);
+    expect(entry !== undefined, `no participant named ${displayName}`).to.equal(true);
+    expect(entry?.participantId).to.equal(this.participantIds.get(displayName));
+    expect(Number.isNaN(Date.parse(entry?.joinedAt ?? ""))).to.equal(false);
+    expect(entry?.leftAt).to.equal(null);
+    expect(Object.keys(entry ?? {}).sort()).to.deep.equal([
+      "displayName",
+      "joinedAt",
+      "leftAt",
+      "participantId",
+    ]);
+  },
+);
+
 Then(
   "the response error code should be {string}",
   function (this: TestWorld, expectedCode: string) {

@@ -37,6 +37,11 @@
     phaseStartedAt: "2026-11-17T09:00:00.000Z",
     phaseEndsAt: "2026-11-17T09:20:00.000Z",
     participantCount: 3,
+    participants: [
+      { participantId: "<participantId>", displayName: "Amira", joinedAt: "2026-11-17T08:58:00.000Z", leftAt: null },
+      { participantId: "<otherParticipantId>", displayName: "Ben", joinedAt: "2026-11-17T08:59:00.000Z", leftAt: null },
+      { participantId: "<thirdParticipantId>", displayName: "Chen", joinedAt: "2026-11-17T09:01:00.000Z", leftAt: null },
+    ],
   };
 
   const sampleChain = {
@@ -429,7 +434,7 @@
             instructorToken: "<instructorToken>",
             participantId: null,
             participantToken: null,
-            state: { ...sampleState, currentPhase: "pretest", activeRoundNumber: null, phaseEndsAt: "2026-11-17T09:15:00.000Z", participantCount: 0 },
+            state: { ...sampleState, currentPhase: "pretest", activeRoundNumber: null, phaseEndsAt: "2026-11-17T09:15:00.000Z", participantCount: 0, participants: [] },
           },
         },
         errors: [
@@ -543,7 +548,6 @@
         deviations: [
           "Requires a Bearer token for this Game Session (401 UNAUTHORIZED_TOKEN without one, 403 FORBIDDEN_ROLE for another session's token); the spec declares no security and only 404.",
           "`activeBoard` is in the spec but never returned: the board can't come from the server yet.",
-          "Only `participantCount` is returned, not the participants; names and per-learner data have no read endpoint.",
           "Round Summary and Completed report `phaseEndsAt` equal to `phaseStartedAt` instead of null.",
         ],
       },
@@ -936,7 +940,7 @@
       },
       "C.roster": {
         ops: ["getGameSessionState", "streamGameSessionEvents", "listRoundChains"],
-        note: "Per-learner chain counts (and display names of learners who submitted) come from list-round-chains (polled). Still a gap: no endpoint lists the participants, so learners with no chain yet are unknown; `state` has only `participantCount`, and `participant.joined` is a specced-only stream event.",
+        note: "The roster is `state.participants` (every learner who joined: `participantId`, `displayName`, `joinedAt`, `leftAt`), polled with get-session-state. Per-learner chain counts come from list-round-chains (polled), matched by `participantId`. `participant.joined` is a specced-only stream event.",
       },
       "C.review": {
         ops: ["listRoundChains", "streamGameSessionEvents"],
@@ -944,7 +948,7 @@
       },
       "C.classmates": {
         ops: ["getGameSessionState", "streamGameSessionEvents"],
-        note: "No endpoint lists the participants: `state` has only `participantCount`. Each classmate's name would arrive in a `participant.joined` stream event (specced only), so today the list can't come from the server.",
+        note: "Classmates are `state.participants` (display name and join time; filter out your own `participantId`), polled with get-session-state; the learner's Capability Token sees the same list as the teacher. `participant.joined` is a specced-only stream event.",
       },
       "C.timeline": {
         ops: ["getGameSessionState"],
@@ -1066,6 +1070,7 @@
       currentPhase: ss.currentPhase, activeRoundNumber: ss.activeRoundNumber ?? null,
       phaseStartedAt: ss.phaseStartedAt, phaseEndsAt: ss.phaseEndsAt ?? null,
       participantCount: state.participants.length, // no activeBoard: the backend never returns it
+      participants: state.participants.map((p) => ({ participantId: p.participantId, displayName: p.displayName, joinedAt: p.joinedAt ?? "<joinedAt>", leftAt: p.leftAt ?? null })),
     };
   }
 
@@ -1122,14 +1127,14 @@
       return { request, response: { status: 201, body: {
         sessionId: "<sessionId>", roomCode: "<roomCode>", instructorToken: "<instructorToken>", participantId: null, participantToken: null,
         state: { sessionId: "<sessionId>", roomCode: "<roomCode>", packId: request.packId, mode: request.mode, adjudicationMode: request.adjudicationMode,
-          currentPhase: "pretest", activeRoundNumber: null, phaseStartedAt: "<createdAt>", phaseEndsAt: pretest ? `<createdAt + ${pretest} s>` : null, participantCount: 0 },
+          currentPhase: "pretest", activeRoundNumber: null, phaseStartedAt: "<createdAt>", phaseEndsAt: pretest ? `<createdAt + ${pretest} s>` : null, participantCount: 0, participants: [] },
       } } };
     }
     const st = publicState(state), fresh = st.currentPhase === "pretest", pretest = timerOf(state).pretestSec;
     const out = { response: { status: 201, body: {
       sessionId: st.sessionId, roomCode: st.roomCode, instructorToken: "<instructorToken>", participantId: null, participantToken: null,
       state: { ...st, currentPhase: "pretest", activeRoundNumber: null, phaseStartedAt: fresh ? st.phaseStartedAt : "<createdAt>",
-        phaseEndsAt: fresh ? st.phaseEndsAt : pretest ? `<createdAt + ${pretest} s>` : null, participantCount: 0 },
+        phaseEndsAt: fresh ? st.phaseEndsAt : pretest ? `<createdAt + ${pretest} s>` : null, participantCount: 0, participants: [] },
     } } };
     const request = sessionRequest(state);
     if (request) out.request = request;
