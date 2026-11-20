@@ -29,6 +29,7 @@ import {
   PackNotFoundError,
   PackValidationFailedError,
   ParticipantHasLeftError,
+  PayloadTooLargeError,
   PhaseClosedForSubmissionsError,
   PhaseHasNoTimerError,
   RoomCodeNotFoundError,
@@ -92,6 +93,9 @@ export function domainErrorMiddleware(): MiddlewareObj<any, any> {
           || error instanceof ParticipantHasLeftError
         ) {
           statusCode = 403;
+        }
+        else if (error instanceof PayloadTooLargeError) {
+          statusCode = 413;
         }
         else if (error instanceof AccountTemporarilyLockedError) {
           statusCode = 423;

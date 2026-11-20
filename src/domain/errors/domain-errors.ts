@@ -454,3 +454,18 @@ export class AccountTemporarilyLockedError extends DomainError {
     );
   }
 }
+
+/**
+ * A request body larger than the API accepts (`maxBytes`, counted in bytes of
+ * the raw body). Refused before the body is parsed.
+ */
+export class PayloadTooLargeError extends DomainError {
+  public readonly code = "PAYLOAD_TOO_LARGE" as const;
+
+  public constructor(maxBytes: number) {
+    super(
+      `The request body is too large. The limit is ${maxBytes} bytes.`,
+      { maxBytes },
+    );
+  }
+}

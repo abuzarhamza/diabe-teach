@@ -93,9 +93,10 @@ Every `/api/v1` route uses this one middy chain. `before` steps run in this orde
    - `none` (sign-up, sign-in) ignores the `Authorization` header.
 
    A token that is present but malformed, invalid, expired or of the wrong kind is a 401 (fail closed). With `tokenRequired: true`, a missing token is a 401 **before the body is read**.
-2. **`jsonObjectBodyMiddleware`**: `@middy/http-json-body-parser`, then "must be a JSON object". Malformed JSON, a missing JSON content type, or an array/string/number/null body is a 400 `INVALID_REQUEST_BODY`. An empty body is left as `undefined`.
-3. **`domainErrorMiddleware`** (onError): maps each `DomainError` subclass to its status (400/401/403/404/409/422/423) with body `{ code, message, details? }` (`ApiErrorResponse`). **When you add a new `DomainError`, add it here**, or it falls through to 500.
-4. **`unexpectedErrorMiddleware`** (onError, last): any other error is a 500 `{ code: "INTERNAL_ERROR", message: "An unexpected error occurred." }`. The stack is only logged, never sent.
+2. **`requestSizeLimitMiddleware`** (`request-size-limit.middleware.ts`): a raw body over 256 KB (`MAX_REQUEST_BODY_BYTES`, counted in bytes, not characters) is a 413 `PAYLOAD_TOO_LARGE`, before anything parses it. Auth runs first, so a caller without a required token still gets 401.
+3. **`jsonObjectBodyMiddleware`**: `@middy/http-json-body-parser`, then "must be a JSON object". Malformed JSON, a missing JSON content type, or an array/string/number/null body is a 400 `INVALID_REQUEST_BODY`. An empty body is left as `undefined`.
+4. **`domainErrorMiddleware`** (onError): maps each `DomainError` subclass to its status (400/401/403/404/409/413/422/423) with body `{ code, message, details? }` (`ApiErrorResponse`). **When you add a new `DomainError`, add it here**, or it falls through to 500.
+5. **`unexpectedErrorMiddleware`** (onError, last): any other error is a 500 `{ code: "INTERNAL_ERROR", message: "An unexpected error occurred." }`. The stack is only logged, never sent.
 
 ### Two token kinds (ADR-0007)
 

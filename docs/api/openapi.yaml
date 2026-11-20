@@ -66,6 +66,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiErrorResponse"
+        "413":
+          $ref: "#/components/responses/PayloadTooLargeError"
         "401":
           description: UNAUTHORIZED_TOKEN. Missing or invalid x-api-key header.
           content:
@@ -113,6 +115,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiErrorResponse"
+        "413":
+          $ref: "#/components/responses/PayloadTooLargeError"
         "401":
           description: >-
             INVALID_CREDENTIALS with the message "Email or password is
@@ -242,6 +246,8 @@ paths:
                     $ref: "#/components/schemas/CurriculumPackSummary"
         "400":
           $ref: "#/components/responses/BadRequestError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLargeError"
         "401":
           description: >-
             UNAUTHORIZED_TOKEN. No Account Token, or one that is malformed,
@@ -331,6 +337,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiErrorResponse"
+        "413":
+          $ref: "#/components/responses/PayloadTooLargeError"
         "401":
           description: >-
             UNAUTHORIZED_TOKEN. No Account Token, or one that is malformed,
@@ -527,6 +535,8 @@ paths:
                 $ref: "#/components/schemas/CreateSessionResponse"
         "400":
           $ref: "#/components/responses/BadRequestError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLargeError"
         "401":
           description: >-
             UNAUTHORIZED_TOKEN. A classroom (non-solo) start sent no Account
@@ -572,6 +582,8 @@ paths:
                 $ref: "#/components/schemas/JoinSessionResponse"
         "400":
           $ref: "#/components/responses/BadRequestError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLargeError"
         "404":
           $ref: "#/components/responses/NotFoundError"
         "409":
@@ -676,6 +688,8 @@ paths:
                     $ref: "#/components/schemas/PublicSessionState"
         "400":
           $ref: "#/components/responses/BadRequestError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLargeError"
         "401":
           $ref: "#/components/responses/UnauthorizedError"
         "403":
@@ -728,6 +742,8 @@ paths:
                     $ref: "#/components/schemas/PublicSessionState"
         "400":
           $ref: "#/components/responses/BadRequestError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLargeError"
         "401":
           $ref: "#/components/responses/UnauthorizedError"
         "403":
@@ -958,6 +974,8 @@ paths:
                     $ref: "#/components/schemas/SubmittedChain"
         "400":
           $ref: "#/components/responses/BadRequestError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLargeError"
         "401":
           $ref: "#/components/responses/UnauthorizedError"
         "403":
@@ -1031,6 +1049,8 @@ paths:
                     $ref: "#/components/schemas/SubmittedChain"
         "400":
           $ref: "#/components/responses/BadRequestError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLargeError"
         "401":
           $ref: "#/components/responses/UnauthorizedError"
         "403":
@@ -1124,6 +1144,8 @@ paths:
                 $ref: "#/components/schemas/AssessmentSubmissionResponse"
         "400":
           $ref: "#/components/responses/BadRequestError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLargeError"
         "401":
           $ref: "#/components/responses/UnauthorizedError"
         "403":
@@ -1184,6 +1206,8 @@ paths:
                     format: date-time
         "400":
           $ref: "#/components/responses/BadRequestError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLargeError"
         "401":
           $ref: "#/components/responses/UnauthorizedError"
         "403":
@@ -1309,6 +1333,17 @@ components:
         application/json:
           schema:
             $ref: "#/components/schemas/ApiErrorResponse"
+    PayloadTooLargeError:
+      description: >-
+        PAYLOAD_TOO_LARGE. The raw request body is over 256 KB (262144 bytes,
+        counted in bytes, not characters). Checked for every route after the
+        token and before the body is parsed, so a request without a valid
+        token gets 401 first. `details.maxBytes` is the limit. Nothing is
+        stored.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiErrorResponse"
     UnauthorizedError:
       description: Missing or invalid bearer token
       content:
@@ -1384,6 +1419,7 @@ components:
         - SESSION_ALREADY_COMPLETED
         - PHASE_HAS_NO_TIMER
         - PARTICIPANT_HAS_LEFT
+        - PAYLOAD_TOO_LARGE
         - INTERNAL_ERROR
 
     ApiErrorResponse:
