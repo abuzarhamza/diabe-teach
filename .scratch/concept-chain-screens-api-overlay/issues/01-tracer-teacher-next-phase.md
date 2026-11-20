@@ -4,7 +4,9 @@
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** resolved
+
+Resolved 2026-11-20: done in PR #4 (merge `2976821`: `d4ac9da`, `2433b0f`, `df1b44f`, `b6dda6e`, `72345f9`); see the Comments below.
 
 - [x] Toggle button in the teacher header with `aria-pressed`; off by default
 - [x] "Next phase" is marked with a declarative attribute; the overlay finds it by that attribute only

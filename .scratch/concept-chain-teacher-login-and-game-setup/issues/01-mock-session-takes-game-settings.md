@@ -4,7 +4,9 @@
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** resolved
+
+Resolved 2026-11-20: done in `fe90fcd` (`claudPoc/concept-chain/login.html`, `setup.html`), later wired to the real API in `93dbb3f`; see the Comments below.
 
 - [x] Creating a session with a `timerConfig` gives matching `phaseEndsAt` on entering chain-mapping and peer-review, and `null` for teacher-paced phases
 - [x] Out-of-range timer values are rejected with a clear error

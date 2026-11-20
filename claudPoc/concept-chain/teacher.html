@@ -164,7 +164,7 @@ function chainCard(s, c) {
     <div class="row between"><span class="by">${CC.esc(name(s, c.participantId))} · ${c.path.length} keywords</span>${CC.statusBadge(c)}</div>
     <div class="text">${CC.chainText(c)}</div>
     <p class="story">${CC.esc(c.narrativeExplanation)}</p>
-    ${c.stepRationales?.some((r) => r.rationale) ? `<ol class="steps-r">${c.stepRationales.map((r, i) => `<li>${CC.esc(c.labels[i])} → ${CC.esc(c.labels[i + 1])}: ${CC.esc(r.rationale || "—")}</li>`).join("")}</ol>` : ""}
+    ${c.stepRationales?.some((r) => r) ? `<ol class="steps-r">${c.stepRationales.map((r, i) => `<li>${CC.esc(c.labels[i])} → ${CC.esc(c.labels[i + 1])}: ${CC.esc(r || "—")}</li>`).join("")}</ol>` : ""}
     <div class="tally">Peer votes: 👍 ${up} · ✋ ${down}</div>
     ${comments ? `<ul class="steps-r">${comments}</ul>` : ""}
     <div class="row"><button class="btn sm" data-trace="${c.chainId}">${c.chainId === selected ? "Hide on board" : "Trace on board"}</button></div>

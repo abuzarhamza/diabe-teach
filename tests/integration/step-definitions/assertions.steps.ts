@@ -237,14 +237,3 @@ Then(
     expect(roundNumber).to.equal(expectedRound);
   },
 );
-
-Then(
-  "the chain should be finalized with score {int}",
-  function (this: TestWorld, expectedScore: number) {
-    const body = this.lastResponseBody as {
-      chain?: { qualityScore?: number; status?: string };
-    };
-    expect(body.chain?.qualityScore).to.equal(expectedScore);
-    expect(body.chain?.status).to.equal("instructor-finalized");
-  },
-);

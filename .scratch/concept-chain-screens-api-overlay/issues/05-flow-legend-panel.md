@@ -4,7 +4,9 @@
 
 **Blocked by:** 01
 
-**Status:** ready-for-agent
+**Status:** resolved
+
+Resolved 2026-11-20: done in PR #4 (merge `2976821`: `d4ac9da`, `2433b0f`, `df1b44f`, `b6dda6e`, `72345f9`); see the Comments below.
 
 - [x] Legend appears only while the overlay is on and doesn't cover the board on desktop
 - [x] Order, titles, actors and screens come from the catalog `steps`, not hard-coded per page

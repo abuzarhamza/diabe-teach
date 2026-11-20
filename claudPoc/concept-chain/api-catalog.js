@@ -23,13 +23,25 @@
 //
 // Pages mark elements with data-api="<letter>" | "<letter>.<detail>" | "gap.<key>" | "nav.<key>"
 // and data-api-io="write" (sends a request, dashed) | "read" (shows API data, solid).
-/* eslint-disable */
+/* eslint-disable antfu/reasonable-newline, antfu/consistent-list-newline, antfu/if-newline, antfu/consistent-chaining, style/arrow-parens, style/quote-props, style/max-statements-per-line, style/multiline-ternary, one-var -- compact browser data script, kept in the screens' own style */
 (function (root) {
-  // PublicSessionState as the backend returns it today (no activeBoard key at all).
+  // A round's board (BoardGridView) as the server deals it, trimmed here to two cells: the real `cells` is rows × cols.
+  const sampleBoard = {
+    seed: "k3v9q2",
+    rows: 7,
+    cols: 7,
+    cells: [[
+      { row: 0, col: 0, card: { id: "insulin", verbatimLabel: "Insulin", displayLabel: "Insulin", aliases: [], domainId: "anatomy-pathophysiology", summary: "Hormone from pancreatic beta cells that lowers blood glucose." } },
+      { row: 0, col: 1, card: { id: "glut4", verbatimLabel: "GLUT4", displayLabel: "GLUT4", aliases: [], domainId: "anatomy-pathophysiology", summary: "Insulin-regulated glucose transporter in muscle and fat cells." } },
+    ]],
+  };
+
+  // PublicSessionState as the backend returns it (`activeBoard` is null outside a round's phases).
   const sampleState = {
     sessionId: "<sessionId>",
     roomCode: "K7QX2M",
     packId: "diabe-teach",
+    packVersion: "1.0.0",
     mode: "classroom",
     adjudicationMode: "peer-instructor",
     currentPhase: "round-1:chain-mapping",
@@ -42,6 +54,7 @@
       { participantId: "<otherParticipantId>", displayName: "Ben", joinedAt: "2026-11-17T08:59:00.000Z", leftAt: null },
       { participantId: "<thirdParticipantId>", displayName: "Chen", joinedAt: "2026-11-17T09:01:00.000Z", leftAt: null },
     ],
+    activeBoard: sampleBoard,
   };
 
   const sampleChain = {
@@ -543,15 +556,13 @@
           { status: 403, code: "FORBIDDEN_ROLE" },
           { status: 404, code: "SESSION_NOT_FOUND" },
         ],
-        status: "partial",
+        status: "implemented",
         notes: [
           "Poll this while the stream (streamGameSessionEvents) is not implemented.",
           "Either Capability Token works: the teacher's instructor token or a learner's participant token for this Game Session. Another session's token gets 403 FORBIDDEN_ROLE.",
           "Round Summary and Completed have no timer, so they report `phaseEndsAt` equal to `phaseStartedAt` (no deadline to come).",
         ],
-        deviations: [
-          "`activeBoard` is in the spec but never returned: the board can't come from the server yet.",
-        ],
+        deviations: [],
       },
 
       streamGameSessionEvents: {
@@ -769,7 +780,7 @@
         status: "partial",
         notes: [
           "The server never auto-advances: a phase changes only when the teacher calls this.",
-          "It only moves to the next phase in the Game Session order; there is no skipping or going back. `jump` must name that next phase as `targetPhase` (otherwise 409 INVALID_PHASE_TRANSITION). Ending early uses endGameSession.",
+          "It only moves to the next phase in the Game Session order; there is no skipping or going back. `jump` must name that next phase as `targetPhase` (another phase gets 409 INVALID_PHASE_TRANSITION, none gets 400 INVALID_REQUEST_BODY). Ending early uses endGameSession.",
           "A write conflict is retried up to 3 times; a 409 CONCURRENT_UPDATE_CONFLICT is safe to retry.",
           "Entering `round-1:chain-mapping` or `round-2:chain-mapping` deals that round's board (`state.activeBoard`). Its seed is this request's `seed`, else (Round 1 only) the creation seed, else one the server generates; `activeBoard.seed` reports it. The same pack, Pack Version and seed always give the same board, so a Study RCT can replay a board by sending its seed.",
         ],
@@ -868,7 +879,7 @@
       },
       boardSize: {
         title: "Board size",
-        note: "Not enforced by the API: createGameSession has no board size field. A pack's size is its `boardConfig.rows` / `cols` (3-12 in the spec), fixed when the pack is registered (`diabe-teach` is 7×7), and the backend deals no board at all today.",
+        note: "Not enforced by the API: createGameSession has no board size field. A pack's size is its `boardConfig.rows` / `cols` (3-12 in the spec), fixed when the pack is registered (`diabe-teach` is 7×7); the server deals each round's board (`state.activeBoard`) at that size, not the one chosen here.",
       },
       minChain: {
         title: "Shortest chain allowed",
@@ -966,7 +977,8 @@
         note: "The countdown is `state.phaseEndsAt` minus now. `phaseEndsAt: null` means the phase is teacher-paced: no deadline, it lasts until the teacher clicks Next phase. When the Chain-Mapping time runs out, submissions are still accepted for a fixed 5 s grace period, then rejected with 409 PHASE_CLOSED_FOR_SUBMISSIONS; the phase stays current (closed) until the teacher advances.",
       },
       "C.board": {
-        note: "Meant to be `state.activeBoard` (a BoardGridView of Keyword Cards). It is in the spec but the backend never returns it and deals no board, so today the board can only be built on the client.",
+        ops: ["getGameSessionState"],
+        note: "`state.activeBoard` (a BoardGridView: `cells[row][col].card` is the Keyword Card), dealt by the server when the round's Chain-Mapping phase starts and `null` outside a round. This demo still draws its own browser-dealt board, so its cards won't match the server's.",
       },
       "C.roster": {
         ops: ["getGameSessionState", "streamGameSessionEvents", "listRoundChains"],
@@ -1097,14 +1109,22 @@
 
   const fillPath = (template, params) => template.replace(/\{(\w+)\}/g, (whole, name) => (params[name] ?? null) === null ? whole : String(params[name]));
 
+  // The demo's board ({ seed, rows, cols, cells: [{ keywordId, label }] }) as a BoardGridView; it has no domain or summary.
+  function boardView(b) {
+    if (!b) return null;
+    return { seed: b.seed, rows: b.rows, cols: b.cols, cells: b.cells.map((cells, row) => cells.map((c, col) => ({ row, col,
+      card: { id: c.keywordId, verbatimLabel: c.label, displayLabel: c.label, aliases: [], domainId: "<domainId>", summary: "<summary>" } }))) };
+  }
+
   function publicState(state) {
     const ss = state.session;
     return {
       sessionId: ss.sessionId, roomCode: ss.roomCode, packId: ss.packId, mode: ss.mode, adjudicationMode: ss.adjudicationMode,
       currentPhase: ss.currentPhase, activeRoundNumber: ss.activeRoundNumber ?? null,
       phaseStartedAt: ss.phaseStartedAt, phaseEndsAt: ss.phaseEndsAt ?? null,
-      participantCount: state.participants.length, // no activeBoard: the backend never returns it
+      participantCount: state.participants.length,
       participants: state.participants.map((p) => ({ participantId: p.participantId, displayName: p.displayName, joinedAt: p.joinedAt ?? "<joinedAt>", leftAt: p.leftAt ?? null })),
+      activeBoard: boardView(ss.activeBoard),
     };
   }
 
@@ -1112,7 +1132,7 @@
     return {
       chainId: c.chainId, sessionId: c.sessionId, roundNumber: c.roundNumber, participantId: c.participantId,
       path: c.path, keywordIds: c.keywordIds, narrativeExplanation: c.narrativeExplanation,
-      // The browser fake keeps `{ fromCoord, toCoord, rationale }` objects; the API sends plain strings.
+      // Plain strings, as the API sends them; a demo saved before the fake switched to strings may still hold objects.
       stepRationales: (c.stepRationales ?? []).map((r) => (typeof r === "string" ? r : r?.rationale ?? "")), status: c.status, verdict: c.verdict ?? null,
       peerVotes: c.peerVotes ?? [], submittedAt: c.submittedAt,
     };
@@ -1146,8 +1166,10 @@
     const cur = publicState(state), i = PHASES.indexOf(cur.currentPhase);
     if (i < 0 || i >= PHASES.length - 1) return cur; // completed: 200 with the state unchanged (see deviations)
     const phase = PHASES[i + 1], m = /^round-(\d)/.exec(phase), sec = timerOf(state)[PHASE_TIMER[phase.split(":").pop()]];
+    // Entering a round's Chain-Mapping deals a new board; it stays through that round's Round Summary.
+    const activeBoard = !m ? null : phase.endsWith(":chain-mapping") ? "<board the server deals for this round>" : cur.activeBoard;
     return { ...cur, currentPhase: phase, activeRoundNumber: m ? Number(m[1]) : null, phaseStartedAt: "<server time>",
-      phaseEndsAt: sec ? `<phaseStartedAt + ${sec} s>` : null };
+      phaseEndsAt: sec ? `<phaseStartedAt + ${sec} s>` : null, activeBoard };
   }
 
   const ops = catalog.operations;
@@ -1161,7 +1183,7 @@
       return { request, response: { status: 201, body: {
         sessionId: "<sessionId>", roomCode: "<roomCode>", instructorToken: "<instructorToken>", participantId: null, participantToken: null,
         state: { sessionId: "<sessionId>", roomCode: "<roomCode>", packId: request.packId, mode: request.mode, adjudicationMode: request.adjudicationMode,
-          currentPhase: "pretest", activeRoundNumber: null, phaseStartedAt: "<createdAt>", phaseEndsAt: pretest ? `<createdAt + ${pretest} s>` : null, participantCount: 0, participants: [] },
+          currentPhase: "pretest", activeRoundNumber: null, phaseStartedAt: "<createdAt>", phaseEndsAt: pretest ? `<createdAt + ${pretest} s>` : null, participantCount: 0, participants: [], activeBoard: null },
       } } };
     }
     const st = publicState(state), fresh = st.currentPhase === "pretest", pretest = timerOf(state).pretestSec;

@@ -2038,7 +2038,8 @@ components:
         targetPhase:
           $ref: "#/components/schemas/PhaseIdentifier"
           description: >
-            Used with `jump` only: the phase to move to, which must be the
+            Required with `jump` (400 INVALID_REQUEST_BODY without it) and
+            ignored by `advance`: the phase to move to, which must be the
             next phase.
         seed:
           type: string

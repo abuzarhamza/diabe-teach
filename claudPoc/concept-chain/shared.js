@@ -1,7 +1,7 @@
 // Shared in-browser mock of the Game Session API for the Concept Chain prototype screens.
 // State mirrors docs/api/openapi.yaml (PublicSessionState, SubmittedChain, PlayerRoundStanding)
 // and is kept in localStorage so a teacher tab and participant tabs stay in sync.
-/* eslint-disable */
+/* eslint-disable antfu/consistent-chaining, antfu/consistent-list-newline, antfu/curly, antfu/if-newline, antfu/reasonable-newline, no-unused-vars, one-var, style/arrow-parens, style/brace-style, style/comma-spacing, style/key-spacing, style/max-statements-per-line, style/quote-props, style/quotes, unused-imports/no-unused-vars -- compact browser script, kept in the screens' own style */
 const CC = (() => {
   const KEY = "cc-demo-session-v1";
   const GRACE_MS = 5000; // fixed grace period after phaseEndsAt (see submitConceptChain 409)
@@ -320,7 +320,7 @@ const CC = (() => {
         s.chains.push({ chainId: uid("chn"), sessionId: s.session.sessionId, roundNumber: s.session.activeRoundNumber, participantId: p.participantId, path,
           keywordIds: path.map((c) => b.cells[c.row][c.col].keywordId), labels,
           narrativeExplanation: `${labels.join(" leads to ")} — sample narrative from ${p.displayName}.`,
-          stepRationales: path.slice(1).map((c, i) => ({ fromCoord: path[i], toCoord: c, rationale: `${labels[i]} relates to ${labels[i + 1]}.` })),
+          stepRationales: path.slice(1).map((_c, i) => `${labels[i]} relates to ${labels[i + 1]}.`),
           status: "pending-review", verdict: null, peerVotes: [], submittedAt: new Date().toISOString() });
       }
     });

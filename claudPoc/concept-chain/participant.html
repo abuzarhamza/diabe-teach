@@ -208,7 +208,7 @@ function reviewCard(s, p, c) {
     <div class="row between"><span class="by">${CC.esc(name(s, c.participantId))} · ${c.path.length} keywords</span>${CC.statusBadge(c)}</div>
     <div class="text">${CC.chainText(c)}</div>
     <p class="story">${CC.esc(c.narrativeExplanation)}</p>
-    ${c.stepRationales?.some((r) => r.rationale) ? `<ol class="steps-r">${c.stepRationales.map((r, i) => `<li>${CC.esc(c.labels[i])} → ${CC.esc(c.labels[i + 1])}: ${CC.esc(r.rationale || "—")}</li>`).join("")}</ol>` : ""}
+    ${c.stepRationales?.some((r) => r) ? `<ol class="steps-r">${c.stepRationales.map((r, i) => `<li>${CC.esc(c.labels[i])} → ${CC.esc(c.labels[i + 1])}: ${CC.esc(r || "—")}</li>`).join("")}</ol>` : ""}
     <div class="row"><button class="btn sm" data-trace="${c.chainId}">${c.chainId === selected ? "Hide on board" : "Show on board"}</button></div>
     ${locked ? `<div class="feedback" data-api="G.verdict" data-api-io="read"><b>Teacher ruled:</b> ${CC.esc(c.verdict.overallFeedback)}</div>` : `
     <div class="vote">
@@ -234,7 +234,7 @@ function tap(coord, el) {
 
 function submit() {
   const s = CC.get(), p = me(s);
-  const stepRationales = draft.path.slice(1).map((c, i) => ({ fromCoord: draft.path[i], toCoord: c, rationale: (draft.links[i] ?? "").trim() }));
+  const stepRationales = draft.path.slice(1).map((_c, i) => (draft.links[i] ?? "").trim());
   try {
     CC.submitChain(p.participantId, draft.path, draft.story, stepRationales);
     draft = { seed: draft.seed, path: [], links: [], story: "" };

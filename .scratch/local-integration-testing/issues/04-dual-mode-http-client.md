@@ -1,5 +1,9 @@
 # Issue 04: Simplify HTTP Client to Use Base URL
 
+**Status:** resolved
+
+Resolved 2026-11-20: done (`netlify-cli` devDependency, `netlify.toml` `[dev]` block and URL-based `tests/integration/support/http-client.ts` in `b368e85`; `dev:local`/`test:bdd` scripts, `BeforeAll` health check in `tests/integration/support/hooks.ts`; no Express in `package.json`).
+
 ## Task
 
 Remove Express dependency from HTTP client and use supertest with base URL directly.
