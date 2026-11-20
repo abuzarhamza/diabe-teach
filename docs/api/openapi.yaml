@@ -653,10 +653,15 @@ paths:
       tags: [Chains]
       summary: List the Concept Chains of a Gameplay Round that the caller may see
       description: >-
-        Returns the Gameplay Round's Concept Chains, each in the same
-        `SubmittedChain` shape that submit and adjudicate return (path,
-        keywords, narrative, step rationales, status, peer votes, verdict),
-        sorted by `submittedAt` ascending, then `chainId`. A round with no
+        Returns the Gameplay Round's Concept Chains, each as a
+        `SubmittedChainListItem`: the `SubmittedChain` shape that submit and
+        adjudicate return (path, keywords, narrative, step rationales, status,
+        peer votes, verdict) plus the submitting learner's
+        `participantDisplayName` and each peer vote's `voterDisplayName`
+        (`"Unknown"` if the participant can't be found). Display names are
+        already public to the class through standings; no email address or
+        Account id appears. Chains are sorted by `submittedAt` ascending, then
+        `chainId`. A round with no
         chains, or one that has not started yet, returns 200 with an empty
         `chains` list.
 
@@ -688,7 +693,7 @@ paths:
                   chains:
                     type: array
                     items:
-                      $ref: "#/components/schemas/SubmittedChain"
+                      $ref: "#/components/schemas/SubmittedChainListItem"
         "400":
           description: >-
             INVALID_REQUEST_BODY. `roundNumber` is not 1 or 2.
@@ -1810,6 +1815,35 @@ components:
         submittedAt:
           type: string
           format: date-time
+
+    SubmittedChainListItem:
+      description: >-
+        A Concept Chain as listed by `listRoundChains`: every `SubmittedChain`
+        field plus the display names a screen needs to label the chain and its
+        peer votes without a learner roster.
+      allOf:
+        - $ref: "#/components/schemas/SubmittedChain"
+        - type: object
+          required: [participantDisplayName, peerVotes]
+          properties:
+            participantDisplayName:
+              type: string
+              description: >-
+                The submitting participant's display name, or "Unknown" if
+                the participant can't be found.
+            peerVotes:
+              type: array
+              items:
+                allOf:
+                  - $ref: "#/components/schemas/PeerVoteRecord"
+                  - type: object
+                    required: [voterDisplayName]
+                    properties:
+                      voterDisplayName:
+                        type: string
+                        description: >-
+                          The voter's display name, or "Unknown" if the
+                          participant can't be found.
 
     AdjudicateChainRequest:
       oneOf:

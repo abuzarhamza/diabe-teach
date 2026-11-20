@@ -188,6 +188,73 @@ describe("get /api/v1/sessions/{sessionId}/rounds/{roundNumber}/chains", () => {
     expect(raw).not.toMatch(/stack|at .*\.ts:\d+/i);
   });
 
+  it("shows the submitting learner's display name on each listed chain", async () => {
+    const world = makeWorld();
+    const { body } = await world.list(1, await world.instructorToken());
+
+    expect(
+      body.chains.map((c: { participantId: string; participantDisplayName: string }) =>
+        [c.participantId, c.participantDisplayName]),
+    ).toEqual([
+      [world.alice.participantId, "Alice"],
+      [world.bob.participantId, "Bob"],
+      [world.alice.participantId, "Alice"],
+    ]);
+  });
+
+  it("shows the voter's display name on each peer vote, and the locked Instructor Final Ruling", async () => {
+    const world = makeWorld();
+    const { body } = await world.list(1, await world.instructorToken());
+
+    const aliceFirst = body.chains[0];
+    expect(aliceFirst.peerVotes).toEqual([
+      expect.objectContaining({
+        voterParticipantId: world.bob.participantId,
+        voterDisplayName: "Bob",
+        decision: "approve",
+        comment: "Holds up",
+      }),
+    ]);
+    expect(aliceFirst.verdict.isLocked).toBe(true);
+  });
+
+  it("shows \"Unknown\" for a chain author or voter who can't be found", async () => {
+    const world = makeWorld((session) => {
+      const ghostChain = ConceptChain.create({
+        chainId: "ghost-chain",
+        participantId: "no-such-participant",
+        roundNumber: 1,
+        path: pathOnRow(4, 4),
+        keywordIds: [],
+        narrativeExplanation: "Orphaned chain",
+        submittedAt: new Date("2026-11-19T10:04:00.000Z"),
+      });
+      ghostChain.addPeerVote({ voterParticipantId: "no-such-voter", decision: "challenge" });
+      session.addChain(ghostChain, new Date());
+    });
+
+    const { body } = await world.list(1, await world.instructorToken());
+
+    const ghost = body.chains.find((c: { chainId: string }) => c.chainId === "ghost-chain");
+    expect(ghost.participantDisplayName).toBe("Unknown");
+    expect(ghost.peerVotes[0].voterDisplayName).toBe("Unknown");
+  });
+
+  it("shows no email address, account id or stack trace in the list response", async () => {
+    const world = makeWorld();
+    for (const token of [
+      await world.instructorToken(),
+      await world.participantToken(world.alice.participantId),
+    ]) {
+      const { raw } = await world.list(1, token);
+
+      expect(raw).not.toContain(TEST_TEACHER.email);
+      expect(raw).not.toContain(TEST_TEACHER.accountId);
+      expect(raw).not.toMatch(/@/);
+      expect(raw).not.toMatch(/stack|at .*\.ts:\d+/i);
+    }
+  });
+
   it("orders chains submitted at the same time by chain id", async () => {
     const sameTime = new Date("2026-11-19T10:05:00.000Z");
     const world = makeWorld((session, carolId) => {

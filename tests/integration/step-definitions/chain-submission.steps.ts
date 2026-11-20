@@ -283,7 +283,12 @@ When(
 );
 
 interface ListedChainsBody {
-  readonly chains: ReadonlyArray<{ chainId: string; participantId: string; status: string }>;
+  readonly chains: ReadonlyArray<{
+    chainId: string;
+    participantId: string;
+    participantDisplayName: string;
+    status: string;
+  }>;
 }
 
 Then(
@@ -292,11 +297,17 @@ Then(
     const body = this.lastResponseBody as ListedChainsBody;
     expect(body?.chains, JSON.stringify(this.lastResponseBody)).to.be.an("array");
     expect(
-      body.chains.map(chain => [chain.chainId, chain.participantId, chain.status]),
+      body.chains.map(chain => [
+        chain.chainId,
+        chain.participantId,
+        chain.participantDisplayName,
+        chain.status,
+      ]),
     ).to.deep.equal([
       [
         this.lastChainId,
         this.participantIds.get(displayName),
+        displayName,
         "pending-review",
       ],
     ]);

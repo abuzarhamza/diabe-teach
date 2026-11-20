@@ -6,13 +6,17 @@ See spec: `.scratch/list-round-chains/spec.md`.
 
 **Blocked by:** 01 (Teacher lists a round's Concept Chains)
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] Handler test: each listed chain shows the submitting learner's display name
-- [ ] Handler test: each peer vote shows the voter's display name, and an Instructor Final Ruling comes back with `verdict.isLocked`
-- [ ] Handler test: a chain whose participant can't be found shows `"Unknown"`
-- [ ] Handler test: no email address, account id or stack trace appears in the list response
-- [ ] Submit and adjudicate responses are unchanged (their existing tests still pass untouched)
-- [ ] OpenAPI adds a `SubmittedChainListItem` schema (the `SubmittedChain` fields plus the two names) and uses it for the list response
-- [ ] Cucumber: the teacher's list step checks the learner's display name on the chain
-- [ ] Typecheck, vitest, BDD (one feature at a time), lint and boundaries are no worse
+- [x] Handler test: each listed chain shows the submitting learner's display name
+- [x] Handler test: each peer vote shows the voter's display name, and an Instructor Final Ruling comes back with `verdict.isLocked`
+- [x] Handler test: a chain whose participant can't be found shows `"Unknown"`
+- [x] Handler test: no email address, account id or stack trace appears in the list response
+- [x] Submit and adjudicate responses are unchanged (their existing tests still pass untouched)
+- [x] OpenAPI adds a `SubmittedChainListItem` schema (the `SubmittedChain` fields plus the two names) and uses it for the list response
+- [x] Cucumber: the teacher's list step checks the learner's display name on the chain
+- [x] Typecheck, vitest, BDD (one feature at a time), lint and boundaries are no worse
+
+## Resolution (2026-11-19)
+
+`ListRoundChainsUseCase` now maps each listed chain to a `ListedChainDto` with `participantDisplayName` and each peer vote to a `ListedPeerVoteDto` with `voterDisplayName`, looked up with `GameSession.getParticipant` and falling back to `"Unknown"` as standings does. Submit and adjudicate are untouched. OpenAPI adds `SubmittedChainListItem` (`allOf` `SubmittedChain` plus the two names) and the list response uses it. Four new handler tests in `tests/functions/list-round-chains.test.ts`; the classroom BDD list step now also checks the chain's `participantDisplayName`. Checks: typecheck passes, vitest 579 passing, `classroom-session-journey.feature` 15/15 under `dev:local`, lint 92, boundaries 6.

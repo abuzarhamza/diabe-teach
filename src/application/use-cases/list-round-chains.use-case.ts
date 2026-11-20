@@ -9,6 +9,9 @@ import type {
 import { SessionNotFoundError } from "../../domain/errors/domain-errors.js";
 import { SessionId } from "../../domain/game-session/session-id.js";
 
+/** Shown for a participant who can't be found, as standings does. */
+const UNKNOWN_DISPLAY_NAME = "Unknown";
+
 /**
  * Lists the Concept Chains of one Gameplay Round that the caller may see,
  * in submission order. A round with no chains (or not started) is an empty
@@ -37,10 +40,14 @@ export class ListRoundChainsUseCase implements ListRoundChainsUseCasePort {
         : {}),
     });
 
+    const displayNameOf = (participantId: string): string =>
+      session.getParticipant(participantId)?.displayName ?? UNKNOWN_DISPLAY_NAME;
+
     const chains: ListedChainDto[] = visible.map(chain => ({
       chainId: chain.chainId,
       sessionId: session.sessionId.value,
       participantId: chain.participantId,
+      participantDisplayName: displayNameOf(chain.participantId),
       roundNumber: chain.roundNumber,
       path: chain.path,
       keywordIds: chain.keywordIds,
@@ -48,7 +55,10 @@ export class ListRoundChainsUseCase implements ListRoundChainsUseCasePort {
       stepRationales: chain.stepRationales,
       chainLength: chain.chainLength,
       status: chain.status,
-      peerVotes: chain.peerVotes,
+      peerVotes: chain.peerVotes.map(vote => ({
+        ...vote,
+        voterDisplayName: displayNameOf(vote.voterParticipantId),
+      })),
       verdict: chain.verdict,
       submittedAt: chain.submittedAt.toISOString(),
     }));
