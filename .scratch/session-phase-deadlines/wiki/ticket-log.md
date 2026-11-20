@@ -93,3 +93,8 @@
   - a pack missing a required field is now 400 on register (was 422) and on validate (was a 200 report).
 
   Claude checked: `ajv` is in `dependencies`, the tree is clean, no dev server is running, and the prototype never calls validate. Open for the user: should validate keep returning a 200 report for malformed packs instead of 400? Not fixed: the browser-fake screens store `stepRationales` as objects, and an unused BDD step expects the old "finalized" status. **api-hardening 03–06 are done.**
+- **2026-11-20:** The user asked for one spec and tickets covering all leftover API work, then a merge request. [Spec](../../api-completion/spec.md) and 15 tickets were published without a breakdown quiz, because the user asked for the whole pipeline in one go. Edges:
+  - 04 is blocked by 01; 06 by 05; 07 by server-owned-board 03; 13 by 04; 15 by everything else;
+  - 10 should run after 02–04.
+
+  Claude's defaults, open for the user to override: roster in session state (no new route), extend capped at 1–600 s, a 256 KB body limit, and validate keeping its 400 for a pack with a missing or wrongly typed field.
