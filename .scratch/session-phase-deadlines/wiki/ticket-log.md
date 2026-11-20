@@ -85,3 +85,11 @@
   - an empty `narrativeExplanation` becomes 400;
   - email validity stays with the domain (it trims and lower-cases first), so Ajv doesn't enforce `format: email` and a padded email still signs up;
   - the prototype API catalog's `stepRationales` sample switches to strings.
+- **2026-11-19:** api-hardening 06 committed as `b042157`. An Ajv step in `createApiHandler` validates every body against the generated schema for the route's declared operationId, giving 400 `INVALID_REQUEST_BODY` with `details.field` and `details.reason`; auth 401 still comes first. A test checks that each route declares the operationId matching its path and method. The agent reported vitest 784/784, lint **49** (new baseline), boundaries 6, and all 5 BDD features passing (classroom 19/19 with a new "join without room code → 400" scenario). Changes clients will notice:
+  - a missing `action` on transition and adjudicate is now 400 (it used to be filled in);
+  - rulings need a non-empty `feedback`, and `qualityScore` must be 1 to 10;
+  - a bad survey rating is now 400 (was 422 `INVALID_SURVEY_RESPONSE`);
+  - `timerConfig` errors now have `details { field, reason }`;
+  - a pack missing a required field is now 400 on register (was 422) and on validate (was a 200 report).
+
+  Claude checked: `ajv` is in `dependencies`, the tree is clean, no dev server is running, and the prototype never calls validate. Open for the user: should validate keep returning a 200 report for malformed packs instead of 400? Not fixed: the browser-fake screens store `stepRationales` as objects, and an unused BDD step expects the old "finalized" status. **api-hardening 03–06 are done.**
