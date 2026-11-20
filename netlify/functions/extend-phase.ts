@@ -1,5 +1,6 @@
 import type { Config } from "@netlify/functions";
 import { wrapLambdaHandler } from "../../src/adapters/inbound/http/lambda-to-v2-wrapper.js";
+import { AppRuntime } from "../../src/app-runtime.js";
 import { lambdaHandler } from "./sessions/extend-phase.js";
 
 export { createExtendPhaseHandler, lambdaHandler } from "./sessions/extend-phase.js";
@@ -10,4 +11,4 @@ export const config: Config = {
 };
 
 // Routed by `config.path` alone (no netlify.toml redirect).
-export default wrapLambdaHandler(lambdaHandler, config);
+export default wrapLambdaHandler(lambdaHandler, config, AppRuntime.invocationOptions);
