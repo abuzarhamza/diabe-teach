@@ -98,3 +98,4 @@
   - 10 should run after 02–04.
 
   Claude's defaults, open for the user to override: roster in session state (no new route), extend capped at 1–600 s, a 256 KB body limit, and validate keeping its 400 for a pack with a missing or wrongly typed field.
+- **2026-11-20:** Pushed the branch and opened [PR #6](https://github.com/abuzarhamza/diabe-teach/pull/6) to `main`. Before pushing, Claude checked: the secrets guard test passes 3/3, and `.env.dev.yaml.example` holds only placeholders. The PR first conflicted, because `main` had an older copy of the prototype from PR #4 (add/add on 8 `claudPoc/` and `tests/claudpoc-*` files). Claude merged `origin/main` into the branch as `92695f9`, keeping the branch versions, with no file content changes. Typecheck passes and vitest is 784/784. GitHub then reported MERGEABLE, with the Snyk and Semgrep checks pending at the time. The PR is not merged; that is the user's call.
