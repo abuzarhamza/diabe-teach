@@ -1,7 +1,7 @@
 import type { TestWorld } from "../support/world.js";
 import { Then, When } from "@cucumber/cucumber";
 import { expect } from "chai";
-import { submitAssessment, transitionPhase } from "../support/http-client.js";
+import { getSessionAnalytics, submitAssessment, transitionPhase } from "../support/http-client.js";
 
 /**
  * Default assessment answers for testing.
@@ -244,5 +244,52 @@ Then(
       report?: { pretest?: { stage?: string } | null };
     };
     expect(body.report?.pretest?.stage).to.equal("pretest");
+  },
+);
+
+When(
+  "participant {string} fetches their analytics report",
+  async function (this: TestWorld, displayName: string) {
+    if (!this.currentSessionId) {
+      throw new Error("No session available.");
+    }
+    const token = this.participantTokens.get(displayName);
+    if (!token) {
+      throw new Error(`No token found for participant '${displayName}'.`);
+    }
+
+    this.lastResponse = await getSessionAnalytics(this.currentSessionId, token);
+    this.parseLastResponse();
+  },
+);
+
+Then(
+  "the analytics report should show their pretest and posttest results",
+  function (this: TestWorld) {
+    const body = this.lastResponseBody as {
+      role?: string;
+      participantReport?: {
+        participantId?: string;
+        pretest?: { stage?: string; correctPercentage?: number } | null;
+        posttest?: { stage?: string; correctPercentage?: number } | null;
+        knowledgeGainDelta?: number | null;
+        guessingReductionDelta?: number | null;
+        chainDiversityIndex?: number;
+        neglectedKeywordIds?: string[];
+      };
+      cohortSummary?: { sessionId?: string; participantCount?: number };
+    };
+    expect(body.role).to.equal("participant");
+    const report = body.participantReport;
+    expect(report?.participantId).to.be.a("string");
+    expect(report?.pretest?.stage).to.equal("pretest");
+    expect(report?.posttest?.stage).to.equal("posttest");
+    // The default answers are the same at both stages, so nothing changed.
+    expect(report?.knowledgeGainDelta).to.equal(0);
+    expect(report?.guessingReductionDelta).to.equal(0);
+    expect(report?.chainDiversityIndex).to.equal(0);
+    expect(report?.neglectedKeywordIds).to.be.an("array");
+    expect(body.cohortSummary?.sessionId).to.equal(this.currentSessionId);
+    expect(body.cohortSummary?.participantCount).to.equal(1);
   },
 );

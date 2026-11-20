@@ -847,10 +847,12 @@
         auth: ["apiKey", "instructor", "participant"],
         errors: [
           { status: 401, code: "UNAUTHORIZED_TOKEN" },
+          { status: 403, code: "FORBIDDEN_ROLE" },
           { status: 404, code: "SESSION_NOT_FOUND" },
         ],
-        status: "specced-only",
-        deviations: ["No handler: nothing in src/ or netlify/functions/ serves this route yet."],
+        status: "partial",
+        deviations: ["`cohortSummary` carries only `sessionId` and `participantCount`; the cohort means and the board neglect heatmap are not served yet (api-completion ticket 06)."],
+        notes: ["A learner's token returns their own `participantReport`; fields whose inputs don't exist yet (e.g. the Posttest) are `null`."],
       },
     },
 

@@ -7,8 +7,6 @@ import type {
 } from "../../domain/game-session/game-session.types.js";
 import type { GameSessionRepositoryPort } from "../ports/game-session-repository.port.js";
 import type {
-  AssessmentStageSummary,
-  LearnerMetacognitiveReport,
   PosttestSubmissionResult,
   PretestSubmissionReceipt,
   QuestionReviewItem,
@@ -25,6 +23,7 @@ import {
 } from "../../domain/errors/domain-errors.js";
 import { SessionId } from "../../domain/game-session/session-id.js";
 import { GameSessionUpdateRetrier } from "../services/game-session-update-retrier.js";
+import { LearnerAnalyticsService } from "../services/learner-analytics-service.js";
 import { SessionPackLoader } from "../services/session-pack-loader.js";
 
 export class SubmitAssessmentUseCase implements SubmitAssessmentUseCasePort {
@@ -32,6 +31,7 @@ export class SubmitAssessmentUseCase implements SubmitAssessmentUseCasePort {
   readonly #sessionUpdates: GameSessionUpdateRetrier;
   /** Reads the session's pinned Pack Version (or the latest, for legacy sessions). */
   readonly #packs: SessionPackLoader;
+  readonly #analytics = new LearnerAnalyticsService();
 
   public constructor(deps: SubmitAssessmentDependencies) {
     this.#sessionRepo = deps.sessionRepo;
@@ -171,12 +171,11 @@ export class SubmitAssessmentUseCase implements SubmitAssessmentUseCasePort {
       posttestAttempt.answers,
     );
 
-    // Build metacognitive report
-    const report = this.#buildMetacognitiveReport(
+    // The same report the analytics route serves, now the posttest is stored.
+    const report = this.#analytics.buildReport(
       session,
       pack,
-      pretestAttempt,
-      posttestAttempt,
+      posttestAttempt.participantId,
     );
 
     return {
@@ -207,189 +206,5 @@ export class SubmitAssessmentUseCase implements SubmitAssessmentUseCasePort {
         posttestChoice,
       };
     });
-  }
-
-  #buildMetacognitiveReport(
-    session: GameSession,
-    pack: CurriculumPack,
-    pretestAttempt: AssessmentAttempt | undefined,
-    posttestAttempt: AssessmentAttempt,
-  ): LearnerMetacognitiveReport {
-    const questions = pack.assessmentInstrument?.questions ?? [];
-    const participantId = posttestAttempt.participantId;
-
-    // Calculate stage summaries
-    const pretestSummary = pretestAttempt
-      ? this.#calculateStageSummary("pretest", questions, pretestAttempt.answers)
-      : null;
-
-    const posttestSummary = this.#calculateStageSummary(
-      "posttest",
-      questions,
-      posttestAttempt.answers,
-    );
-
-    // Calculate deltas (null if no pretest)
-    const knowledgeGainDelta = pretestSummary
-      ? posttestSummary.correctPercentage - pretestSummary.correctPercentage
-      : null;
-
-    const guessingReductionDelta = pretestSummary
-      ? pretestSummary.wrongGuessPercentage - posttestSummary.wrongGuessPercentage
-      : null;
-
-    // Calculate chain diversity index
-    const chainDiversityIndex = this.#calculateChainDiversityIndex(
-      session,
-      pack,
-      participantId,
-    );
-
-    // Find neglected keywords
-    const neglectedKeywordIds = this.#findNeglectedKeywords(
-      session,
-      pack,
-      participantId,
-    );
-
-    return {
-      participantId,
-      pretest: pretestSummary,
-      posttest: posttestSummary,
-      knowledgeGainDelta,
-      guessingReductionDelta,
-      chainDiversityIndex,
-      neglectedKeywordIds,
-    };
-  }
-
-  #calculateStageSummary(
-    stage: "pretest" | "posttest",
-    questions: readonly AssessmentQuestion[],
-    answers: ReadonlyMap<string, McqAnswerChoice>,
-  ): AssessmentStageSummary {
-    const totalQuestions = questions.length;
-
-    if (totalQuestions === 0) {
-      return {
-        stage,
-        totalQuestions: 0,
-        correctCount: 0,
-        wrongGuessCount: 0,
-        iDontKnowCount: 0,
-        correctPercentage: 0,
-        wrongGuessPercentage: 0,
-        iDontKnowPercentage: 0,
-        uncertaintyCalibrationRatio: 1.0,
-      };
-    }
-
-    let correctCount = 0;
-    let wrongGuessCount = 0;
-    let iDontKnowCount = 0;
-
-    for (const question of questions) {
-      const answer = answers.get(question.id);
-
-      if (answer === "I_DONT_KNOW" || answer === undefined) {
-        iDontKnowCount++;
-      }
-      else if (answer === question.correctIndex) {
-        correctCount++;
-      }
-      else {
-        wrongGuessCount++;
-      }
-    }
-
-    // Calculate uncertainty calibration ratio for this stage
-    // = I_DONT_KNOW / (I_DONT_KNOW + wrongGuess), or 1.0 if both are 0
-    const calibrationDenominator = iDontKnowCount + wrongGuessCount;
-    const uncertaintyCalibrationRatio = calibrationDenominator === 0
-      ? 1.0
-      : iDontKnowCount / calibrationDenominator;
-
-    return {
-      stage,
-      totalQuestions,
-      correctCount,
-      wrongGuessCount,
-      iDontKnowCount,
-      correctPercentage: (correctCount / totalQuestions) * 100,
-      wrongGuessPercentage: (wrongGuessCount / totalQuestions) * 100,
-      iDontKnowPercentage: (iDontKnowCount / totalQuestions) * 100,
-      uncertaintyCalibrationRatio,
-    };
-  }
-
-  /**
-   * Calculate the chain diversity index as the ratio of unique semantic domains
-   * used across all chains by this participant to the total domains in the pack.
-   * Returns a value between 0 and 1.
-   */
-  #calculateChainDiversityIndex(
-    session: GameSession,
-    pack: CurriculumPack,
-    participantId: string,
-  ): number {
-    const participantChains = session.chains.filter(
-      c => c.participantId === participantId,
-    );
-
-    if (participantChains.length === 0) {
-      return 0;
-    }
-
-    // Get unique domains from cards used in chains
-    const usedDomainIds = new Set<string>();
-
-    for (const chain of participantChains) {
-      for (const keywordId of chain.keywordIds) {
-        const card = pack.getCardById(keywordId);
-        if (card) {
-          usedDomainIds.add(card.domainId);
-        }
-      }
-    }
-
-    const totalDomains = pack.domains.length;
-
-    if (totalDomains === 0) {
-      return 0;
-    }
-
-    return usedDomainIds.size / totalDomains;
-  }
-
-  /**
-   * Find keywords from the pack that were never used in any chain by this participant.
-   * These represent potential blind spots.
-   */
-  #findNeglectedKeywords(
-    session: GameSession,
-    pack: CurriculumPack,
-    participantId: string,
-  ): string[] {
-    const participantChains = session.chains.filter(
-      c => c.participantId === participantId,
-    );
-
-    // Collect all keyword IDs used by this participant
-    const usedKeywordIds = new Set<string>();
-    for (const chain of participantChains) {
-      for (const keywordId of chain.keywordIds) {
-        usedKeywordIds.add(keywordId);
-      }
-    }
-
-    // Find keywords that were never used
-    const neglected: string[] = [];
-    for (const card of pack.cards) {
-      if (!usedKeywordIds.has(card.id)) {
-        neglected.push(card.id);
-      }
-    }
-
-    return neglected;
   }
 }

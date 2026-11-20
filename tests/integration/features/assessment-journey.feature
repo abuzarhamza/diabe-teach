@@ -32,6 +32,9 @@ Feature: Assessment Submission Journey
     And the response should contain submittedAt
     And the response should contain a metacognitive report
     And the response should contain answer key review
+    When participant "Alice" fetches their analytics report
+    Then the response status should be 200
+    And the analytics report should show their pretest and posttest results
 
   @error-handling @duplicate
   Scenario: Participant cannot submit pretest twice

@@ -61,6 +61,15 @@ export async function getSession(sessionId: string, token: string) {
   return toApiGatewayResult(res);
 }
 
+export async function getSessionAnalytics(sessionId: string, token: string) {
+  const res = await request(BASE_URL)
+    .get(`/api/v1/sessions/${sessionId}/analytics`)
+    .set("x-api-key", API_KEY)
+    .set("Authorization", `Bearer ${token}`);
+
+  return toApiGatewayResult(res);
+}
+
 export async function transitionPhase(
   sessionId: string,
   token: string,

@@ -1153,6 +1153,16 @@ paths:
       operationId: getSessionAnalytics
       tags: [Assessments & Analytics]
       summary: Fetch individual learner or full cohort metacognitive and gameplay analytics
+      description: >-
+        A participant Capability Token gets `{ role: "participant",
+        participantReport, cohortSummary }`, where `participantReport` is the
+        caller's own LearnerMetacognitiveReport. An instructor token gets
+        `{ role: "instructor", cohortSummary }` without `participantReport`.
+        Works in any phase: inputs that do not exist yet (for example the
+        Posttest before the learner has taken it) are `null`, never an error.
+        Pack data comes from the session's pinned Pack Version. Until the full
+        cohort summary ships, `cohortSummary` carries only `sessionId` and
+        `participantCount`.
       security:
         - BearerAuth: []
       parameters:
@@ -1166,6 +1176,13 @@ paths:
                 $ref: "#/components/schemas/SessionAnalyticsResponse"
         "401":
           $ref: "#/components/responses/UnauthorizedError"
+        "403":
+          description: >-
+            FORBIDDEN_ROLE. The token belongs to another session.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
         "404":
           $ref: "#/components/responses/NotFoundError"
 
@@ -2244,8 +2261,15 @@ components:
 
     LearnerMetacognitiveReport:
       type: object
+      description: >-
+        One learner's report. A stage the learner has not taken is `null`, and
+        so is each delta that needs both stages.
       required:
         - participantId
+        - pretest
+        - posttest
+        - knowledgeGainDelta
+        - guessingReductionDelta
         - chainDiversityIndex
         - neglectedKeywordIds
       properties:
@@ -2261,14 +2285,24 @@ components:
             - type: "null"
         knowledgeGainDelta:
           type: [number, "null"]
+          description: Posttest correct % minus Pretest correct %.
         guessingReductionDelta:
           type: [number, "null"]
+          description: Pretest wrong-guess % minus Posttest wrong-guess %.
         chainDiversityIndex:
           type: number
           minimum: 0
           maximum: 1
+          description: >-
+            Distinct Semantic Domains crossed by the learner's approved Concept
+            Chains, divided by the pack's Semantic Domain count (0 with no
+            approved chain).
         neglectedKeywordIds:
           type: array
+          description: >-
+            Keyword Cards on the round boards dealt so far that none of the
+            learner's Concept Chains used (whatever their verdict), each once,
+            in round, row, column order. Empty before any board is dealt.
           items:
             type: string
 
@@ -2353,20 +2387,19 @@ components:
 
     CohortAnalyticsReport:
       type: object
+      description: >-
+        For now only `sessionId` and `participantCount` are returned; the
+        other fields are not yet served and are optional until the full
+        cohort summary ships.
       required:
         - sessionId
         - participantCount
-        - pretestCohortMeanPercentage
-        - posttestCohortMeanPercentage
-        - posttestWrongGuessMeanPercentage
-        - posttestIDontKnowMeanPercentage
-        - meanChainDiversityIndex
-        - boardNeglectHeatmap
       properties:
         sessionId:
           type: string
         participantCount:
           type: integer
+          description: Learners still in the session (those who left are not counted).
         pretestCohortMeanPercentage:
           type: [number, "null"]
         posttestCohortMeanPercentage:
