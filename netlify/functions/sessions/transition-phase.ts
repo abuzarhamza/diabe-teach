@@ -63,12 +63,13 @@ export function createTransitionPhaseHandler(
       );
     }
 
-    const body = readOptionalJsonObjectBody(event.body) as Partial<TransitionSessionPhaseCommand>;
+    // The request schema has already required a known `action` (api-hardening 06).
+    const body = readOptionalJsonObjectBody(event.body) as Pick<TransitionSessionPhaseCommand, "action" | "targetPhase" | "seed">;
 
     const result = await useCase.execute({
       sessionId,
       verifiedCapability: event.auth,
-      action: body.action ?? "advance",
+      action: body.action,
       targetPhase: body.targetPhase,
       seed: body.seed,
     });
@@ -88,7 +89,7 @@ export function createTransitionPhaseHandler(
     requireApiKey: deps.requireApiKey ?? false,
     tokenRequired: true,
     missingTokenMessage: "Authentication required.",
-  });
+  }, "transitionSessionPhase");
 }
 
 export const lambdaHandler = createTransitionPhaseHandler();

@@ -255,7 +255,7 @@ describe("an unexpected server error returns a generic 500 (api-hardening 01)", 
     const failure = new Error("connection refused at /srv/app/src/db.ts:42");
     const handler = createApiHandler(async () => {
       throw failure;
-    }, {}) as unknown as Handler;
+    }, {}, "getGameSessionState") as unknown as Handler;
 
     const res = await call(handler, makeEvent({ path: "/api/v1/anything", rawBody: null }));
 
@@ -281,7 +281,14 @@ describe("an unexpected server error returns a generic 500 (api-hardening 01)", 
 
     const res = await call(handler, makeEvent({
       path: `/api/v1/sessions/${session.sessionId.value}/rounds/1/chains`,
-      rawBody: JSON.stringify({ path: [], keywordIds: [], narrativeExplanation: "" }),
+      rawBody: JSON.stringify({
+        path: [
+          { row: 0, col: 0 },
+          { row: 0, col: 1 },
+        ],
+        keywordIds: [],
+        narrativeExplanation: "A story",
+      }),
       headers: { "content-type": "application/json", "authorization": `Bearer ${token}` },
       pathParameters: { sessionId: session.sessionId.value, roundNumber: "1" },
     }));

@@ -95,7 +95,7 @@ export function createSubmitSurveyHandler(
     requireApiKey: deps.requireApiKey ?? false,
     tokenRequired: true,
     missingTokenMessage: "Authentication required.",
-  });
+  }, "submitPerceptionSurvey");
 }
 
 export const lambdaHandler = createSubmitSurveyHandler();

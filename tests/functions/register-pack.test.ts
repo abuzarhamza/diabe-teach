@@ -133,12 +133,29 @@ describe("pOST /api/v1/packs", () => {
     expect(body.message).toBe("Curriculum Pack 'test-pack' version '1.0.0' already exists.");
   });
 
-  it("returns 422 for invalid pack structure", async () => {
+  it("returns 400 naming the first missing required field (request schema, api-hardening 06)", async () => {
+    const ctx = createTestContext();
+    const handler = createRegisterPackHandler(ctx.deps);
+    const token = await ctx.teachers.tokenFor();
+
+    const result = (await handler(
+      createEvent({ id: "Invalid ID!", title: "" }, token),
+      {} as never,
+    )) as APIGatewayProxyResult;
+
+    expect(result.statusCode).toBe(400);
+    const body = JSON.parse(result.body);
+    expect(body.code).toBe("INVALID_REQUEST_BODY");
+    expect(body.details).toEqual({ field: "version", reason: "is required" });
+  });
+
+  it("returns 422 for a well-shaped pack that breaks the pack rules", async () => {
     const ctx = createTestContext();
     const handler = createRegisterPackHandler(ctx.deps);
     const token = await ctx.teachers.tokenFor();
 
     const invalidPack = {
+      ...createMinimalValidPack(),
       id: "Invalid ID!",
       title: "",
     };

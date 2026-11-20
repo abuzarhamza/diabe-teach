@@ -39,7 +39,7 @@ export function createGetPackByIdHandler(
     tokenVerifier: deps.tokenVerifier,
     apiKey: deps.apiKey,
     requireApiKey: deps.requireApiKey,
-  });
+  }, "getCurriculumPackById");
 }
 
 export const lambdaHandler = createGetPackByIdHandler();

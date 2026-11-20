@@ -32,7 +32,7 @@ export function createListPacksHandler(
     tokenVerifier: deps.tokenVerifier,
     apiKey: deps.apiKey,
     requireApiKey: deps.requireApiKey,
-  });
+  }, "listCurriculumPacks");
 }
 
 // Lambda handler for unit tests and production

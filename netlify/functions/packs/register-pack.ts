@@ -65,7 +65,7 @@ export function createRegisterPackHandler(
     requireApiKey: deps.requireApiKey,
     tokenRequired: true,
     missingTokenMessage: "An Account Token is required to register curriculum packs. Sign in first.",
-  });
+  }, "registerCurriculumPack");
 }
 
 export const lambdaHandler = createRegisterPackHandler();

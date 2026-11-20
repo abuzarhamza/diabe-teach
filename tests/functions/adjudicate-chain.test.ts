@@ -116,7 +116,7 @@ describe("post /api/v1/sessions/{sessionId}/rounds/{n}/chains/{chainId}/adjudica
       {
         action: "instructor-approve",
         feedback: "Good clinical reasoning!",
-        qualityScore: 85,
+        qualityScore: 8,
       },
       { authorization: `Bearer ${token}` },
     );
@@ -184,7 +184,7 @@ describe("post /api/v1/sessions/{sessionId}/rounds/{n}/chains/{chainId}/adjudica
       session.sessionId.value,
       1,
       "non-existent-chain",
-      { action: "instructor-approve" },
+      { action: "instructor-approve", feedback: "Name the mechanism." },
       { authorization: `Bearer ${token}` },
     );
 
@@ -216,7 +216,7 @@ describe("post /api/v1/sessions/{sessionId}/rounds/{n}/chains/{chainId}/adjudica
       session.sessionId.value,
       1,
       chain.chainId,
-      { action: "instructor-approve" },
+      { action: "instructor-approve", feedback: "Name the mechanism." },
       { authorization: `Bearer ${token}` },
     );
 

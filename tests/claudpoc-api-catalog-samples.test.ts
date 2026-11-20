@@ -132,10 +132,7 @@ describe("claudPoc Concept Chain live API samples", () => {
     expect(out.request).toEqual({
       path,
       narrativeExplanation: "The story",
-      stepRationales: [
-        { fromCoord: path[0], toCoord: path[1], rationale: "Insulin moves glucose" },
-        { fromCoord: path[1], toCoord: path[2], rationale: "Glucose raises HbA1c" },
-      ],
+      stepRationales: ["Insulin moves glucose", "Glucose raises HbA1c"],
     });
     const chain = out.response?.body.chain as Record<string, unknown>;
     expect(out.response?.status).toBe(201);

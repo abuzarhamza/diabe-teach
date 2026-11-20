@@ -52,7 +52,7 @@ export function createJoinSessionHandler(
     tokenVerifier: undefined,
     apiKey: deps.apiKey,
     requireApiKey: deps.requireApiKey ?? false,
-  });
+  }, "joinGameSession");
 }
 
 export const lambdaHandler = createJoinSessionHandler();

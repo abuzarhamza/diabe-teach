@@ -379,7 +379,7 @@ describe("post /api/v1/sessions: a classroom start needs a signed-in teacher", (
     const ruling = await call(world.adjudicate, inGame(
       `${sessionPath}/rounds/1/chains/no-such-chain/adjudicate`,
       "POST",
-      { action: "instructor-final", qualityScore: 3 },
+      { action: "instructor-approve", feedback: "Clear chain.", qualityScore: 3 },
       { sessionId, roundNumber: "1", chainId: "no-such-chain" },
     ));
     expect(ruling.statusCode).toBe(404);

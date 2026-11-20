@@ -47,7 +47,7 @@
     path: [{ row: 0, col: 0 }, { row: 0, col: 1 }, { row: 1, col: 1 }, { row: 2, col: 1 }],
     keywordIds: ["insulin", "glut4", "glucose-uptake", "hyperglycaemia"],
     narrativeExplanation: "Insulin moves GLUT4 to the membrane, so glucose uptake rises; without it, blood glucose stays high.",
-    stepRationales: [{ fromCoord: { row: 0, col: 0 }, toCoord: { row: 0, col: 1 }, rationale: "Insulin signalling translocates GLUT4." }],
+    stepRationales: ["Insulin signalling translocates GLUT4."],
     status: "pending-review",
     verdict: null,
     peerVotes: [{ voterParticipantId: "<otherParticipantId>", decision: "approve", comment: null, votedAt: "2026-11-17T09:22:00.000Z" }],
@@ -329,6 +329,7 @@
           body: { valid: false, issues: [{ jsonPointer: "/adjudicationRubric/chainContinuityCriteria", rule: "minItems", message: "At least one chain continuity criterion is required." }] },
         },
         errors: [
+          { status: 400, code: "INVALID_REQUEST_BODY" },
           { status: 401, code: "UNAUTHORIZED_TOKEN" },
         ],
         status: "partial",
@@ -452,7 +453,6 @@
           "Every session starts in `pretest`, including solo mode (the spec summary says solo auto-starts Round 1; it only auto-joins the creator).",
           "`state` has no `activeBoard` key and no board is dealt; `seed` is ignored, so the previewed board can't be reproduced server-side.",
           "`creatorDisplayName` (Game setup's \"name shown to your class\") is only used in solo mode (as the auto-joined learner's name); in classroom mode it is dropped.",
-          "`mode` and `adjudicationMode` are not validated; only `timerConfig` is (400 INVALID_REQUEST_BODY). A missing `adjudicationMode` gets 500 from the Mongo store.",
         ],
       },
 
@@ -472,6 +472,7 @@
           },
         },
         errors: [
+          { status: 400, code: "INVALID_REQUEST_BODY" },
           { status: 404, code: "ROOM_CODE_NOT_FOUND" },
           { status: 409, code: "CONCURRENT_UPDATE_CONFLICT" },
         ],
@@ -485,7 +486,6 @@
         deviations: [
           "Joining is accepted in any phase, including `completed`.",
           "A missing `displayName` becomes \"Anonymous\"; joining twice creates two participants.",
-          "A missing `roomCode` is not mapped to 400 INVALID_REQUEST_BODY (it gets a generic 500 INTERNAL_ERROR).",
         ],
       },
 
@@ -498,13 +498,14 @@
           path: [{ row: 0, col: 0 }, { row: 0, col: 1 }, { row: 1, col: 1 }, { row: 2, col: 1 }],
           narrativeExplanation: sampleChain.narrativeExplanation,
           stepRationales: [
-            { fromCoord: { row: 0, col: 0 }, toCoord: { row: 0, col: 1 }, rationale: "Insulin signalling translocates GLUT4." },
-            { fromCoord: { row: 0, col: 1 }, toCoord: { row: 1, col: 1 }, rationale: "GLUT4 at the membrane lets glucose in." },
-            { fromCoord: { row: 1, col: 1 }, toCoord: { row: 2, col: 1 }, rationale: "Without that uptake, blood glucose stays high." },
+            "Insulin signalling translocates GLUT4.",
+            "GLUT4 at the membrane lets glucose in.",
+            "Without that uptake, blood glucose stays high.",
           ],
         },
         response: { status: 201, body: { chain: { ...sampleChain, peerVotes: [] } } },
         errors: [
+          { status: 400, code: "INVALID_REQUEST_BODY" },
           { status: 401, code: "UNAUTHORIZED_TOKEN" },
           { status: 404, code: "SESSION_NOT_FOUND" },
           { status: 409, code: "PHASE_CLOSED_FOR_SUBMISSIONS" },
@@ -521,8 +522,6 @@
         ],
         deviations: [
           "A chain needs at least 4 cells (fixed, not read from the Curriculum Pack); the spec says `minItems: 2` and the demo accepts 2.",
-          "`stepRationales` is stored as plain strings, not the spec's StepRationale objects; `keywordIds` is read from the body although the spec doesn't define it, and isn't derived from a board (no board is dealt).",
-          "An empty `narrativeExplanation` is accepted (spec `minLength: 1`).",
           "The returned chain has no `sessionId`, `stepRationales`, `peerVotes` or `verdict`, and adds `chainLength` and `keywordIds`.",
           "An instructor token, or a token for another Game Session, gets 403 FORBIDDEN_ROLE, which the spec doesn't declare for this route.",
         ],
@@ -630,6 +629,7 @@
           },
         },
         errors: [
+          { status: 400, code: "INVALID_REQUEST_BODY" },
           { status: 401, code: "UNAUTHORIZED_TOKEN" },
           { status: 403, code: "FORBIDDEN_ROLE" },
           { status: 404, code: "SESSION_NOT_FOUND" },
@@ -701,11 +701,9 @@
           },
         },
         deviations: [
-          "`feedback` is not enforced: an empty or missing feedback is accepted. `qualityScore` is not range-checked.",
           "The verdict comes back as `{ isApproved, isLocked, feedback, qualityScore, decidedBy: \"instructor\", decidedAt }`, not the spec's AdjudicationVerdict (no `adjudicatorType`, `overallFeedback`, `transitionEvaluations`).",
           "The returned chain has no `sessionId` or `stepRationales`, and adds `chainLength`.",
           "A ruling is accepted in any phase, and the path's `roundNumber` is not checked against the chain's round.",
-          "A missing `action` defaults to `peer-approve`; an unknown action changes nothing and still returns 200.",
           "`ai-evaluate` is a placeholder that always approves with `qualityScore: 75`.",
         ],
       },
@@ -753,6 +751,7 @@
           body: { state: sampleState },
         },
         errors: [
+          { status: 400, code: "INVALID_REQUEST_BODY" },
           { status: 401, code: "UNAUTHORIZED_TOKEN" },
           { status: 403, code: "FORBIDDEN_ROLE" },
           { status: 404, code: "SESSION_NOT_FOUND" },
@@ -769,7 +768,6 @@
           "No Keyword Card board is shuffled on Round 1 or Round 2 entry, and `seed` is ignored; `activeBoard` is never returned.",
           "`jump` is accepted but can only target the next phase (otherwise 409 INVALID_PHASE_TRANSITION).",
           "Advancing from `completed` returns 200 with the unchanged state instead of 409.",
-          "A missing `action` defaults to `advance` although the spec makes it required.",
           "Round Summary and Completed report `phaseEndsAt` equal to `phaseStartedAt` instead of null.",
           "Only the instructor token is accepted (a participant gets 403 FORBIDDEN_ROLE).",
           "x-api-key is checked when the server has API_KEY set, but the spec does not declare it here.",
@@ -782,6 +780,7 @@
         pathParams: { stage: ["pretest", "posttest"] },
         auth: ["apiKey", "participant"],
         errors: [
+          { status: 400, code: "INVALID_REQUEST_BODY" },
           { status: 401, code: "UNAUTHORIZED_TOKEN" },
           { status: 404, code: "SESSION_NOT_FOUND" },
           { status: 409, code: "ASSESSMENT_ALREADY_SUBMITTED" },
@@ -798,6 +797,7 @@
         path: "/api/v1/sessions/{sessionId}/survey",
         auth: ["apiKey", "participant"],
         errors: [
+          { status: 400, code: "INVALID_REQUEST_BODY" },
           { status: 401, code: "UNAUTHORIZED_TOKEN" },
           { status: 404, code: "SESSION_NOT_FOUND" },
           { status: 409, code: "SURVEY_ALREADY_SUBMITTED" },
@@ -1073,7 +1073,8 @@
     return {
       chainId: c.chainId, sessionId: c.sessionId, roundNumber: c.roundNumber, participantId: c.participantId,
       path: c.path, keywordIds: c.keywordIds, narrativeExplanation: c.narrativeExplanation,
-      stepRationales: c.stepRationales ?? [], status: c.status, verdict: c.verdict ?? null,
+      // The browser fake keeps `{ fromCoord, toCoord, rationale }` objects; the API sends plain strings.
+      stepRationales: (c.stepRationales ?? []).map((r) => (typeof r === "string" ? r : r?.rationale ?? "")), status: c.status, verdict: c.verdict ?? null,
       peerVotes: c.peerVotes ?? [], submittedAt: c.submittedAt,
     };
   }
@@ -1088,7 +1089,7 @@
     return {
       path,
       narrativeExplanation: (draft.story ?? "").trim(),
-      stepRationales: path.slice(1).map((c, i) => ({ fromCoord: path[i], toCoord: c, rationale: (draft.links?.[i] ?? "").trim() })),
+      stepRationales: path.slice(1).map((_c, i) => (draft.links?.[i] ?? "").trim()),
     };
   }
 

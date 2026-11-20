@@ -47,7 +47,7 @@ export function createSignUpHandler(dependencies?: SignUpHandlerDependencies) {
     bearerScheme: "none",
     apiKey: deps.apiKey,
     requireApiKey: deps.requireApiKey,
-  });
+  }, "signUpInstructor");
 }
 
 export const lambdaHandler = createSignUpHandler();

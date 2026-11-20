@@ -67,7 +67,7 @@ export function createGetSessionHandler(
     requireApiKey: deps.requireApiKey ?? false,
     tokenRequired: true,
     missingTokenMessage: "Authentication required.",
-  });
+  }, "getGameSessionState");
 }
 
 export const lambdaHandler = createGetSessionHandler();

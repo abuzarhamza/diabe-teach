@@ -184,6 +184,14 @@ When(
 );
 
 When(
+  "someone attempts to join without a room code",
+  async function (this: TestWorld) {
+    this.lastResponse = await joinSession({ displayName: "Unknown" });
+    this.parseLastResponse();
+  },
+);
+
+When(
   "someone attempts to join with invalid room code {string}",
   async function (this: TestWorld, invalidCode: string) {
     this.lastResponse = await joinSession({

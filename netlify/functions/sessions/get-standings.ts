@@ -71,7 +71,7 @@ export function createGetStandingsHandler(
     requireApiKey: deps.requireApiKey ?? false,
     tokenRequired: true,
     missingTokenMessage: "Authentication required.",
-  });
+  }, "getRoundStandings");
 }
 
 export const lambdaHandler = createGetStandingsHandler();

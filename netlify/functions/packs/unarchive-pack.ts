@@ -55,7 +55,7 @@ export function createUnarchivePackHandler(
     requireApiKey: deps.requireApiKey,
     tokenRequired: true,
     missingTokenMessage: "An Account Token is required to unarchive curriculum packs. Sign in first.",
-  });
+  }, "unarchiveCurriculumPack");
 }
 
 export const lambdaHandler = createUnarchivePackHandler();

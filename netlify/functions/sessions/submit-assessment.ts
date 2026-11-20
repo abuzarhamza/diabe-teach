@@ -108,7 +108,7 @@ export function createSubmitAssessmentHandler(
     requireApiKey: deps.requireApiKey ?? false,
     tokenRequired: true,
     missingTokenMessage: "Authentication required.",
-  });
+  }, "submitAssessmentAttempt");
 }
 
 export const lambdaHandler = createSubmitAssessmentHandler();

@@ -55,7 +55,7 @@ export function createArchivePackHandler(
     requireApiKey: deps.requireApiKey,
     tokenRequired: true,
     missingTokenMessage: "An Account Token is required to archive curriculum packs. Sign in first.",
-  });
+  }, "archiveCurriculumPack");
 }
 
 export const lambdaHandler = createArchivePackHandler();

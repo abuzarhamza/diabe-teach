@@ -73,7 +73,7 @@ export function createCreateSessionHandler(
     accountTokenVerifier,
     apiKey: deps.apiKey,
     requireApiKey: deps.requireApiKey ?? false,
-  });
+  }, "createGameSession");
 }
 
 export const lambdaHandler = createCreateSessionHandler();

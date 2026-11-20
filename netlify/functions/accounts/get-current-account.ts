@@ -46,7 +46,7 @@ export function createGetCurrentAccountHandler(
     requireApiKey: deps.requireApiKey,
     tokenRequired: true,
     missingTokenMessage: "An Account Token is required. Sign in first.",
-  });
+  }, "getCurrentInstructorAccount");
 }
 
 export const lambdaHandler = createGetCurrentAccountHandler();

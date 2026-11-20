@@ -199,7 +199,7 @@ When(
       this.lastChainId,
       this.instructorToken,
       {
-        action: "instructor-final",
+        action: "instructor-approve",
         qualityScore: score,
         feedback: "Good chain construction demonstrating understanding.",
       },

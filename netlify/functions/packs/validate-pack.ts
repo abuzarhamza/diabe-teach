@@ -51,7 +51,7 @@ export function createValidatePackHandler(
     requireApiKey: deps.requireApiKey,
     tokenRequired: true,
     missingTokenMessage: "An Account Token is required to validate curriculum packs. Sign in first.",
-  });
+  }, "validateCurriculumPack");
 }
 
 export const lambdaHandler = createValidatePackHandler();

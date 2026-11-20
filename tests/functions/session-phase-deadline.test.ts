@@ -453,7 +453,11 @@ describe("instructor-driven (untimed) phases", () => {
 
     expect(created.statusCode).toBe(400);
     expect(created.body.code).toBe("INVALID_REQUEST_BODY");
-    expect(created.body.details).toEqual({ field: "roundMappingSec", value });
+    // The request schema catches it first and names the JSON path (api-hardening 06).
+    expect(created.body.details).toEqual({
+      field: "timerConfig.roundMappingSec",
+      reason: expect.any(String),
+    });
   });
 
   it("rejects an unknown timer field at create time with INVALID_REQUEST_BODY", async () => {
@@ -471,7 +475,7 @@ describe("instructor-driven (untimed) phases", () => {
 
     expect(created.statusCode).toBe(400);
     expect(created.body.code).toBe("INVALID_REQUEST_BODY");
-    expect(created.body.details).toEqual({ field: "roundMapingSec", value: null });
+    expect(created.body.details).toEqual({ field: "timerConfig.roundMapingSec", reason: "is not allowed" });
   });
 
   it.each([

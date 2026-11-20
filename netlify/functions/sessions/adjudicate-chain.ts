@@ -52,14 +52,15 @@ export function createAdjudicateChainHandler(
     }
 
     const roundNumber = Number.parseInt(roundNumberStr, 10) as 1 | 2;
-    const body = readOptionalJsonObjectBody(event.body) as Partial<AdjudicateConceptChainCommand>;
+    // The request schema has already required a known `action` (api-hardening 06).
+    const body = readOptionalJsonObjectBody(event.body) as Pick<AdjudicateConceptChainCommand, "action" | "comment" | "feedback" | "qualityScore">;
 
     const result = await useCase.execute({
       sessionId,
       roundNumber,
       chainId,
       verifiedCapability: event.auth,
-      action: body.action ?? "peer-approve",
+      action: body.action,
       comment: body.comment,
       feedback: body.feedback,
       qualityScore: body.qualityScore,
@@ -80,7 +81,7 @@ export function createAdjudicateChainHandler(
     requireApiKey: deps.requireApiKey ?? false,
     tokenRequired: true,
     missingTokenMessage: "Authentication required.",
-  });
+  }, "adjudicateConceptChain");
 }
 
 export const lambdaHandler = createAdjudicateChainHandler();

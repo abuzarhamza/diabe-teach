@@ -81,7 +81,7 @@ export function createListRoundChainsHandler(
     requireApiKey: deps.requireApiKey ?? false,
     tokenRequired: true,
     missingTokenMessage: "Authentication required.",
-  });
+  }, "listRoundChains");
 }
 
 export const lambdaHandler = createListRoundChainsHandler();

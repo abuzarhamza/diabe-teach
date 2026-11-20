@@ -3,7 +3,9 @@
  * Generates `src/adapters/inbound/http/request-schemas.generated.ts` from
  * `docs/api/openapi.yaml`: one JSON Schema per operation request body, keyed
  * by operationId, with every `$ref` resolved by
- * `@apidevtools/json-schema-ref-parser` (ADR-0005: no hand-written resolver).
+ * `@apidevtools/json-schema-ref-parser` (ADR-0005: no hand-written resolver),
+ * plus the list of every operationId, so each route can declare its own to
+ * `createApiHandler` and get its body validated.
  *
  * The output targets Ajv's JSON Schema 2020-12 build (`ajv/dist/2020`), the
  * dialect OpenAPI 3.1 schemas use, with `discriminator: true`:
@@ -90,19 +92,25 @@ export async function buildRequestSchemasModule(openapiYaml: string): Promise<st
   }) as OpenApiDocument;
 
   const schemas: Record<string, { required: boolean; schema: unknown }> = {};
+  const operationIds: string[] = [];
   for (const [route, pathItem] of Object.entries(resolved.paths ?? {})) {
     for (const method of HTTP_METHODS) {
       const operation = pathItem[method];
-      if (!operation?.requestBody)
+      if (!operation)
         continue;
       const where = `${method.toUpperCase()} ${route}`;
+      if (operation.operationId) {
+        if (operationIds.includes(operation.operationId))
+          throw new Error(`Duplicate operationId "${operation.operationId}".`);
+        operationIds.push(operation.operationId);
+      }
+      if (!operation.requestBody)
+        continue;
       if (!operation.operationId)
         throw new Error(`${where} has a request body but no operationId.`);
       const schema = operation.requestBody.content?.["application/json"]?.schema;
       if (!schema)
         throw new Error(`${where} (${operation.operationId}) has no application/json request schema.`);
-      if (operation.operationId in schemas)
-        throw new Error(`Duplicate operationId "${operation.operationId}".`);
       schemas[operation.operationId] = {
         required: operation.requestBody.required === true,
         schema: toAjvSchema(schema, `${operation.operationId}/requestBody`),
@@ -119,6 +127,11 @@ export async function buildRequestSchemasModule(openapiYaml: string): Promise<st
     `export const requestBodySchemas = ${JSON.stringify(schemas, null, 2)} as const;`,
     "",
     "export type RequestBodyOperationId = keyof typeof requestBodySchemas;",
+    "",
+    "/** Every operationId in the contract, with or without a request body. */",
+    `export const apiOperationIds = ${JSON.stringify(operationIds, null, 2)} as const;`,
+    "",
+    "export type ApiOperationId = (typeof apiOperationIds)[number];",
     "",
   ].join("\n");
 }

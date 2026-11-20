@@ -38,6 +38,14 @@ Feature: Classroom Game Session Journey
     Then the response status should be 404
     And the response error code should be "ROOM_CODE_NOT_FOUND"
 
+  @error-handling @validation
+  Scenario: Joining without a room code returns 400 naming the field
+    When someone attempts to join without a room code
+    Then the response status should be 400
+    And the response error code should be "INVALID_REQUEST_BODY"
+    And the error should name the field "roomCode"
+    And the response should be a standard error body
+
   @phase-transition
   Scenario: Instructor advances through phases
     When the instructor creates a classroom session with pack "diabe-teach"

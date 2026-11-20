@@ -1010,3 +1010,30 @@ export const requestBodySchemas = {
 } as const;
 
 export type RequestBodyOperationId = keyof typeof requestBodySchemas;
+
+/** Every operationId in the contract, with or without a request body. */
+export const apiOperationIds = [
+  "signUpInstructor",
+  "signInInstructor",
+  "getCurrentInstructorAccount",
+  "listCurriculumPacks",
+  "registerCurriculumPack",
+  "validateCurriculumPack",
+  "getCurriculumPackById",
+  "archiveCurriculumPack",
+  "unarchiveCurriculumPack",
+  "createGameSession",
+  "joinGameSession",
+  "getGameSessionState",
+  "streamGameSessionEvents",
+  "transitionSessionPhase",
+  "listRoundChains",
+  "submitConceptChain",
+  "adjudicateConceptChain",
+  "getRoundStandings",
+  "submitAssessmentAttempt",
+  "submitPerceptionSurvey",
+  "getSessionAnalytics"
+] as const;
+
+export type ApiOperationId = (typeof apiOperationIds)[number];

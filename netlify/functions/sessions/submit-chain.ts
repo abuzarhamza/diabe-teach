@@ -84,7 +84,7 @@ export function createSubmitChainHandler(
     requireApiKey: deps.requireApiKey ?? false,
     tokenRequired: true,
     missingTokenMessage: "Authentication required.",
-  });
+  }, "submitConceptChain");
 }
 
 export const lambdaHandler = createSubmitChainHandler();

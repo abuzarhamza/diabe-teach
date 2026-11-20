@@ -105,7 +105,10 @@ paths:
               schema:
                 $ref: "#/components/schemas/AccountTokenResponse"
         "400":
-          description: INVALID_REQUEST_BODY. The body is not a JSON object.
+          description: >-
+            INVALID_REQUEST_BODY. The body is not a JSON object, or `email` or
+            `password` is not a string (or longer than its `maxLength`).
+            `details.field` names the field.
           content:
             application/json:
               schema:
@@ -1052,9 +1055,17 @@ components:
       description: >-
         INVALID_REQUEST_BODY. The body is not valid JSON, was sent without
         `Content-Type: application/json`, or is not a JSON object (an array,
-        string, number or null). Checked for every route after the token, so a
-        request without a valid token gets 401 first. The response never
-        contains a stack trace.
+        string, number or null), or it breaks the operation's request schema
+        (a missing required field, a wrong type, an unknown enum value, a
+        value out of range). For a schema failure, `details.field` is the path
+        of the first failing field (for example `roomCode`,
+        `timerConfig.pretestSec` or `path[1].row`) and `details.reason` says
+        what is wrong (for example "is required" or "must be one of: advance,
+        jump"). A request with no body is checked as `{}`. Checked for every
+        route after the token, so a request without a valid token gets 401
+        first. Rules beyond the schema keep their own codes (for example 422
+        PACK_VALIDATION_FAILED or CHAIN_TOPOLOGY_INVALID). The response never
+        contains a stack trace or validator internals.
       content:
         application/json:
           schema:

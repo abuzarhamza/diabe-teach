@@ -46,7 +46,7 @@ export function createSignInHandler(dependencies?: SignInHandlerDependencies) {
     bearerScheme: "none",
     apiKey: deps.apiKey,
     requireApiKey: deps.requireApiKey,
-  });
+  }, "signInInstructor");
 }
 
 export const lambdaHandler = createSignInHandler();

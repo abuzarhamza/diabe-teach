@@ -40,8 +40,8 @@ export async function createSession(body: {
 }
 
 export async function joinSession(body: {
-  roomCode: string;
-  displayName: string;
+  roomCode?: string;
+  displayName?: string;
 }) {
   const res = await request(BASE_URL)
     .post("/api/v1/sessions/join")
@@ -67,7 +67,7 @@ export async function transitionPhase(
   body: {
     action?: "advance" | "jump";
     targetPhase?: string;
-    seed?: number;
+    seed?: string;
   } = {},
 ) {
   const res = await request(BASE_URL)
@@ -107,7 +107,7 @@ export async function adjudicateChain(
   chainId: string,
   token: string,
   body: {
-    action?: "peer-approve" | "peer-reject" | "instructor-final";
+    action?: "peer-approve" | "peer-challenge" | "ai-evaluate" | "instructor-approve" | "instructor-reject";
     comment?: string;
     feedback?: string;
     qualityScore?: number;

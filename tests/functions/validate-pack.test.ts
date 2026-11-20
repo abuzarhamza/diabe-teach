@@ -106,11 +106,29 @@ describe("pOST /api/v1/packs/validate", () => {
     expect(body.errors).toHaveLength(0);
   });
 
-  it("returns errors for missing required fields", async () => {
+  it("returns 400 naming a missing required field (request schema, api-hardening 06)", async () => {
+    const ctx = createTestContext();
+    const handler = createValidatePackHandler(ctx.deps);
+    const token = await ctx.teachers.tokenFor();
+    const { boardConfig: _omitted, ...pack } = createMinimalValidPack();
+
+    const result = (await handler(
+      createEvent(pack, token),
+      {} as never,
+    )) as APIGatewayProxyResult;
+
+    expect(result.statusCode).toBe(400);
+    const body = JSON.parse(result.body);
+    expect(body.code).toBe("INVALID_REQUEST_BODY");
+    expect(body.details).toEqual({ field: "boardConfig", reason: "is required" });
+  });
+
+  it("returns errors for empty required fields", async () => {
     const ctx = createTestContext();
     const handler = createValidatePackHandler(ctx.deps);
     const token = await ctx.teachers.tokenFor();
     const pack = {
+      ...createMinimalValidPack(),
       id: "",
       title: "",
       version: "",
