@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "engines": {
+    "node": "24.x"
+  },
   "scripts": {
     "dev": "netlify dev",
     "dev:debug": "DEBUG=* netlify dev",
@@ -26,10 +29,7 @@
   },
   "dependencies": {
     "@middy/core": "^7.9.2",
-    "@middy/http-cors": "^7.9.2",
-    "@middy/http-header-normalizer": "^7.9.2",
     "@middy/http-json-body-parser": "^7.9.2",
-    "@middy/http-security-headers": "^7.9.2",
     "@netlify/functions": "^3.1.2",
     "@node-rs/argon2": "^2.2.2",
     "ajv": "^8.20.0",

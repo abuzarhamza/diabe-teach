@@ -1,5 +1,4 @@
 import middy from "@middy/core";
-import httpHeaderNormalizer from "@middy/http-header-normalizer";
 import { describe, expect, it } from "vitest";
 import { authMiddleware } from "../src/adapters/inbound/http/middy/auth.middleware.js";
 import { domainErrorMiddleware } from "../src/adapters/inbound/http/middy/domain-error.middleware.js";
@@ -18,7 +17,6 @@ describe("middy Middlewares (Ticket 01)", () => {
           body: JSON.stringify({ auth: event.auth ?? null }),
         };
       })
-        .use(httpHeaderNormalizer())
         .use(authMiddleware({ tokenVerifier: tokenAdapter }));
 
       const response = await handler({
@@ -41,7 +39,6 @@ describe("middy Middlewares (Ticket 01)", () => {
           body: JSON.stringify({ auth: event.auth }),
         };
       })
-        .use(httpHeaderNormalizer())
         .use(authMiddleware({ tokenVerifier: tokenAdapter }));
 
       const response = await handler({
@@ -59,7 +56,6 @@ describe("middy Middlewares (Ticket 01)", () => {
 
     it("throws UnauthorizedTokenError when authorization header is malformed", async () => {
       const handler = middy(async () => ({ statusCode: 200, body: "" }))
-        .use(httpHeaderNormalizer())
         .use(authMiddleware({ tokenVerifier: tokenAdapter }));
 
       await expect(
@@ -73,7 +69,6 @@ describe("middy Middlewares (Ticket 01)", () => {
 
     it("rejects request with 401 when apiKey is configured and header is missing", async () => {
       const handler = middy(async () => ({ statusCode: 200, body: "" }))
-        .use(httpHeaderNormalizer())
         .use(
           authMiddleware({
             tokenVerifier: tokenAdapter,

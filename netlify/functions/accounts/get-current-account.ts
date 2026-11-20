@@ -17,7 +17,7 @@ export function createGetCurrentAccountHandler(
     ...dependencies,
   };
   const useCase = new GetCurrentInstructorAccountUseCase({
-    accountRepo: deps.accountRepo!,
+    accountRepo: deps.accountRepo,
   });
 
   const rawHandler = async (

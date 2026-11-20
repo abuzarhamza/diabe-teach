@@ -15,7 +15,7 @@ export function createSignUpHandler(dependencies?: SignUpHandlerDependencies) {
     ...dependencies,
   };
   const useCase = new SignUpInstructorUseCase({
-    accountRepo: deps.accountRepo!,
+    accountRepo: deps.accountRepo,
     passwordHasher: deps.passwordHasher!,
     accountTokenSigner: deps.accountTokenSigner!,
     idGenerator: deps.idGenerator!,

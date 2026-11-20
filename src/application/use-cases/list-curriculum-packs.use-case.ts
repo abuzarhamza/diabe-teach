@@ -16,7 +16,7 @@ import { CurriculumPackProjector } from "../dtos/curriculum-pack-projector.js";
 export class ListCurriculumPacksUseCase
 implements ListCurriculumPacksUseCasePort {
   readonly #packRepo: CurriculumPackRepositoryPort;
-  readonly #accountRepo: InstructorAccountRepositoryPort | undefined;
+  readonly #accountRepo: InstructorAccountRepositoryPort;
 
   public constructor(deps: ListCurriculumPacksDependencies) {
     this.#packRepo = deps.packRepo;
@@ -50,9 +50,6 @@ implements ListCurriculumPacksUseCasePort {
     packs: readonly CurriculumPack[],
   ): Promise<ReadonlyMap<string, string>> {
     const accountRepo = this.#accountRepo;
-    if (!accountRepo) {
-      return new Map();
-    }
     const creatorIds = [
       ...new Set(
         packs

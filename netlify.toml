@@ -1,6 +1,11 @@
 [build]
   command = "npm run typecheck"
 
+# Node is pinned to one major version, the same in `.nvmrc`, `package.json`
+# `engines` and here (api-completion ticket 14).
+[build.environment]
+  NODE_VERSION = "24"
+
 [functions]
   directory = "netlify/functions"
   node_bundler = "esbuild"

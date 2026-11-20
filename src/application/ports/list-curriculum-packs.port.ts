@@ -6,9 +6,9 @@ export interface ListCurriculumPacksDependencies {
   readonly packRepo: CurriculumPackRepositoryPort;
   /**
    * Looks up the account behind each latest Pack Version's `createdBy` to
-   * work out its author handle. Without it every pack shows no handle.
+   * work out its author handle.
    */
-  readonly accountRepo?: InstructorAccountRepositoryPort;
+  readonly accountRepo: InstructorAccountRepositoryPort;
 }
 
 export interface ListCurriculumPacksInput {
