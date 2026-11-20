@@ -1160,9 +1160,9 @@ paths:
         `{ role: "instructor", cohortSummary }` without `participantReport`.
         Works in any phase: inputs that do not exist yet (for example the
         Posttest before the learner has taken it) are `null`, never an error.
-        Pack data comes from the session's pinned Pack Version. Until the full
-        cohort summary ships, `cohortSummary` carries only `sessionId` and
-        `participantCount`.
+        Pack data comes from the session's pinned Pack Version. Both roles get
+        the same `cohortSummary`, computed over the learners still in the
+        session.
       security:
         - BearerAuth: []
       parameters:
@@ -2388,12 +2388,19 @@ components:
     CohortAnalyticsReport:
       type: object
       description: >-
-        For now only `sessionId` and `participantCount` are returned; the
-        other fields are not yet served and are optional until the full
-        cohort summary ships.
+        The cohort is the learners still in the session; learners who left are
+        not counted in any field. Each mean is taken over the cohort learners
+        who have its input and is `null` when none has (for example every
+        Posttest mean before anyone has taken the Posttest).
       required:
         - sessionId
         - participantCount
+        - pretestCohortMeanPercentage
+        - posttestCohortMeanPercentage
+        - posttestWrongGuessMeanPercentage
+        - posttestIDontKnowMeanPercentage
+        - meanChainDiversityIndex
+        - boardNeglectHeatmap
       properties:
         sessionId:
           type: string
@@ -2402,21 +2409,35 @@ components:
           description: Learners still in the session (those who left are not counted).
         pretestCohortMeanPercentage:
           type: [number, "null"]
+          description: Mean Pretest correct % over the learners who took the Pretest.
         posttestCohortMeanPercentage:
           type: [number, "null"]
+          description: Mean Posttest correct % over the learners who took the Posttest.
         posttestWrongGuessMeanPercentage:
           type: [number, "null"]
+          description: Mean Posttest wrong-guess % over the learners who took the Posttest.
         posttestIDontKnowMeanPercentage:
           type: [number, "null"]
+          description: Mean Posttest "I don't know" % over the learners who took the Posttest.
         meanChainDiversityIndex:
           type: number
+          minimum: 0
+          maximum: 1
+          description: >-
+            Mean of the cohort learners' `chainDiversityIndex` (0 when the
+            session has no learner).
         boardNeglectHeatmap:
           type: array
-          description: 2D matrix of usage frequencies per (row, col) cell
+          description: >-
+            `boardNeglectHeatmap[row][col]` is how many cohort learners never
+            used that grid coordinate in a Concept Chain (whatever its verdict)
+            in any round with a stored board. The grid spans the largest stored
+            board; empty before any board is dealt.
           items:
             type: array
             items:
-              type: number
+              type: integer
+              minimum: 0
 
     SessionAnalyticsResponse:
       type: object

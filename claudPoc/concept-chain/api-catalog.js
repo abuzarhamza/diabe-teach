@@ -850,9 +850,12 @@
           { status: 403, code: "FORBIDDEN_ROLE" },
           { status: 404, code: "SESSION_NOT_FOUND" },
         ],
-        status: "partial",
-        deviations: ["`cohortSummary` carries only `sessionId` and `participantCount`; the cohort means and the board neglect heatmap are not served yet (api-completion ticket 06)."],
-        notes: ["A learner's token returns their own `participantReport`; fields whose inputs don't exist yet (e.g. the Posttest) are `null`."],
+        status: "implemented",
+        deviations: [],
+        notes: [
+          "A learner's token returns their own `participantReport`; fields whose inputs don't exist yet (e.g. the Posttest) are `null`.",
+          "An instructor token returns `{ role, cohortSummary }` only. The cohort is the learners still in the session; each mean is over the learners who have its input (`null` when none has), and `boardNeglectHeatmap[row][col]` counts the learners who never used that cell.",
+        ],
       },
     },
 

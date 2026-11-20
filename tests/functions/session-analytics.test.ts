@@ -15,6 +15,8 @@ import { GameSession } from "../../src/domain/game-session/game-session.js";
 const START = new Date("2026-03-01T09:00:00.000Z");
 const ALICE = "alice-id";
 const BOB = "bob-id";
+const CAROL = "carol-id";
+const DAVE = "dave-id";
 
 function card(id: string): KeywordCard {
   const found = DIABE_TEACH_PACK.getCardById(id);
@@ -49,12 +51,13 @@ function chain(
   roundNumber: 1 | 2,
   keywordIds: readonly string[],
   outcome: "approved-status" | "approved-verdict" | "rejected" | "pending",
+  path: readonly (readonly [number, number])[] = keywordIds.map((_, col) => [0, col] as const),
 ): ConceptChain {
   const decidedAt = START;
   return ConceptChain.create({
     participantId,
     roundNumber,
-    path: keywordIds.map((_, col) => ({ row: 0, col })),
+    path: path.map(([row, col]) => ({ row, col })),
     keywordIds,
     narrativeExplanation: "Because each card leads to the next one.",
     status: outcome === "approved-status"
@@ -182,6 +185,95 @@ function fixtureSession(options: {
   });
 }
 
+/**
+ * Hand-computed three-learner cohort (Diabe-teach: 7 Semantic Domains, 10
+ * questions), on the same two 2 × 2 boards as `fixtureSession`:
+ * - Alice: R1 [adiponectin, autoimmune] at (0,0),(1,0) approved; R2 [diet, c-peptide]
+ *   at (1,0),(0,0) rejected. Domains anatomy, subtypes → 2/7. Cells used: (0,0), (1,0).
+ * - Bob: R1 [amylin, beta-cells] at (0,1),(1,1) approved. Domain anatomy → 1/7.
+ *   Cells used: (0,1), (1,1).
+ * - Carol: R2 [children, adiponectin] at (0,1),(1,1) approved (verdict); R1
+ *   [adiponectin, amylin] at (0,0),(0,1) pending. Domains subtypes, anatomy → 2/7.
+ *   Cells used: (0,0), (0,1), (1,1).
+ * - Dave left the session: his perfect Pretest and his chain are not counted.
+ * - Pretest: Alice 30 %, Bob 0 %, Carol 60 % → mean 30. Posttest: Alice 80/10/10,
+ *   Bob 50/30/20, Carol none → means 65 correct, 20 wrong guess, 15 "I don't know".
+ * - Mean chain diversity: (2 + 1 + 2) / 7 / 3 = 5/21.
+ * - Heatmap (learners who never used the cell): (0,0) Bob → 1; (0,1) Alice → 1;
+ *   (1,0) Bob, Carol → 2; (1,1) Alice → 1.
+ */
+function cohortSession(): GameSession {
+  const learner = (participantId: string, displayName: string, leftAt: Date | null = null) => ({
+    participantId,
+    displayName,
+    joinedAt: START,
+    leftAt,
+  });
+  return GameSession.rehydrate({
+    packId: "diabe-teach",
+    packVersion: "1.0.0",
+    mode: "classroom",
+    adjudicationMode: "peer-instructor",
+    currentPhase: "feedback-survey",
+    phaseStartedAt: START,
+    createdAt: START,
+    participants: [
+      learner(ALICE, "Alice"),
+      learner(BOB, "Bob"),
+      learner(CAROL, "Carol"),
+      learner(DAVE, "Dave", START),
+    ],
+    _roundBoards: [
+      board(1, [
+        "adiponectin",
+        "amylin",
+        "autoimmune",
+        "beta-cells",
+      ]),
+      board(2, [
+        "c-peptide",
+        "children",
+        "diet",
+        "adiponectin",
+      ]),
+    ],
+    _chains: [
+      chain(ALICE, 1, ["adiponectin", "autoimmune"], "approved-status", [
+        [0, 0],
+        [1, 0],
+      ]),
+      chain(ALICE, 2, ["diet", "c-peptide"], "rejected", [
+        [1, 0],
+        [0, 0],
+      ]),
+      chain(BOB, 1, ["amylin", "beta-cells"], "approved-status", [
+        [0, 1],
+        [1, 1],
+      ]),
+      chain(CAROL, 2, ["children", "adiponectin"], "approved-verdict", [
+        [0, 1],
+        [1, 1],
+      ]),
+      chain(CAROL, 1, ["adiponectin", "amylin"], "pending", [
+        [0, 0],
+        [0, 1],
+      ]),
+      chain(DAVE, 1, ["autoimmune", "beta-cells"], "approved-status", [
+        [1, 0],
+        [1, 1],
+      ]),
+    ],
+    _assessments: [
+      attempt(ALICE, "pretest", 3, 5),
+      attempt(BOB, "pretest", 0, 0),
+      attempt(CAROL, "pretest", 6, 2),
+      attempt(DAVE, "pretest", 10, 0),
+      attempt(ALICE, "posttest", 8, 1),
+      attempt(BOB, "posttest", 5, 3),
+    ],
+  });
+}
+
 function makeEvent(sessionId: string, token?: string): APIGatewayProxyEvent {
   return {
     httpMethod: "GET",
@@ -237,7 +329,7 @@ describe("getSessionAnalytics: GET /api/v1/sessions/{sessionId}/analytics", () =
       expect(res.statusCode).toBe(200);
       expect(res.body.role).toBe("participant");
       expect(res.body.participantReport.participantId).toBe(ALICE);
-      expect(res.body.cohortSummary).toEqual({ sessionId, participantCount: 2 });
+      expect(res.body.cohortSummary).toMatchObject({ sessionId, participantCount: 2 });
     });
 
     it("summarizes the Pretest and Posttest", async () => {
@@ -368,13 +460,114 @@ describe("getSessionAnalytics: GET /api/v1/sessions/{sessionId}/analytics", () =
         chainDiversityIndex: 0,
         neglectedKeywordIds: [],
       });
-      expect(res.body.cohortSummary).toEqual({ sessionId, participantCount: 1 });
+      expect(res.body.cohortSummary).toEqual({
+        sessionId,
+        participantCount: 1,
+        pretestCohortMeanPercentage: null,
+        posttestCohortMeanPercentage: null,
+        posttestWrongGuessMeanPercentage: null,
+        posttestIDontKnowMeanPercentage: null,
+        meanChainDiversityIndex: 0,
+        boardNeglectHeatmap: [],
+      });
+    });
+  });
+
+  describe("the cohort summary", () => {
+    async function cohortSummary() {
+      const session = cohortSession();
+      const sessionId = session.sessionId.value;
+      const api = await setUp([session]);
+      const res = await api.get(sessionId, await api.instructorToken(sessionId));
+      expect(res.statusCode).toBe(200);
+      return { sessionId, summary: res.body.cohortSummary };
+    }
+
+    it("counts the learners still in the session", async () => {
+      const { sessionId, summary } = await cohortSummary();
+
+      expect(summary.sessionId).toBe(sessionId);
+      expect(summary.participantCount).toBe(3);
+    });
+
+    it("averages the Pretest over the learners who took it (30, 0, 60 → 30)", async () => {
+      const { summary } = await cohortSummary();
+
+      expect(summary.pretestCohortMeanPercentage).toBeCloseTo(30, 10);
+    });
+
+    it("averages the Posttest over the learners who took it (65 correct, 20 wrong guess, 15 \"I don't know\")", async () => {
+      const { summary } = await cohortSummary();
+
+      expect(summary.posttestCohortMeanPercentage).toBeCloseTo(65, 10);
+      expect(summary.posttestWrongGuessMeanPercentage).toBeCloseTo(20, 10);
+      expect(summary.posttestIDontKnowMeanPercentage).toBeCloseTo(15, 10);
+    });
+
+    it("averages the learners' chain diversity ((2 + 1 + 2) / 7 / 3)", async () => {
+      const { summary } = await cohortSummary();
+
+      expect(summary.meanChainDiversityIndex).toBeCloseTo(5 / 21, 10);
+    });
+
+    it("counts, per grid coordinate, the learners who never used it", async () => {
+      const { summary } = await cohortSummary();
+
+      expect(summary.boardNeglectHeatmap).toEqual([
+        [1, 1],
+        [2, 1],
+      ]);
+    });
+
+    it("is the same for a learner as for the instructor", async () => {
+      const session = cohortSession();
+      const sessionId = session.sessionId.value;
+      const api = await setUp([session]);
+
+      const learner = await api.get(sessionId, await api.participantToken(sessionId, CAROL));
+      const instructor = await api.get(sessionId, await api.instructorToken(sessionId));
+
+      expect(learner.body.cohortSummary).toEqual(instructor.body.cohortSummary);
+    });
+
+    it("before the posttest, the Posttest means are null", async () => {
+      const session = fixtureSession({ withPosttest: false });
+      const sessionId = session.sessionId.value;
+      const api = await setUp([session]);
+
+      const { cohortSummary: summary } = (await api.get(sessionId, await api.instructorToken(sessionId))).body;
+
+      expect(summary.pretestCohortMeanPercentage).toBeCloseTo(15, 10);
+      expect(summary.posttestCohortMeanPercentage).toBeNull();
+      expect(summary.posttestWrongGuessMeanPercentage).toBeNull();
+      expect(summary.posttestIDontKnowMeanPercentage).toBeNull();
     });
   });
 
   describe("the instructor", () => {
     it("gets the cohort summary without a participant report", async () => {
-      const session = fixtureSession();
+      const session = cohortSession();
+      const sessionId = session.sessionId.value;
+      const api = await setUp([session]);
+
+      const res = await api.get(sessionId, await api.instructorToken(sessionId));
+
+      expect(res.statusCode).toBe(200);
+      expect(res.body.role).toBe("instructor");
+      expect(res.body).not.toHaveProperty("participantReport");
+      expect(Object.keys(res.body).sort()).toEqual(["cohortSummary", "role"]);
+      expect(res.body.cohortSummary.participantCount).toBe(3);
+    });
+
+    it("a session with no assessments, chains or boards gives null means, not errors", async () => {
+      const session = GameSession.create({
+        packId: "diabe-teach",
+        packVersion: "1.0.0",
+        mode: "classroom",
+        adjudicationMode: "peer-instructor",
+      });
+      session.addParticipant("Carol");
+      session.addParticipant("Dan");
       const sessionId = session.sessionId.value;
       const api = await setUp([session]);
 
@@ -383,7 +576,16 @@ describe("getSessionAnalytics: GET /api/v1/sessions/{sessionId}/analytics", () =
       expect(res.statusCode).toBe(200);
       expect(res.body).toEqual({
         role: "instructor",
-        cohortSummary: { sessionId, participantCount: 2 },
+        cohortSummary: {
+          sessionId,
+          participantCount: 2,
+          pretestCohortMeanPercentage: null,
+          posttestCohortMeanPercentage: null,
+          posttestWrongGuessMeanPercentage: null,
+          posttestIDontKnowMeanPercentage: null,
+          meanChainDiversityIndex: 0,
+          boardNeglectHeatmap: [],
+        },
       });
     });
   });

@@ -34,12 +34,24 @@ export interface LearnerMetacognitiveReport {
 }
 
 /**
- * The cohort summary (OpenAPI CohortAnalyticsReport). Until api-completion
- * ticket 06 it carries only the session id and the participant count.
+ * The cohort summary (OpenAPI CohortAnalyticsReport), over the learners still
+ * in the session. A mean with no learner to average is `null`.
  */
 export interface CohortAnalyticsReport {
   readonly sessionId: string;
   readonly participantCount: number;
+  /** Mean Pretest correct % over the learners who took the Pretest. */
+  readonly pretestCohortMeanPercentage: number | null;
+  /** Mean Posttest correct % over the learners who took the Posttest. */
+  readonly posttestCohortMeanPercentage: number | null;
+  /** Mean Posttest wrong-guess % over the learners who took the Posttest. */
+  readonly posttestWrongGuessMeanPercentage: number | null;
+  /** Mean Posttest "I don't know" % over the learners who took the Posttest. */
+  readonly posttestIDontKnowMeanPercentage: number | null;
+  /** Mean of the learners' chain diversity indexes (0 with no learner). */
+  readonly meanChainDiversityIndex: number;
+  /** `[row][col]`: learners who never used that coordinate; `[]` before any board. */
+  readonly boardNeglectHeatmap: readonly (readonly number[])[];
 }
 
 /** OpenAPI SessionAnalyticsResponse. */
