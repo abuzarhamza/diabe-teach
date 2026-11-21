@@ -19,10 +19,19 @@ See spec: `.scratch/bdd-non-happy-path-coverage/spec.md`.
 
 **Blocked by:** 01 (Adjudication lifecycle, Instructor Final Ruling lock, and standings in BDD and handler tests)
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] BDD classroom scenario: `< minChainLength` returns `422 CHAIN_TOPOLOGY_INVALID`, same learner re-submitting identical or reversed path returns `409 CHAIN_ALREADY_SUBMITTED`, and a classmate submitting that path succeeds (`201`)
-- [ ] BDD classroom scenario: skipping phases via `jump` returns `409 INVALID_PHASE_TRANSITION`, `jump` without `targetPhase` returns `400 INVALID_REQUEST_BODY` naming `targetPhase`, out-of-range round `3` on chain listing returns `400 INVALID_REQUEST_BODY`, and an Account Token on chain listing returns `401 UNAUTHORIZED_TOKEN`
-- [ ] BDD classroom scenario: a departed learner gets `403 PARTICIPANT_HAS_LEFT` on Assessment Attempt submission, peer voting, and perception survey submission, and an instructor calling `leave` gets `403 FORBIDDEN_ROLE`
-- [ ] Zero wall-clock sleeps added
-- [ ] Typecheck, vitest (`--no-file-parallelism`), BDD (`classroom-session-journey`), lint (≤ 29) and boundaries (≤ 6) are no worse
+- [x] BDD classroom scenario: `< minChainLength` returns `422 CHAIN_TOPOLOGY_INVALID`, same learner re-submitting identical or reversed path returns `409 CHAIN_ALREADY_SUBMITTED`, and a classmate submitting that path succeeds (`201`)
+- [x] BDD classroom scenario: skipping phases via `jump` returns `409 INVALID_PHASE_TRANSITION`, `jump` without `targetPhase` returns `400 INVALID_REQUEST_BODY` naming `targetPhase`, out-of-range round `3` on chain listing returns `400 INVALID_REQUEST_BODY`, and an Account Token on chain listing returns `401 UNAUTHORIZED_TOKEN`
+- [x] BDD classroom scenario: a departed learner gets `403 PARTICIPANT_HAS_LEFT` on Assessment Attempt submission, peer voting, and perception survey submission, and an instructor calling `leave` gets `403 FORBIDDEN_ROLE`
+- [x] Zero wall-clock sleeps added
+- [x] Typecheck, vitest (`--no-file-parallelism`), BDD (`classroom-session-journey`), lint (≤ 29) and boundaries (≤ 6) are no worse
+
+## Resolution
+
+- Added three BDD scenarios to `tests/integration/features/classroom-session-journey.feature`:
+  1. `Too-short, duplicate, and reversed concept chains are rejected while a classmate can submit the same path`: exercises `< minChainLength` (`422 CHAIN_TOPOLOGY_INVALID`), same-learner identical-path and reversed-path duplicate submissions (`409 CHAIN_ALREADY_SUBMITTED`), and classmate submission of the same path (`201`).
+  2. `Phase jump refusals, invalid round number, and Account Token on a session route`: exercises phase-skipping via `jump` (`409 INVALID_PHASE_TRANSITION`), `jump` without `targetPhase` (`400 INVALID_REQUEST_BODY` naming `targetPhase`), out-of-range round `3` on chain listing (`400 INVALID_REQUEST_BODY`), and sending a teacher's Account Token to `GET /api/v1/sessions/:sessionId/rounds/1/chains` (`401 UNAUTHORIZED_TOKEN`).
+  3. `A departed learner cannot submit assessments, peer votes, or surveys, and an instructor cannot leave`: verifies `403 FORBIDDEN_ROLE` when the instructor calls `leave`, and `403 PARTICIPANT_HAS_LEFT` when a departed learner attempts to submit a Pretest Assessment Attempt, cast a peer vote in Peer-Adjudication, or submit the perception survey.
+- Wired step definitions in `tests/integration/step-definitions/chain-submission.steps.ts`, `tests/integration/step-definitions/phase-transition.steps.ts`, and `tests/integration/step-definitions/assertions.steps.ts`.
+

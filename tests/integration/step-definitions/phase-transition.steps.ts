@@ -61,6 +61,22 @@ When(
 );
 
 When(
+  "the instructor attempts to jump without a targetPhase",
+  async function (this: TestWorld) {
+    if (!this.currentSessionId || !this.instructorToken) {
+      throw new Error("No session or instructor token available.");
+    }
+
+    this.lastResponse = await transitionPhase(
+      this.currentSessionId,
+      this.instructorToken,
+      { action: "jump" },
+    );
+    this.parseLastResponse();
+  },
+);
+
+When(
   "participant {string} attempts to advance the phase",
   async function (this: TestWorld, displayName: string) {
     if (!this.currentSessionId) {
@@ -156,6 +172,18 @@ When(
     }
 
     this.lastResponse = await leaveSession(this.currentSessionId, token);
+    this.parseLastResponse();
+  },
+);
+
+When(
+  "the instructor attempts to leave the session",
+  async function (this: TestWorld) {
+    if (!this.currentSessionId || !this.instructorToken) {
+      throw new Error("No session or instructor token available.");
+    }
+
+    this.lastResponse = await leaveSession(this.currentSessionId, this.instructorToken);
     this.parseLastResponse();
   },
 );

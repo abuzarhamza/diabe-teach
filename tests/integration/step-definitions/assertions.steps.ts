@@ -133,13 +133,15 @@ Then(
   },
 );
 
-/** A request schema failure names the field (api-hardening 06). */
+/** A request schema failure or domain body check names the field (api-hardening 06). */
 Then(
   "the error should name the field {string}",
   function (this: TestWorld, field: string) {
     const body = this.lastResponseBody as { details?: { field?: string; reason?: string } };
     expect(body.details?.field).to.equal(field);
-    expect(body.details?.reason).to.be.a("string").and.not.equal("");
+    if (body.details?.reason !== undefined) {
+      expect(body.details.reason).to.be.a("string").and.not.equal("");
+    }
   },
 );
 

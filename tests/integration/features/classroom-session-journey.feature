@@ -315,3 +315,79 @@ Feature: Classroom Game Session Journey
     Then the response status should be 200
     And the response should contain standings
     And the standings should rank participant "Alice" at rank 1 with chain length 4
+
+  @chain-submission @validation @topology
+  Scenario: Too-short, duplicate, and reversed concept chains are rejected while a classmate can submit the same path
+    When the instructor creates a classroom session with pack "diabe-teach"
+    And participants "Alice" and "Bob" join using the room code
+    And the instructor advances the phase 2 times
+    Then the session phase should be "round-1:chain-mapping"
+    When participant "Alice" submits a chain that is too short
+    Then the response status should be 422
+    And the response error code should be "CHAIN_TOPOLOGY_INVALID"
+    And the response should be a standard error body
+    When participant "Alice" submits a concept chain for round 1
+    Then the response status should be 201
+    When participant "Alice" submits a concept chain for round 1
+    Then the response status should be 409
+    And the response error code should be "CHAIN_ALREADY_SUBMITTED"
+    And the response should be a standard error body
+    When participant "Alice" submits the reversed concept chain for round 1
+    Then the response status should be 409
+    And the response error code should be "CHAIN_ALREADY_SUBMITTED"
+    And the response should be a standard error body
+    When participant "Bob" submits a concept chain for round 1
+    Then the response status should be 201
+
+  @phase-transition @authorization @route-params @error-handling
+  Scenario: Phase jump refusals, invalid round number, and Account Token on a session route
+    When the instructor creates a classroom session with pack "diabe-teach"
+    And the instructor jumps to phase "completed"
+    Then the response status should be 409
+    And the response error code should be "INVALID_PHASE_TRANSITION"
+    And the response should be a standard error body
+    When the instructor attempts to jump without a targetPhase
+    Then the response status should be 400
+    And the response error code should be "INVALID_REQUEST_BODY"
+    And the error should name the field "targetPhase"
+    And the response should be a standard error body
+    When the instructor lists the chains of round 3
+    Then the response status should be 400
+    And the response error code should be "INVALID_REQUEST_BODY"
+    And the response should be a standard error body
+    When the instructor lists the chains of round 1 using their Account Token
+    Then the response status should be 401
+    And the response error code should be "UNAUTHORIZED_TOKEN"
+    And the response should be a standard error body
+
+  @leave-session @authorization @error-handling
+  Scenario: A departed learner cannot submit assessments, peer votes, or surveys, and an instructor cannot leave
+    When the instructor creates a classroom session with pack "diabe-teach"
+    And participants "Alice" and "Bob" join using the room code
+    And the instructor attempts to leave the session
+    Then the response status should be 403
+    And the response error code should be "FORBIDDEN_ROLE"
+    And the response should be a standard error body
+    When participant "Alice" leaves the session
+    Then the response status should be 200
+    When participant "Alice" submits pretest answers
+    Then the response status should be 403
+    And the response error code should be "PARTICIPANT_HAS_LEFT"
+    And the response should be a standard error body
+    When the instructor advances the phase 2 times
+    Then the session phase should be "round-1:chain-mapping"
+    When participant "Bob" submits a concept chain for round 1
+    Then the response status should be 201
+    When the instructor advances the phase
+    Then the session phase should be "round-1:peer-adjudication"
+    When participant "Alice" peer-approves the last submitted chain
+    Then the response status should be 403
+    And the response error code should be "PARTICIPANT_HAS_LEFT"
+    And the response should be a standard error body
+    When the instructor advances the phase 6 times
+    Then the session phase should be "feedback-survey"
+    When participant "Alice" submits a perception survey
+    Then the response status should be 403
+    And the response error code should be "PARTICIPANT_HAS_LEFT"
+    And the response should be a standard error body
+

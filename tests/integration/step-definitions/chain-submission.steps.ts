@@ -40,6 +40,42 @@ When(
 );
 
 When(
+  "participant {string} submits the reversed concept chain for round {int}",
+  async function (this: TestWorld, displayName: string, roundNumber: number) {
+    if (!this.currentSessionId) {
+      throw new Error("No session available.");
+    }
+
+    const token = this.participantTokens.get(displayName);
+    if (!token) {
+      throw new Error(`No token found for participant '${displayName}'.`);
+    }
+
+    this.lastResponse = await submitChain(
+      this.currentSessionId,
+      roundNumber,
+      token,
+      {
+        path: [
+          { row: 1, col: 2 },
+          { row: 1, col: 1 },
+          { row: 0, col: 1 },
+          { row: 0, col: 0 },
+        ],
+        keywordIds: ["kw-4", "kw-3", "kw-2", "kw-1"],
+        narrativeExplanation: `${displayName}'s reversed chain explanation connecting concepts in diabetes management.`,
+      },
+    );
+    this.parseLastResponse();
+
+    if (this.lastResponse.statusCode === 201) {
+      const body = this.lastResponseBody as { chain: { chainId: string } };
+      this.lastChainId = body.chain.chainId;
+    }
+  },
+);
+
+When(
   "participant {string} submits a chain with path from {string} to {string}",
   async function (
     this: TestWorld,
@@ -346,6 +382,22 @@ When(
       this.currentSessionId,
       roundNumber,
       this.instructorToken,
+    );
+    this.parseLastResponse();
+  },
+);
+
+When(
+  "the instructor lists the chains of round {int} using their Account Token",
+  async function (this: TestWorld, roundNumber: number) {
+    if (!this.currentSessionId || !this.accountToken) {
+      throw new Error("No session or Account Token available.");
+    }
+
+    this.lastResponse = await listRoundChains(
+      this.currentSessionId,
+      roundNumber,
+      this.accountToken,
     );
     this.parseLastResponse();
   },
