@@ -15,8 +15,10 @@ import { FakeClock } from "../../src/adapters/outbound/fake-clock.js";
 import { InMemoryCurriculumPackRepository } from "../../src/adapters/outbound/in-memory-curriculum-pack-repository.js";
 import { InMemoryGameSessionRepository } from "../../src/adapters/outbound/in-memory-game-session-repository.js";
 import { InMemoryInstructorAccountRepository } from "../../src/adapters/outbound/in-memory-instructor-account-repository.js";
+import { PinoLogger } from "../../src/adapters/outbound/pino-logger.js";
 import { DIABE_TEACH_PACK } from "../../src/domain/curriculum-pack/diabe-teach-pack.js";
 import { GameSession } from "../../src/domain/game-session/game-session.js";
+import { InMemoryLogSink } from "../support/in-memory-log-sink.js";
 import { SignedInTeachers } from "./support/signed-in-teacher.js";
 
 type Handler = (event: APIGatewayProxyEvent, context: never) => Promise<unknown>;
@@ -378,22 +380,33 @@ describe("an unexpected server error returns a generic 500 (api-hardening 01)", 
     vi.restoreAllMocks();
   });
 
-  it("hides the error from the caller and logs its stack", async () => {
-    const logged = vi.spyOn(console, "error").mockImplementation(() => {});
-    const failure = new Error("connection refused at /srv/app/src/db.ts:42");
+  it("hides the error from the caller and logs its class, message and stack at error (structured-logging 03)", async () => {
+    const sink = new InMemoryLogSink();
+    const logger = PinoLogger.create({ level: "info", destination: sink });
+    const failure = new TypeError("connection refused at /srv/app/src/db.ts:42");
     const handler = createApiHandler(async () => {
       throw failure;
     }, {}, "getGameSessionState") as unknown as Handler;
 
-    const res = await call(handler, makeEvent({ path: "/api/v1/anything", rawBody: null }));
+    const event = {
+      ...makeEvent({ path: "/api/v1/anything", rawBody: null }),
+      logger,
+    };
+    const res = await call(handler, event);
 
     expect(res.status).toBe(500);
     expect(res.body).toEqual({ code: "INTERNAL_ERROR", message: "An unexpected error occurred." });
-    expect(logged).toHaveBeenCalledWith(expect.any(String), failure);
+    const errorLines = sink.lines().filter(line => line.level === "error");
+    expect(errorLines).toHaveLength(1);
+    expect(errorLines[0]!.err).toMatchObject({
+      type: "TypeError",
+      message: failure.message,
+      stack: failure.stack,
+    });
+    expect(String((errorLines[0]!.err as { stack: string }).stack)).toMatch(/\n\s+at /);
   });
 
   it("does so on a real route when the repository throws", async () => {
-    vi.spyOn(console, "error").mockImplementation(() => {});
     const session = makeChainMappingSession();
     const tokens = new FakeCapabilityTokenAdapter();
     const token = await tokens.signToken({ role: "participant", sessionId: session.sessionId.value, participantId: "p-1" });

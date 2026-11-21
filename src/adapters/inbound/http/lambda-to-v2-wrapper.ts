@@ -57,19 +57,21 @@ function onlyStringParams(params: Partial<Record<string, string | string[]>>): R
  * Route parameters for a request, read from the request URL by matching it
  * against the function's own `config.path` (ADR-0005: `path-to-regexp`).
  * `context.params` is only a cross-check, and the fallback when no declared
- * path matches.
+ * path matches. A disagreement is logged at `warn` through `logger` (the
+ * request's logger, so the line carries its request id).
  */
 export function resolvePathParameters(
   pathname: string,
   config: RouteConfig,
   contextParams?: Record<string, string> | null,
+  logger: LoggerPort = new SilentLogger(),
 ): Record<string, string> | null {
   const requestPath = stripDevRetrySuffix(pathname);
   for (const routePath of routePaths(config)) {
     const matched = match(routePath, { decode: decodeURIComponent })(requestPath);
     if (matched) {
       const params = onlyStringParams(matched.params);
-      warnOnParamMismatch(pathname, requestPath, params, contextParams);
+      warnOnParamMismatch(logger, pathname, requestPath, params, contextParams);
       return params;
     }
   }
@@ -79,6 +81,7 @@ export function resolvePathParameters(
 }
 
 function warnOnParamMismatch(
+  logger: LoggerPort,
   pathname: string,
   requestPath: string,
   params: Record<string, string>,
@@ -90,7 +93,7 @@ function warnOnParamMismatch(
   }
   const differs = Object.entries(params).some(([key, value]) => contextParams[key] !== undefined && contextParams[key] !== value);
   if (differs) {
-    console.warn(`Route parameters from the URL and context.params disagree for ${pathname}; using the URL.`);
+    logger.warn({ pathname }, "route parameters from URL and context.params disagree; using the URL");
   }
 }
 
@@ -101,6 +104,7 @@ async function requestToLambdaEvent(
   request: Request,
   context: Context,
   config: RouteConfig,
+  logger: LoggerPort,
 ): Promise<APIGatewayProxyEvent> {
   const url = new URL(request.url);
   const body = request.body
@@ -115,7 +119,7 @@ async function requestToLambdaEvent(
   return {
     httpMethod: request.method,
     path: url.pathname,
-    pathParameters: resolvePathParameters(url.pathname, config, context.params),
+    pathParameters: resolvePathParameters(url.pathname, config, context.params, logger),
     queryStringParameters: Object.fromEntries(url.searchParams),
     headers,
     body,
@@ -236,7 +240,7 @@ export function wrapLambdaHandler(handler: LambdaHandler, config: RouteConfig, o
     try {
       let result: APIGatewayProxyResult;
       try {
-        const lambdaEvent = await requestToLambdaEvent(request, context, config);
+        const lambdaEvent = await requestToLambdaEvent(request, context, config, logger);
         const event: APIGatewayProxyEvent & RequestLogFields = { ...lambdaEvent, logger, requestOutcome };
         result = await handler(event, lambdaContext);
       }

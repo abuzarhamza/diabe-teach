@@ -4,6 +4,8 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { resolvePathParameters, wrapLambdaHandler } from "../../src/adapters/inbound/http/lambda-to-v2-wrapper.js";
+import { PinoLogger } from "../../src/adapters/outbound/pino-logger.js";
+import { InMemoryLogSink } from "../support/in-memory-log-sink.js";
 
 const CHAINS_PATH = "/api/v1/sessions/:sessionId/rounds/:roundNumber/chains";
 const ARCHIVE_PATH = "/api/v1/packs/:packId/archive";
@@ -89,6 +91,41 @@ describe("wrapLambdaHandler route parameters (api-hardening 03)", () => {
 
   it("returns no parameters for a route without any", () => {
     expect(resolvePathParameters("/api/v1/packs", { path: "/api/v1/packs" }, {})).toEqual({});
+  });
+});
+
+describe("wrapLambdaHandler route parameter mismatch (structured-logging 03)", () => {
+  it("logs warn with the request id and pathname, and uses the URL", async () => {
+    const sink = new InMemoryLogSink();
+    const logger = PinoLogger.create({ level: "info", destination: sink });
+    const handler = wrapLambdaHandler(async event => ({
+      statusCode: 200,
+      body: JSON.stringify(event.pathParameters),
+    }), { path: ARCHIVE_PATH }, { logger });
+
+    const response = await handler(
+      new Request("http://localhost:8888/api/v1/packs/from-url/archive"),
+      netlifyContext({ packId: "from-context" }),
+    );
+
+    expect(await response.json()).toEqual({ packId: "from-url" });
+    const warnings = sink.lines().filter(line => line.level === "warn");
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toMatchObject({
+      requestId: "req-1",
+      pathname: "/api/v1/packs/from-url/archive",
+      msg: "route parameters from URL and context.params disagree; using the URL",
+    });
+  });
+
+  it("logs nothing when the URL and context.params agree", async () => {
+    const sink = new InMemoryLogSink();
+    const logger = PinoLogger.create({ level: "info", destination: sink });
+    const handler = wrapLambdaHandler(async () => ({ statusCode: 200, body: "{}" }), { path: ARCHIVE_PATH }, { logger });
+
+    await handler(new Request("http://localhost:8888/api/v1/packs/p-1/archive"), netlifyContext({ packId: "p-1" }));
+
+    expect(sink.lines().filter(line => line.level === "warn")).toEqual([]);
   });
 });
 

@@ -119,7 +119,6 @@ describe("request completed summary line (structured-logging ticket 02)", () => 
   });
 
   it("an unexpected error's summary line is at error with status 500", async () => {
-    vi.spyOn(console, "error").mockImplementation(() => {});
     const { sink, logger } = sinkLogger();
     const failing = createApiHandler(async () => {
       throw new Error("database exploded");
@@ -139,5 +138,11 @@ describe("request completed summary line (structured-logging ticket 02)", () => 
       status: 500,
     });
     expect(lines[0]).not.toHaveProperty("errorCode");
+    const unhandled = sink.lines().find(line => line.msg === "unhandled error in API handler");
+    expect(unhandled).toMatchObject({
+      level: "error",
+      requestId: "req-500",
+      err: { type: "Error", message: "database exploded" },
+    });
   });
 });

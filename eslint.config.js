@@ -27,4 +27,12 @@ export default antfu(
       "node/prefer-global/buffer": "off",
     },
   },
+  {
+    // The API logs only through the LoggerPort (structured-logging 03); scripts/ is exempt.
+    files: ["src/**", "netlify/**"],
+    rules: {
+      // Options given explicitly: a bare "error" would keep antfu's allow list (warn, error).
+      "no-console": ["error", {}],
+    },
+  },
 );
