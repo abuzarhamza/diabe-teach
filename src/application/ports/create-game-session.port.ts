@@ -10,6 +10,7 @@ import type { CapabilityTokenSignerPort } from "./capability-token.port.js";
 import type { ClockPort } from "./clock.port.js";
 import type { CurriculumPackRepositoryPort } from "./curriculum-pack-repository.port.js";
 import type { GameSessionRepositoryPort } from "./game-session-repository.port.js";
+import type { LoggerPort } from "./logger.port.js";
 
 export interface CreateGameSessionDependencies {
   readonly packRepo: CurriculumPackRepositoryPort;
@@ -65,5 +66,5 @@ export interface CreateGameSessionResult {
 }
 
 export interface CreateGameSessionUseCasePort {
-  execute: (command: CreateGameSessionCommand) => Promise<CreateGameSessionResult>;
+  execute: (command: CreateGameSessionCommand, logger?: LoggerPort) => Promise<CreateGameSessionResult>;
 }

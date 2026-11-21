@@ -1,10 +1,24 @@
 import type { GameSession } from "../../domain/game-session/game-session.js";
 import type { SessionId } from "../../domain/game-session/session-id.js";
 import type { GameSessionRepositoryPort } from "../ports/game-session-repository.port.js";
+import type { LoggerPort } from "../ports/logger.port.js";
 import {
   ConcurrentUpdateConflictError,
   SessionNotFoundError,
 } from "../../domain/errors/domain-errors.js";
+import { SilentLogger } from "./silent-logger.js";
+
+/** Options for one `run`. */
+export interface GameSessionUpdateRunOptions {
+  /**
+   * A session the caller has just loaded (for example to read its
+   * Curriculum Pack first); the first attempt uses it instead of loading
+   * again. Later attempts always reload.
+   */
+  readonly loaded?: GameSession;
+  /** The request's logger; each retry after a write conflict logs at `debug`. */
+  readonly logger?: LoggerPort;
+}
 
 /**
  * Runs "load the Game Session → apply a command → save it" and, when the save
@@ -24,16 +38,12 @@ export class GameSessionUpdateRetrier {
     this.#sessionRepo = sessionRepo;
   }
 
-  /**
-   * `loaded` is a session the caller has just loaded (for example to read its
-   * Curriculum Pack first); the first attempt uses it instead of loading again.
-   * Later attempts always reload.
-   */
   public async run<TResult>(
     sessionId: SessionId,
     command: (session: GameSession) => TResult,
-    loaded?: GameSession,
+    options: GameSessionUpdateRunOptions = {},
   ): Promise<TResult> {
+    const { loaded, logger = new SilentLogger() } = options;
     for (let attempt = 1; ; attempt++) {
       // Reload every retry: a successful save does not bump the version on
       // the object we hold, and a conflict means the stored state moved on.
@@ -57,6 +67,10 @@ export class GameSessionUpdateRetrier {
         ) {
           throw error;
         }
+        logger.debug(
+          { sessionId: sessionId.value, attempt: attempt + 1 },
+          "session write conflict; retrying",
+        );
       }
     }
   }

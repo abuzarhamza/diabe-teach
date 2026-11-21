@@ -1,6 +1,7 @@
 import type { CurriculumPackProps } from "../../domain/curriculum-pack/curriculum-pack.types.js";
 import type { ClockPort } from "./clock.port.js";
 import type { CurriculumPackRepositoryPort } from "./curriculum-pack-repository.port.js";
+import type { LoggerPort } from "./logger.port.js";
 import type {
   ValidationError,
   ValidationWarning,
@@ -48,5 +49,5 @@ export interface RegisterCurriculumPackDependencies {
 }
 
 export interface RegisterCurriculumPackUseCasePort {
-  execute: (input: RegisterCurriculumPackInput) => Promise<RegisterCurriculumPackResult>;
+  execute: (input: RegisterCurriculumPackInput, logger?: LoggerPort) => Promise<RegisterCurriculumPackResult>;
 }

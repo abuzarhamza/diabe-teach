@@ -6,6 +6,7 @@ import type {
   McqAnswerChoice,
 } from "../../domain/game-session/game-session.types.js";
 import type { GameSessionRepositoryPort } from "../ports/game-session-repository.port.js";
+import type { LoggerPort } from "../ports/logger.port.js";
 import type {
   PosttestSubmissionResult,
   PretestSubmissionReceipt,
@@ -25,6 +26,7 @@ import { SessionId } from "../../domain/game-session/session-id.js";
 import { GameSessionUpdateRetrier } from "../services/game-session-update-retrier.js";
 import { LearnerAnalyticsService } from "../services/learner-analytics-service.js";
 import { SessionPackLoader } from "../services/session-pack-loader.js";
+import { SilentLogger } from "../services/silent-logger.js";
 
 export class SubmitAssessmentUseCase implements SubmitAssessmentUseCasePort {
   readonly #sessionRepo: GameSessionRepositoryPort;
@@ -41,6 +43,7 @@ export class SubmitAssessmentUseCase implements SubmitAssessmentUseCasePort {
 
   public async execute(
     command: SubmitAssessmentCommand,
+    logger: LoggerPort = new SilentLogger(),
   ): Promise<SubmitAssessmentResult> {
     // Validate participant role
     if (command.verifiedCapability.role !== "participant") {
@@ -69,7 +72,7 @@ export class SubmitAssessmentUseCase implements SubmitAssessmentUseCasePort {
     this.#validatePhaseForStage(loaded, command.stage, participantId);
 
     // Load curriculum pack for question validation
-    const pack = await this.#packs.load(loaded);
+    const pack = await this.#packs.load(loaded, logger);
 
     // Validate all questions have answers
     const questions = pack.assessmentInstrument?.questions ?? [];
@@ -91,6 +94,11 @@ export class SubmitAssessmentUseCase implements SubmitAssessmentUseCasePort {
           attempt: session.submitAssessment(participantId, command.stage, answersMap),
         };
       },
+      { logger },
+    );
+    logger.info(
+      { sessionId: command.sessionId, participantId, stage: command.stage },
+      "assessment submitted",
     );
 
     // Return stage-appropriate result

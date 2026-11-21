@@ -5,6 +5,7 @@ import type { GameSessionRepositoryPort } from "../../../src/application/ports/g
 import type { McqAnswerChoice } from "../../../src/domain/game-session/game-session.types.js";
 import { readOptionalJsonObjectBody } from "../../../src/adapters/inbound/http/json-object-body.js";
 import { createApiHandler } from "../../../src/adapters/inbound/http/middy/api-handler.js";
+import { requestLoggerOf } from "../../../src/adapters/inbound/http/request-logger.js";
 import { AppRuntime } from "../../../src/app-runtime.js";
 import { SubmitAssessmentUseCase } from "../../../src/application/use-cases/submit-assessment.use-case.js";
 import { ForbiddenRoleError, UnauthorizedTokenError } from "../../../src/domain/errors/domain-errors.js";
@@ -91,7 +92,7 @@ export function createSubmitAssessmentHandler(
       stage,
       verifiedCapability: event.auth,
       answers: body.answers,
-    });
+    }, requestLoggerOf(event));
 
     return {
       statusCode: 201,

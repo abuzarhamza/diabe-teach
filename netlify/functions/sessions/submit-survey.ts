@@ -5,6 +5,7 @@ import type { GameSessionRepositoryPort } from "../../../src/application/ports/g
 import type { LikertRating } from "../../../src/domain/game-session/game-session.types.js";
 import { readOptionalJsonObjectBody } from "../../../src/adapters/inbound/http/json-object-body.js";
 import { createApiHandler } from "../../../src/adapters/inbound/http/middy/api-handler.js";
+import { requestLoggerOf } from "../../../src/adapters/inbound/http/request-logger.js";
 import { AppRuntime } from "../../../src/app-runtime.js";
 import { SubmitPerceptionSurveyUseCase } from "../../../src/application/use-cases/submit-perception-survey.use-case.js";
 import { ForbiddenRoleError, UnauthorizedTokenError } from "../../../src/domain/errors/domain-errors.js";
@@ -78,7 +79,7 @@ export function createSubmitSurveyHandler(
       verifiedCapability: event.auth,
       responses: body.responses,
       comments: body.comments,
-    });
+    }, requestLoggerOf(event));
 
     return {
       statusCode: 201,

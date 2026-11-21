@@ -2,6 +2,7 @@ import type { LikertRating } from "../../domain/game-session/game-session.types.
 import type { VerifiedCapability } from "../ports/capability-token.port.js";
 import type { CurriculumPackRepositoryPort } from "../ports/curriculum-pack-repository.port.js";
 import type { GameSessionRepositoryPort } from "../ports/game-session-repository.port.js";
+import type { LoggerPort } from "../ports/logger.port.js";
 
 export interface SubmitPerceptionSurveyDependencies {
   readonly sessionRepo: GameSessionRepositoryPort;
@@ -22,5 +23,5 @@ export interface SurveySubmissionReceipt {
 }
 
 export interface SubmitPerceptionSurveyUseCasePort {
-  execute: (command: SubmitPerceptionSurveyCommand) => Promise<SurveySubmissionReceipt>;
+  execute: (command: SubmitPerceptionSurveyCommand, logger?: LoggerPort) => Promise<SurveySubmissionReceipt>;
 }

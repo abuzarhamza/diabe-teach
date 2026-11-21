@@ -3,6 +3,7 @@ import type { ErrorObject, ValidateFunction } from "ajv";
 import type { ApiOperationId } from "../request-schemas.generated.js";
 import Ajv2020 from "ajv/dist/2020.js";
 import { MalformedRequestBodyError } from "../../../../domain/errors/domain-errors.js";
+import { requestLoggerOf } from "../request-logger.js";
 import { requestBodySchemas } from "../request-schemas.generated.js";
 
 /** Longest field path echoed back; a longer one (a huge unknown key) is cut. */
@@ -238,6 +239,8 @@ export function requestBodySchemaMiddleware(operationId: ApiOperationId): Middle
       const { field, reason } = last
         ? describeSchemaError(last)
         : { field: ROOT_FIELD, reason: "is not valid" };
+      // The field path and our own reason only, never the submitted value.
+      requestLoggerOf(request.event).debug({ field, reason }, "request body rejected");
       throw new MalformedRequestBodyError(`Invalid request body: '${field}' ${reason}.`, { field, reason });
     },
   };

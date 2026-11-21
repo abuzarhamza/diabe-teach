@@ -1,6 +1,7 @@
 import type { CapabilityTokenSignerPort } from "./capability-token.port.js";
 import type { PublicSessionStateDto } from "./create-game-session.port.js";
 import type { GameSessionRepositoryPort } from "./game-session-repository.port.js";
+import type { LoggerPort } from "./logger.port.js";
 
 export interface JoinGameSessionDependencies {
   readonly sessionRepo: GameSessionRepositoryPort;
@@ -20,5 +21,5 @@ export interface JoinGameSessionResult {
 }
 
 export interface JoinGameSessionUseCasePort {
-  execute: (command: JoinGameSessionCommand) => Promise<JoinGameSessionResult>;
+  execute: (command: JoinGameSessionCommand, logger?: LoggerPort) => Promise<JoinGameSessionResult>;
 }

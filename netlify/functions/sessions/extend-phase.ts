@@ -5,6 +5,7 @@ import type { ExtendSessionPhaseCommand } from "../../../src/application/ports/e
 import type { GameSessionRepositoryPort } from "../../../src/application/ports/game-session-repository.port.js";
 import { readOptionalJsonObjectBody } from "../../../src/adapters/inbound/http/json-object-body.js";
 import { createApiHandler } from "../../../src/adapters/inbound/http/middy/api-handler.js";
+import { requestLoggerOf } from "../../../src/adapters/inbound/http/request-logger.js";
 import { AppRuntime } from "../../../src/app-runtime.js";
 import { ExtendSessionPhaseUseCase } from "../../../src/application/use-cases/extend-session-phase.use-case.js";
 import { ForbiddenRoleError, UnauthorizedTokenError } from "../../../src/domain/errors/domain-errors.js";
@@ -59,7 +60,7 @@ export function createExtendPhaseHandler(
       sessionId,
       verifiedCapability: event.auth,
       seconds: body.seconds,
-    });
+    }, requestLoggerOf(event));
 
     return {
       statusCode: 200,

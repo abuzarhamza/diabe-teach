@@ -2,6 +2,7 @@ import type { APIGatewayProxyResult } from "aws-lambda";
 import type { AuthenticatedEvent } from "../../../src/adapters/inbound/http/middy/auth.middleware.js";
 import type { ProductionDependencies } from "../../../src/app-runtime.types.js";
 import { createApiHandler } from "../../../src/adapters/inbound/http/middy/api-handler.js";
+import { requestLoggerOf } from "../../../src/adapters/inbound/http/request-logger.js";
 import { AppRuntime } from "../../../src/app-runtime.js";
 import { UnarchiveCurriculumPackUseCase } from "../../../src/application/use-cases/unarchive-curriculum-pack.use-case.js";
 import { PackNotFoundError, UnauthorizedTokenError } from "../../../src/domain/errors/domain-errors.js";
@@ -34,7 +35,7 @@ export function createUnarchivePackHandler(
       throw new PackNotFoundError("");
     }
 
-    const result = await useCase.execute({ packId, accountId: account.accountId });
+    const result = await useCase.execute({ packId, accountId: account.accountId }, requestLoggerOf(event));
 
     return {
       statusCode: 200,

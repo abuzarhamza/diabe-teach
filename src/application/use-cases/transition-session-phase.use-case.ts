@@ -3,6 +3,7 @@ import type { RoundBoard } from "../../domain/game-session/round-board.types.js"
 import type { BoardSeedGeneratorPort, SeededRandomPort } from "../ports/board-randomness.port.js";
 import type { ClockPort } from "../ports/clock.port.js";
 import type { GameSessionRepositoryPort } from "../ports/game-session-repository.port.js";
+import type { LoggerPort } from "../ports/logger.port.js";
 import type {
   TransitionSessionPhaseCommand,
   TransitionSessionPhaseDependencies,
@@ -22,6 +23,7 @@ import { SessionId } from "../../domain/game-session/session-id.js";
 import { PublicSessionStateProjector } from "../dtos/public-session-state-projector.js";
 import { GameSessionUpdateRetrier } from "../services/game-session-update-retrier.js";
 import { SessionPackLoader } from "../services/session-pack-loader.js";
+import { SilentLogger } from "../services/silent-logger.js";
 
 export class TransitionSessionPhaseUseCase
 implements TransitionSessionPhaseUseCasePort {
@@ -44,6 +46,7 @@ implements TransitionSessionPhaseUseCasePort {
 
   public async execute(
     command: TransitionSessionPhaseCommand,
+    logger: LoggerPort = new SilentLogger(),
   ): Promise<TransitionSessionPhaseResult> {
     if (command.verifiedCapability.role !== "instructor") {
       throw new ForbiddenRoleError(
@@ -82,12 +85,18 @@ implements TransitionSessionPhaseUseCasePort {
 
     // Dealt once, before the retried command: the seed (possibly a freshly
     // generated one) and so the board stay the same across retries.
-    const board = await this.#dealBoardFor(current, targetPhase, command.seed);
+    const board = await this.#dealBoardFor(current, targetPhase, command.seed, logger);
 
+    let fromPhase: PhaseIdentifier | undefined;
     const session = await this.#sessionUpdates.run(sessionId, (session) => {
+      fromPhase = session.currentPhase;
       session.transitionTo(targetPhase, now, board);
       return session;
-    });
+    }, { logger });
+    logger.info(
+      { sessionId: command.sessionId, from: fromPhase, to: session.currentPhase },
+      "session phase changed",
+    );
 
     return {
       state: PublicSessionStateProjector.toDto(session),
@@ -103,19 +112,30 @@ implements TransitionSessionPhaseUseCasePort {
     session: GameSession,
     targetPhase: PhaseIdentifier,
     requestSeed: string | undefined,
+    logger: LoggerPort,
   ): Promise<RoundBoard | undefined> {
     const roundNumber = GameSession.roundEnteredBy(targetPhase);
     if (roundNumber === null) {
       return undefined;
     }
 
-    const pack = await this.#packs.load(session);
+    const pack = await this.#packs.load(session, logger);
 
     const creationSeed = roundNumber === 1
       ? session.creationSeed
       : null;
     const seed = requestSeed ?? creationSeed ?? this.#seedGenerator.nextSeed();
 
+    logger.debug(
+      {
+        sessionId: session.sessionId.value,
+        roundNumber,
+        seed,
+        rows: pack.boardConfig.rows,
+        cols: pack.boardConfig.cols,
+      },
+      "board dealt",
+    );
     return BoardDealer.deal(
       {
         roundNumber,

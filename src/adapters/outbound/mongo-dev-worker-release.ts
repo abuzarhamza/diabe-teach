@@ -1,4 +1,6 @@
+import type { LoggerPort } from "../../application/ports/logger.port.js";
 import { isMainThread } from "node:worker_threads";
+import { SilentLogger } from "../../application/services/silent-logger.js";
 import { MongoConnectionManager } from "./mongo-client-singleton.js";
 
 /**
@@ -14,9 +16,10 @@ export class MongoDevWorkerRelease {
   public static async afterInvocation(
     env: NodeJS.ProcessEnv = process.env,
     mainThread: boolean = isMainThread,
+    logger: LoggerPort = new SilentLogger(),
   ): Promise<void> {
     if (env.NETLIFY_DEV === "true" && !mainThread) {
-      await MongoConnectionManager.closeAll();
+      await MongoConnectionManager.closeAll(logger);
     }
   }
 }

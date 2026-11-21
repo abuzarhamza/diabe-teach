@@ -4,10 +4,12 @@ import type {
   KeywordCard,
   SemanticDomain,
 } from "../../domain/curriculum-pack/curriculum-pack.types.js";
+import type { LoggerPort } from "../ports/logger.port.js";
 import type {
   ValidationError,
   ValidationWarning,
 } from "../ports/validate-curriculum-pack.port.js";
+import { SilentLogger } from "./silent-logger.js";
 
 type PackInput = Omit<
   CurriculumPackProps,
@@ -24,7 +26,11 @@ const PACK_ID_PATTERN = /^[a-z][a-z0-9-]*[a-z0-9]$/;
 const VERSION_PATTERN = /^\d+\.\d+\.\d+$/;
 
 export class PackValidator {
-  public static validate(pack: PackInput): PackValidationResult {
+  /**
+   * Logs the outcome at `debug` through `logger`: the pack id (only when it
+   * is a valid slug, never other input) and the error and warning counts.
+   */
+  public static validate(pack: PackInput, logger: LoggerPort = new SilentLogger()): PackValidationResult {
     const errors: ValidationError[] = [];
     const warnings: ValidationWarning[] = [];
 
@@ -33,6 +39,17 @@ export class PackValidator {
     PackValidator.#validateBoardCapacity(pack, errors);
     PackValidator.#validateCalibration(pack, errors);
     PackValidator.#checkOptionalFields(pack, warnings);
+
+    logger.debug(
+      {
+        packId: typeof pack.id === "string" && PACK_ID_PATTERN.test(pack.id)
+          ? pack.id
+          : null,
+        errorCount: errors.length,
+        warningCount: warnings.length,
+      },
+      "pack validated",
+    );
 
     return {
       valid: errors.length === 0,

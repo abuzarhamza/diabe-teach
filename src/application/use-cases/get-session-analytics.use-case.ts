@@ -5,11 +5,13 @@ import type {
   GetSessionAnalyticsResult,
   GetSessionAnalyticsUseCasePort,
 } from "../ports/get-session-analytics.port.js";
+import type { LoggerPort } from "../ports/logger.port.js";
 import { ForbiddenRoleError, SessionNotFoundError } from "../../domain/errors/domain-errors.js";
 import { SessionId } from "../../domain/game-session/session-id.js";
 import { CohortAnalyticsService } from "../services/cohort-analytics-service.js";
 import { LearnerAnalyticsService } from "../services/learner-analytics-service.js";
 import { SessionPackLoader } from "../services/session-pack-loader.js";
+import { SilentLogger } from "../services/silent-logger.js";
 
 /**
  * Serves a Game Session's analytics: a learner gets their own metacognitive
@@ -29,13 +31,14 @@ export class GetSessionAnalyticsUseCase implements GetSessionAnalyticsUseCasePor
 
   public async execute(
     query: GetSessionAnalyticsQuery,
+    logger: LoggerPort = new SilentLogger(),
   ): Promise<GetSessionAnalyticsResult> {
     const session = await this.#sessionRepo.findById(SessionId.from(query.sessionId));
     if (!session) {
       throw new SessionNotFoundError(query.sessionId);
     }
 
-    const pack = await this.#packs.load(session);
+    const pack = await this.#packs.load(session, logger);
     const cohortSummary = this.#cohort.buildSummary(session, pack);
     const capability = query.verifiedCapability;
 

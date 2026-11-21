@@ -1,6 +1,7 @@
 import type { AccountTokenSignerPort } from "../ports/account-token.port.js";
 import type { ClockPort } from "../ports/clock.port.js";
 import type { InstructorAccountRepositoryPort } from "../ports/instructor-account-repository.port.js";
+import type { LoggerPort } from "../ports/logger.port.js";
 import type { PasswordHasherPort } from "../ports/password-hasher.port.js";
 import type {
   SignInInstructorCommand,
@@ -10,6 +11,8 @@ import type {
 } from "../ports/sign-in-instructor.port.js";
 import { AccountTemporarilyLockedError, InvalidCredentialsError } from "../../domain/errors/domain-errors.js";
 import { AccountEmail } from "../../domain/instructor-account/account-email.js";
+import { InstructorAccount } from "../../domain/instructor-account/instructor-account.js";
+import { SilentLogger } from "../services/silent-logger.js";
 
 /**
  * Signs a teacher in with an email and a password. An unknown email and a
@@ -38,7 +41,10 @@ export class SignInInstructorUseCase implements SignInInstructorUseCasePort {
     this.#clock = deps.clock;
   }
 
-  public async execute(command: SignInInstructorCommand): Promise<SignInInstructorResult> {
+  public async execute(
+    command: SignInInstructorCommand,
+    logger: LoggerPort = new SilentLogger(),
+  ): Promise<SignInInstructorResult> {
     if (typeof command.email !== "string" || typeof command.password !== "string") {
       throw new InvalidCredentialsError();
     }
@@ -47,12 +53,20 @@ export class SignInInstructorUseCase implements SignInInstructorUseCasePort {
 
     if (!account) {
       await this.#passwordHasher.verify(await this.#getDecoyHash(), password);
+      logger.debug({}, "sign-in refused: no account for that email");
       throw new InvalidCredentialsError();
     }
 
     const now = this.#clock.now();
     const lockEnd = account.activeLockEnd(now);
     if (lockEnd) {
+      logger.warn(
+        {
+          accountId: account.accountId,
+          lockedUntil: lockEnd.toISOString(),
+        },
+        "sign-in refused: account locked",
+      );
       throw new AccountTemporarilyLockedError(lockEnd);
     }
     if (!(await this.#passwordHasher.verify(account.passwordHash, password))) {
@@ -60,7 +74,24 @@ export class SignInInstructorUseCase implements SignInInstructorUseCasePort {
       // each count once and together lock the account exactly once.
       const updated = await this.#accountRepo.recordFailedSignIn(account.accountId, now);
       const newLockEnd = updated?.activeLockEnd(now) ?? null;
+      // The locking attempt resets the stored count, so it is reported as the maximum.
+      logger.info(
+        {
+          accountId: account.accountId,
+          failedCount: newLockEnd
+            ? InstructorAccount.MAX_FAILED_SIGN_INS
+            : updated?.failedSignInCount ?? account.failedSignInCount + 1,
+        },
+        "sign-in wrong password",
+      );
       if (newLockEnd) {
+        logger.info(
+          {
+            accountId: account.accountId,
+            lockedUntil: newLockEnd.toISOString(),
+          },
+          "instructor account locked",
+        );
         throw new AccountTemporarilyLockedError(newLockEnd);
       }
       throw new InvalidCredentialsError();
@@ -69,6 +100,8 @@ export class SignInInstructorUseCase implements SignInInstructorUseCasePort {
       account.recordSuccessfulSignIn();
       await this.#accountRepo.saveSignInCounters(account);
     }
+
+    logger.info({ accountId: account.accountId }, "instructor signed in");
 
     const issued = await this.#accountTokenSigner.signAccountToken(
       { accountId: account.accountId, email: account.email },

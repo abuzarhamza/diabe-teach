@@ -8,8 +8,11 @@ import type {
   CapabilityTokenPort,
   VerifiedCapability,
 } from "../../../../application/ports/capability-token.port.js";
+import type { LoggerPort } from "../../../../application/ports/logger.port.js";
 import { timingSafeEqual } from "node:crypto";
+import { decodeJwt } from "jose";
 import { UnauthorizedTokenError } from "../../../../domain/errors/domain-errors.js";
+import { requestLoggerOf } from "../request-logger.js";
 
 export type AuthenticatedEvent = APIGatewayProxyEvent & {
   /** The verified Capability Token (`BearerAuth`), or null when none was sent. */
@@ -69,15 +72,51 @@ function getHeader(
 
 const INVALID_ACCOUNT_TOKEN_MESSAGE = "Malformed, invalid, or expired account token.";
 
+/**
+ * The `kind` claims our tokens carry (`src/adapters/outbound/token-kinds.ts`).
+ * Only these are ever logged; any other claim value is attacker-chosen text.
+ */
+const KNOWN_TOKEN_KINDS: readonly string[] = ["account", "capability"];
+
+/**
+ * The `kind` claim of a refused token, read without verifying it, or null
+ * when it is not a JWT or claims no known kind. A `capability` kind on an
+ * `AccountAuth` route (or the reverse) is a token signed for another kind.
+ */
+function claimedTokenKind(token: string): string | null {
+  try {
+    const kind = decodeJwt(token).kind;
+    return typeof kind === "string" && KNOWN_TOKEN_KINDS.includes(kind)
+      ? kind
+      : null;
+  }
+  catch {
+    return null;
+  }
+}
+
+/**
+ * One `warn` line for a present bearer token that failed verification:
+ * the route's scheme and the claimed kind only, never the token.
+ */
+function warnTokenRefused(logger: LoggerPort, scheme: BearerScheme, token: string): void {
+  logger.warn({
+    scheme,
+    claimedKind: claimedTokenKind(token),
+  }, "bearer token refused");
+}
+
 /** Fails closed: a present but unverifiable Account Token is a 401. */
 async function verifyAccountToken(
   verifier: AccountTokenVerifierPort | undefined,
   token: string,
+  logger: LoggerPort,
 ): Promise<VerifiedAccount> {
   const verified = verifier
     ? await verifier.verifyAccountToken(token)
     : null;
   if (!verified) {
+    warnTokenRefused(logger, "AccountAuth", token);
     throw new UnauthorizedTokenError(INVALID_ACCOUNT_TOKEN_MESSAGE);
   }
   return verified;
@@ -90,6 +129,7 @@ export function authMiddleware(
     before: async (request) => {
       const { event } = request;
       const headers = event.headers ?? {};
+      const logger = requestLoggerOf(event);
 
       // 1. Validate x-api-key if required or configured
       const shouldEnforceApiKey
@@ -116,6 +156,7 @@ export function authMiddleware(
             && timingSafeEqual(actualBuf, expectedBuf);
 
         if (!isValid) {
+          logger.warn({}, "x-api-key refused");
           throw new UnauthorizedTokenError(
             "Missing or invalid x-api-key header.",
           );
@@ -146,7 +187,7 @@ export function authMiddleware(
         const token = match[1];
         if (options.bearerScheme === "AccountAuth") {
           event.auth = null;
-          event.account = await verifyAccountToken(options.accountTokenVerifier, token);
+          event.account = await verifyAccountToken(options.accountTokenVerifier, token, logger);
           return;
         }
 
@@ -158,6 +199,7 @@ export function authMiddleware(
 
         const verified = await options.tokenVerifier.verifyToken(token);
         if (!verified) {
+          warnTokenRefused(logger, "BearerAuth", token);
           throw new UnauthorizedTokenError(
             "Malformed, invalid, or expired capability token.",
           );

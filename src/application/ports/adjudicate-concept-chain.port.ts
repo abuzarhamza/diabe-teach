@@ -1,6 +1,7 @@
 import type { ChainVerdict, GridCoord, PeerVote } from "../../domain/game-session/concept-chain.js";
 import type { VerifiedCapability } from "./capability-token.port.js";
 import type { GameSessionRepositoryPort } from "./game-session-repository.port.js";
+import type { LoggerPort } from "./logger.port.js";
 
 export interface AdjudicateConceptChainDependencies {
   readonly sessionRepo: GameSessionRepositoryPort;
@@ -43,5 +44,5 @@ export interface AdjudicateConceptChainResult {
 }
 
 export interface AdjudicateConceptChainUseCasePort {
-  execute: (command: AdjudicateConceptChainCommand) => Promise<AdjudicateConceptChainResult>;
+  execute: (command: AdjudicateConceptChainCommand, logger?: LoggerPort) => Promise<AdjudicateConceptChainResult>;
 }

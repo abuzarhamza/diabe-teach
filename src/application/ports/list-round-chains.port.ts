@@ -1,6 +1,7 @@
 import type { ChainVerdict, GridCoord, PeerVote } from "../../domain/game-session/concept-chain.js";
 import type { VerifiedCapability } from "./capability-token.port.js";
 import type { GameSessionRepositoryPort } from "./game-session-repository.port.js";
+import type { LoggerPort } from "./logger.port.js";
 
 export interface ListRoundChainsDependencies {
   readonly sessionRepo: GameSessionRepositoryPort;
@@ -44,5 +45,5 @@ export interface ListRoundChainsResult {
 }
 
 export interface ListRoundChainsUseCasePort {
-  execute: (query: ListRoundChainsQuery) => Promise<ListRoundChainsResult>;
+  execute: (query: ListRoundChainsQuery, logger?: LoggerPort) => Promise<ListRoundChainsResult>;
 }

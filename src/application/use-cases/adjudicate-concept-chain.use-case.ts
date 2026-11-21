@@ -7,6 +7,7 @@ import type {
   AdjudicateConceptChainUseCasePort,
   AdjudicatedChainDto,
 } from "../ports/adjudicate-concept-chain.port.js";
+import type { LoggerPort } from "../ports/logger.port.js";
 import {
   AdjudicationLockedError,
   ChainNotFoundError,
@@ -14,6 +15,7 @@ import {
 } from "../../domain/errors/domain-errors.js";
 import { SessionId } from "../../domain/game-session/session-id.js";
 import { GameSessionUpdateRetrier } from "../services/game-session-update-retrier.js";
+import { SilentLogger } from "../services/silent-logger.js";
 
 export class AdjudicateConceptChainUseCase
 implements AdjudicateConceptChainUseCasePort {
@@ -25,13 +27,16 @@ implements AdjudicateConceptChainUseCasePort {
 
   public async execute(
     command: AdjudicateConceptChainCommand,
+    logger: LoggerPort = new SilentLogger(),
   ): Promise<AdjudicateConceptChainResult> {
     const decidedAt = new Date();
 
     const chain = await this.#sessionUpdates.run(
       SessionId.from(command.sessionId),
       session => this.#adjudicate(session, command, decidedAt),
+      { logger },
     );
+    this.#logDecision(logger, command, chain);
 
     const chainDto: AdjudicatedChainDto = {
       chainId: chain.chainId,
@@ -48,6 +53,31 @@ implements AdjudicateConceptChainUseCasePort {
     };
 
     return { chain: chainDto };
+  }
+
+  /** One `info` line per peer vote or instructor ruling (the AI placeholder is not logged). */
+  #logDecision(logger: LoggerPort, command: AdjudicateConceptChainCommand, chain: ConceptChain): void {
+    const ids = { sessionId: command.sessionId, chainId: chain.chainId };
+    switch (command.action) {
+      case "peer-approve":
+      case "peer-challenge":
+        logger.info(
+          {
+            ...ids,
+            decision: command.action === "peer-approve"
+              ? "approve"
+              : "challenge",
+          },
+          "chain peer vote",
+        );
+        break;
+      case "instructor-approve":
+      case "instructor-reject":
+        logger.info({ ...ids, approved: command.action === "instructor-approve" }, "chain instructor ruling");
+        break;
+      default:
+        break;
+    }
   }
 
   #adjudicate(

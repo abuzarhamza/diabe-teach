@@ -1,5 +1,6 @@
 import type { Connection, Model } from "mongoose";
 import type { GameSessionRepositoryPort } from "../../application/ports/game-session-repository.port.js";
+import type { LoggerPort } from "../../application/ports/logger.port.js";
 import type { AssessmentAttempt, LikertRating, McqAnswerChoice, SurveyResponse } from "../../domain/game-session/game-session.types.js";
 import type { RoomCode } from "../../domain/game-session/room-code.js";
 import type { RoundBoard } from "../../domain/game-session/round-board.types.js";
@@ -12,6 +13,7 @@ import type {
   ParticipantDocument,
   RoundBoardDocument,
 } from "./mongo-game-session-repository.types.js";
+import { SilentLogger } from "../../application/services/silent-logger.js";
 import { ConcurrentUpdateConflictError } from "../../domain/errors/domain-errors.js";
 import { GameSession } from "../../domain/game-session/game-session.js";
 import { DEFAULT_MONGODB_DB_NAME } from "./curriculum-pack.schema.js";
@@ -53,6 +55,7 @@ export class MongoGameSessionRepository implements GameSessionRepositoryPort {
 
   public static fromConfig(
     config: MongoGameSessionConnectionConfig,
+    logger: LoggerPort = new SilentLogger(),
   ): MongoGameSessionRepository {
     return new MongoGameSessionRepository({
       getCollection: async () => {
@@ -64,6 +67,7 @@ export class MongoGameSessionRepository implements GameSessionRepositoryPort {
         const connection = await MongoConnectionManager.getConnection(
           config.mongoUri,
           config.mongoDbName ?? DEFAULT_MONGODB_DB_NAME,
+          logger,
         );
         const model = MongoGameSessionRepository.getModel(connection);
         return {

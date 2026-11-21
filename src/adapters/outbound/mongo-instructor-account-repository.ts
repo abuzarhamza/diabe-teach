@@ -1,11 +1,13 @@
 import type { Connection, Model } from "mongoose";
 import type { InstructorAccountRepositoryPort } from "../../application/ports/instructor-account-repository.port.js";
+import type { LoggerPort } from "../../application/ports/logger.port.js";
 import type {
   InstructorAccountCollectionLike,
   InstructorAccountDocument,
   MongoInstructorAccountConnectionConfig,
   MongoInstructorAccountRepositoryOptions,
 } from "./mongo-instructor-account-repository.types.js";
+import { SilentLogger } from "../../application/services/silent-logger.js";
 import { EmailAlreadyRegisteredError } from "../../domain/errors/domain-errors.js";
 import { InstructorAccount } from "../../domain/instructor-account/instructor-account.js";
 import { DEFAULT_MONGODB_DB_NAME } from "./curriculum-pack.schema.js";
@@ -43,6 +45,7 @@ export class MongoInstructorAccountRepository implements InstructorAccountReposi
 
   public static fromConfig(
     config: MongoInstructorAccountConnectionConfig,
+    logger: LoggerPort = new SilentLogger(),
   ): MongoInstructorAccountRepository {
     return new MongoInstructorAccountRepository({
       getCollection: async () => {
@@ -54,6 +57,7 @@ export class MongoInstructorAccountRepository implements InstructorAccountReposi
         const connection = await MongoConnectionManager.getConnection(
           config.mongoUri,
           config.mongoDbName ?? DEFAULT_MONGODB_DB_NAME,
+          logger,
         );
         const model = MongoInstructorAccountRepository.getModel(connection);
         // Builds the unique email index (once per model) before any write.

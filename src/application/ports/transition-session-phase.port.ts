@@ -5,6 +5,7 @@ import type { ClockPort } from "./clock.port.js";
 import type { PublicSessionStateDto } from "./create-game-session.port.js";
 import type { CurriculumPackRepositoryPort } from "./curriculum-pack-repository.port.js";
 import type { GameSessionRepositoryPort } from "./game-session-repository.port.js";
+import type { LoggerPort } from "./logger.port.js";
 
 export interface TransitionSessionPhaseDependencies {
   readonly sessionRepo: GameSessionRepositoryPort;
@@ -31,5 +32,5 @@ export interface TransitionSessionPhaseResult {
 }
 
 export interface TransitionSessionPhaseUseCasePort {
-  execute: (command: TransitionSessionPhaseCommand) => Promise<TransitionSessionPhaseResult>;
+  execute: (command: TransitionSessionPhaseCommand, logger?: LoggerPort) => Promise<TransitionSessionPhaseResult>;
 }

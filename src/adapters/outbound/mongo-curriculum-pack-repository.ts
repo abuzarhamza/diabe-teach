@@ -1,5 +1,6 @@
 import type { Connection, Model } from "mongoose";
 import type { CurriculumPackRepositoryPort } from "../../application/ports/curriculum-pack-repository.port.js";
+import type { LoggerPort } from "../../application/ports/logger.port.js";
 import type { PackId } from "../../domain/curriculum-pack/pack-id.js";
 import type {
   CurriculumPackCollectionLike,
@@ -8,6 +9,7 @@ import type {
   MongoCurriculumPackConnectionConfig,
   MongoCurriculumPackRepositoryOptions,
 } from "./mongo-curriculum-pack-repository.types.js";
+import { SilentLogger } from "../../application/services/silent-logger.js";
 import { CurriculumPack } from "../../domain/curriculum-pack/curriculum-pack.js";
 import {
   CURRICULUM_PACK_MODEL_NAME,
@@ -53,6 +55,7 @@ implements CurriculumPackRepositoryPort {
 
   public static fromConfig(
     config: MongoCurriculumPackConnectionConfig,
+    logger: LoggerPort = new SilentLogger(),
   ): MongoCurriculumPackRepository {
     return new MongoCurriculumPackRepository({
       getCollection: async () => {
@@ -64,6 +67,7 @@ implements CurriculumPackRepositoryPort {
         const connection = await MongoConnectionManager.getConnection(
           config.mongoUri,
           config.mongoDbName ?? DEFAULT_MONGODB_DB_NAME,
+          logger,
         );
         const model = MongoCurriculumPackRepository.getModel(connection);
         return {

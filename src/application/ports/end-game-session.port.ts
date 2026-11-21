@@ -2,6 +2,7 @@ import type { VerifiedCapability } from "./capability-token.port.js";
 import type { ClockPort } from "./clock.port.js";
 import type { PublicSessionStateDto } from "./create-game-session.port.js";
 import type { GameSessionRepositoryPort } from "./game-session-repository.port.js";
+import type { LoggerPort } from "./logger.port.js";
 
 export interface EndGameSessionDependencies {
   readonly sessionRepo: GameSessionRepositoryPort;
@@ -18,5 +19,5 @@ export interface EndGameSessionResult {
 }
 
 export interface EndGameSessionUseCasePort {
-  execute: (command: EndGameSessionCommand) => Promise<EndGameSessionResult>;
+  execute: (command: EndGameSessionCommand, logger?: LoggerPort) => Promise<EndGameSessionResult>;
 }

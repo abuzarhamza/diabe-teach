@@ -2,6 +2,7 @@ import type { AccountTokenSignerPort } from "../ports/account-token.port.js";
 import type { ClockPort } from "../ports/clock.port.js";
 import type { IdGeneratorPort } from "../ports/id-generator.port.js";
 import type { InstructorAccountRepositoryPort } from "../ports/instructor-account-repository.port.js";
+import type { LoggerPort } from "../ports/logger.port.js";
 import type { PasswordHasherPort } from "../ports/password-hasher.port.js";
 import type {
   SignUpInstructorCommand,
@@ -13,6 +14,7 @@ import { EmailAlreadyRegisteredError } from "../../domain/errors/domain-errors.j
 import { AccountEmail } from "../../domain/instructor-account/account-email.js";
 import { AccountPasswordPolicy } from "../../domain/instructor-account/account-password-policy.js";
 import { InstructorAccount } from "../../domain/instructor-account/instructor-account.js";
+import { SilentLogger } from "../services/silent-logger.js";
 
 /**
  * Creates an Instructor Account from an email and a password and signs the
@@ -33,7 +35,10 @@ export class SignUpInstructorUseCase implements SignUpInstructorUseCasePort {
     this.#clock = deps.clock;
   }
 
-  public async execute(command: SignUpInstructorCommand): Promise<SignUpInstructorResult> {
+  public async execute(
+    command: SignUpInstructorCommand,
+    logger: LoggerPort = new SilentLogger(),
+  ): Promise<SignUpInstructorResult> {
     const email = AccountEmail.parse(command.email);
     const password = AccountPasswordPolicy.accept(command.password);
 
@@ -51,6 +56,7 @@ export class SignUpInstructorUseCase implements SignUpInstructorUseCasePort {
       createdAt: now,
     });
     await this.#accountRepo.create(account);
+    logger.info({ accountId: account.accountId }, "instructor signed up");
 
     const issued = await this.#accountTokenSigner.signAccountToken(
       { accountId: account.accountId, email: account.email },

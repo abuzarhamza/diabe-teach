@@ -8,6 +8,7 @@ import type { CurriculumPackRepositoryPort } from "../../../src/application/port
 import type { GameSessionRepositoryPort } from "../../../src/application/ports/game-session-repository.port.js";
 import { readOptionalJsonObjectBody } from "../../../src/adapters/inbound/http/json-object-body.js";
 import { createApiHandler } from "../../../src/adapters/inbound/http/middy/api-handler.js";
+import { requestLoggerOf } from "../../../src/adapters/inbound/http/request-logger.js";
 import { AppRuntime } from "../../../src/app-runtime.js";
 import { CreateGameSessionUseCase } from "../../../src/application/use-cases/create-game-session.use-case.js";
 
@@ -57,7 +58,7 @@ export function createCreateSessionHandler(
     const result = await useCase.execute({
       ...body,
       ownerAccountId: event.account?.accountId ?? null,
-    });
+    }, requestLoggerOf(event));
 
     return {
       statusCode: 201,

@@ -3,6 +3,7 @@ import type { AuthenticatedEvent } from "../../../src/adapters/inbound/http/midd
 import type { ProductionDependencies } from "../../../src/app-runtime.types.js";
 import { readJsonObjectBody } from "../../../src/adapters/inbound/http/json-object-body.js";
 import { createApiHandler } from "../../../src/adapters/inbound/http/middy/api-handler.js";
+import { requestLoggerOf } from "../../../src/adapters/inbound/http/request-logger.js";
 import { AppRuntime } from "../../../src/app-runtime.js";
 import { SignUpInstructorUseCase } from "../../../src/application/use-cases/sign-up-instructor.use-case.js";
 
@@ -29,7 +30,7 @@ export function createSignUpHandler(dependencies?: SignUpHandlerDependencies) {
     const result = await useCase.execute({
       email: body.email,
       password: body.password,
-    });
+    }, requestLoggerOf(event));
 
     return {
       statusCode: 201,

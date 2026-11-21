@@ -3,6 +3,7 @@ import type { CapabilityTokenPort, VerifiedCapability } from "../../../src/appli
 import type { ClockPort } from "../../../src/application/ports/clock.port.js";
 import type { GameSessionRepositoryPort } from "../../../src/application/ports/game-session-repository.port.js";
 import { createApiHandler } from "../../../src/adapters/inbound/http/middy/api-handler.js";
+import { requestLoggerOf } from "../../../src/adapters/inbound/http/request-logger.js";
 import { AppRuntime } from "../../../src/app-runtime.js";
 import { EndGameSessionUseCase } from "../../../src/application/use-cases/end-game-session.use-case.js";
 import { ForbiddenRoleError, UnauthorizedTokenError } from "../../../src/domain/errors/domain-errors.js";
@@ -54,7 +55,7 @@ export function createEndSessionHandler(
     const result = await useCase.execute({
       sessionId,
       verifiedCapability: event.auth,
-    });
+    }, requestLoggerOf(event));
 
     return {
       statusCode: 200,

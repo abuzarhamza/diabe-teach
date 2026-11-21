@@ -2,6 +2,7 @@ import type { VerifiedCapability } from "./capability-token.port.js";
 import type { ClockPort } from "./clock.port.js";
 import type { PublicSessionStateDto } from "./create-game-session.port.js";
 import type { GameSessionRepositoryPort } from "./game-session-repository.port.js";
+import type { LoggerPort } from "./logger.port.js";
 
 export interface ExtendSessionPhaseDependencies {
   readonly sessionRepo: GameSessionRepositoryPort;
@@ -20,5 +21,5 @@ export interface ExtendSessionPhaseResult {
 }
 
 export interface ExtendSessionPhaseUseCasePort {
-  execute: (command: ExtendSessionPhaseCommand) => Promise<ExtendSessionPhaseResult>;
+  execute: (command: ExtendSessionPhaseCommand, logger?: LoggerPort) => Promise<ExtendSessionPhaseResult>;
 }

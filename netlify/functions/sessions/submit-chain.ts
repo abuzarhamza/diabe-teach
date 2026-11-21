@@ -6,6 +6,7 @@ import type { GameSessionRepositoryPort } from "../../../src/application/ports/g
 import type { SubmitConceptChainCommand } from "../../../src/application/ports/submit-concept-chain.port.js";
 import { readOptionalJsonObjectBody } from "../../../src/adapters/inbound/http/json-object-body.js";
 import { createApiHandler } from "../../../src/adapters/inbound/http/middy/api-handler.js";
+import { requestLoggerOf } from "../../../src/adapters/inbound/http/request-logger.js";
 import { AppRuntime } from "../../../src/app-runtime.js";
 import { SubmitConceptChainUseCase } from "../../../src/application/use-cases/submit-concept-chain.use-case.js";
 import { ForbiddenRoleError, UnauthorizedTokenError } from "../../../src/domain/errors/domain-errors.js";
@@ -69,7 +70,7 @@ export function createSubmitChainHandler(
       keywordIds: body.keywordIds ?? [],
       narrativeExplanation: body.narrativeExplanation ?? "",
       stepRationales: body.stepRationales,
-    });
+    }, requestLoggerOf(event));
 
     return {
       statusCode: 201,

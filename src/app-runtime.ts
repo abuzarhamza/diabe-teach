@@ -43,7 +43,11 @@ export class AppRuntime {
    * logger currently cached, built on first use.
    */
   public static readonly invocationOptions: WrapLambdaHandlerOptions = {
-    afterInvocation: async () => MongoDevWorkerRelease.afterInvocation(),
+    afterInvocation: async () => MongoDevWorkerRelease.afterInvocation(
+      process.env,
+      undefined,
+      AppRuntime.getProductionDependencies().logger,
+    ),
     get logger(): LoggerPort | undefined {
       return AppRuntime.getProductionDependencies().logger;
     },
@@ -185,22 +189,24 @@ export class AppRuntime {
       config.accountTokenSecret,
     ) ?? new FakeAccountTokenAdapter();
 
+    const logger = AppRuntime.buildLogger(config);
+
     return {
-      packRepo: MongoCurriculumPackRepository.fromConfig(config),
-      sessionRepo: MongoGameSessionRepository.fromConfig(config),
+      packRepo: MongoCurriculumPackRepository.fromConfig(config, logger),
+      sessionRepo: MongoGameSessionRepository.fromConfig(config, logger),
       tokenSigner: tokenAdapter,
       tokenVerifier: tokenAdapter,
       clock: new SystemClock(),
       seededRandom: new SeedrandomSeededRandom(),
       seedGenerator: new CryptoBoardSeedGenerator(),
-      accountRepo: MongoInstructorAccountRepository.fromConfig(config),
+      accountRepo: MongoInstructorAccountRepository.fromConfig(config, logger),
       passwordHasher: new Argon2PasswordHasher(),
       accountTokenSigner: accountTokenAdapter,
       accountTokenVerifier: accountTokenAdapter,
       idGenerator: new CryptoIdGenerator(),
       apiKey: config.apiKey,
       requireApiKey: Boolean(config.apiKey),
-      logger: AppRuntime.buildLogger(config),
+      logger,
     };
   }
 

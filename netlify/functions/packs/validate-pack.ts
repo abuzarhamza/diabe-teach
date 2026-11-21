@@ -4,6 +4,7 @@ import type {
 } from "../../../src/adapters/inbound/http/middy/auth.middleware.js";
 import type { AccountTokenVerifierPort } from "../../../src/application/ports/account-token.port.js";
 import { createApiHandler } from "../../../src/adapters/inbound/http/middy/api-handler.js";
+import { requestLoggerOf } from "../../../src/adapters/inbound/http/request-logger.js";
 import { AppRuntime } from "../../../src/app-runtime.js";
 import { ValidateCurriculumPackUseCase } from "../../../src/application/use-cases/validate-curriculum-pack.use-case.js";
 import { UnauthorizedTokenError } from "../../../src/domain/errors/domain-errors.js";
@@ -33,7 +34,7 @@ export function createValidatePackHandler(
       ? event.body as Record<string, unknown>
       : {};
 
-    const result = await useCase.execute({ pack: pack as never });
+    const result = await useCase.execute({ pack: pack as never }, requestLoggerOf(event));
 
     return {
       statusCode: 200,

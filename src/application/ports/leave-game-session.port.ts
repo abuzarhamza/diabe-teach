@@ -2,6 +2,7 @@ import type { VerifiedCapability } from "./capability-token.port.js";
 import type { ClockPort } from "./clock.port.js";
 import type { PublicSessionStateDto } from "./create-game-session.port.js";
 import type { GameSessionRepositoryPort } from "./game-session-repository.port.js";
+import type { LoggerPort } from "./logger.port.js";
 
 export interface LeaveGameSessionDependencies {
   readonly sessionRepo: GameSessionRepositoryPort;
@@ -18,5 +19,5 @@ export interface LeaveGameSessionResult {
 }
 
 export interface LeaveGameSessionUseCasePort {
-  execute: (command: LeaveGameSessionCommand) => Promise<LeaveGameSessionResult>;
+  execute: (command: LeaveGameSessionCommand, logger?: LoggerPort) => Promise<LeaveGameSessionResult>;
 }

@@ -3,6 +3,7 @@ import type { VerifiedCapability } from "./capability-token.port.js";
 import type { ClockPort } from "./clock.port.js";
 import type { CurriculumPackRepositoryPort } from "./curriculum-pack-repository.port.js";
 import type { GameSessionRepositoryPort } from "./game-session-repository.port.js";
+import type { LoggerPort } from "./logger.port.js";
 
 export interface SubmitConceptChainDependencies {
   readonly sessionRepo: GameSessionRepositoryPort;
@@ -42,5 +43,5 @@ export interface SubmitConceptChainResult {
 }
 
 export interface SubmitConceptChainUseCasePort {
-  execute: (command: SubmitConceptChainCommand) => Promise<SubmitConceptChainResult>;
+  execute: (command: SubmitConceptChainCommand, logger?: LoggerPort) => Promise<SubmitConceptChainResult>;
 }

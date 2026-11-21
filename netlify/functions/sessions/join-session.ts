@@ -4,6 +4,7 @@ import type { GameSessionRepositoryPort } from "../../../src/application/ports/g
 import type { JoinGameSessionCommand } from "../../../src/application/ports/join-game-session.port.js";
 import { readOptionalJsonObjectBody } from "../../../src/adapters/inbound/http/json-object-body.js";
 import { createApiHandler } from "../../../src/adapters/inbound/http/middy/api-handler.js";
+import { requestLoggerOf } from "../../../src/adapters/inbound/http/request-logger.js";
 import { AppRuntime } from "../../../src/app-runtime.js";
 import { JoinGameSessionUseCase } from "../../../src/application/use-cases/join-game-session.use-case.js";
 
@@ -37,7 +38,7 @@ export function createJoinSessionHandler(
   ): Promise<APIGatewayProxyResult> => {
     const body = readOptionalJsonObjectBody(event.body) as unknown as JoinGameSessionCommand;
 
-    const result = await useCase.execute(body);
+    const result = await useCase.execute(body, requestLoggerOf(event));
 
     return {
       statusCode: 200,

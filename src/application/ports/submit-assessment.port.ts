@@ -3,6 +3,7 @@ import type { LearnerMetacognitiveReport } from "../dtos/session-analytics.dto.j
 import type { VerifiedCapability } from "./capability-token.port.js";
 import type { CurriculumPackRepositoryPort } from "./curriculum-pack-repository.port.js";
 import type { GameSessionRepositoryPort } from "./game-session-repository.port.js";
+import type { LoggerPort } from "./logger.port.js";
 
 export type { AssessmentStageSummary, LearnerMetacognitiveReport } from "../dtos/session-analytics.dto.js";
 
@@ -58,5 +59,5 @@ export type SubmitAssessmentResult
     | PosttestSubmissionResult;
 
 export interface SubmitAssessmentUseCasePort {
-  execute: (command: SubmitAssessmentCommand) => Promise<SubmitAssessmentResult>;
+  execute: (command: SubmitAssessmentCommand, logger?: LoggerPort) => Promise<SubmitAssessmentResult>;
 }

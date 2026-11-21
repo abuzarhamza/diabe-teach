@@ -4,6 +4,7 @@ import type { CapabilityTokenPort, VerifiedCapability } from "../../../src/appli
 import type { GameSessionRepositoryPort } from "../../../src/application/ports/game-session-repository.port.js";
 import { readOptionalJsonObjectBody } from "../../../src/adapters/inbound/http/json-object-body.js";
 import { createApiHandler } from "../../../src/adapters/inbound/http/middy/api-handler.js";
+import { requestLoggerOf } from "../../../src/adapters/inbound/http/request-logger.js";
 import { AppRuntime } from "../../../src/app-runtime.js";
 import { AdjudicateConceptChainUseCase } from "../../../src/application/use-cases/adjudicate-concept-chain.use-case.js";
 import { ForbiddenRoleError, UnauthorizedTokenError } from "../../../src/domain/errors/domain-errors.js";
@@ -64,7 +65,7 @@ export function createAdjudicateChainHandler(
       comment: body.comment,
       feedback: body.feedback,
       qualityScore: body.qualityScore,
-    });
+    }, requestLoggerOf(event));
 
     return {
       statusCode: 200,

@@ -1,6 +1,7 @@
 import type { GridCoord } from "../../domain/game-session/concept-chain.js";
 import type { ClockPort } from "../ports/clock.port.js";
 import type { GameSessionRepositoryPort } from "../ports/game-session-repository.port.js";
+import type { LoggerPort } from "../ports/logger.port.js";
 import type {
   SubmitConceptChainCommand,
   SubmitConceptChainDependencies,
@@ -17,6 +18,7 @@ import { ConceptChain } from "../../domain/game-session/concept-chain.js";
 import { SessionId } from "../../domain/game-session/session-id.js";
 import { GameSessionUpdateRetrier } from "../services/game-session-update-retrier.js";
 import { SessionPackLoader } from "../services/session-pack-loader.js";
+import { SilentLogger } from "../services/silent-logger.js";
 
 export class SubmitConceptChainUseCase
 implements SubmitConceptChainUseCasePort {
@@ -35,6 +37,7 @@ implements SubmitConceptChainUseCasePort {
 
   public async execute(
     command: SubmitConceptChainCommand,
+    logger: LoggerPort = new SilentLogger(),
   ): Promise<SubmitConceptChainResult> {
     // Read the time on arrival so storage latency does not eat the grace period.
     const receivedAt = this.#clock.now();
@@ -57,7 +60,7 @@ implements SubmitConceptChainUseCasePort {
     if (!loaded) {
       throw new SessionNotFoundError(command.sessionId);
     }
-    const minChainLength = (await this.#packs.load(loaded)).minChainLength;
+    const minChainLength = (await this.#packs.load(loaded, logger)).minChainLength;
 
     // Built once, so a retry keeps the same chain id and submission time.
     let built: ConceptChain | undefined;
@@ -77,7 +80,16 @@ implements SubmitConceptChainUseCasePort {
 
         return session.addChain(built, receivedAt);
       },
-      loaded,
+      { loaded, logger },
+    );
+    logger.info(
+      {
+        sessionId: command.sessionId,
+        roundNumber: chain.roundNumber,
+        chainId: chain.chainId,
+        length: chain.chainLength,
+      },
+      "chain submitted",
     );
 
     const chainDto: SubmittedChainDto = {
