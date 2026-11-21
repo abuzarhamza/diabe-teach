@@ -1228,7 +1228,13 @@ paths:
               schema:
                 $ref: "#/components/schemas/ApiErrorResponse"
         "422":
-          $ref: "#/components/responses/UnprocessableEntityError"
+          description: >-
+            SURVEY_COMMENTS_TOO_LONG. Optional free-text `comments` exceed the
+            maximum length of 1,000 words.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
 
   /api/v1/sessions/{sessionId}/analytics:
     get:
@@ -1410,6 +1416,7 @@ components:
         - CONCURRENT_UPDATE_CONFLICT
         - CHAIN_ALREADY_SUBMITTED
         - SURVEY_ALREADY_SUBMITTED
+        - SURVEY_COMMENTS_TOO_LONG
         - EMAIL_ALREADY_REGISTERED
         - INVALID_CREDENTIALS
         - ACCOUNT_TEMPORARILY_LOCKED

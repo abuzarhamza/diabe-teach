@@ -119,6 +119,75 @@ When(
   },
 );
 
+When(
+  "participant {string} submits a perception survey with rating {int} for item {string}",
+  async function (this: TestWorld, displayName: string, rating: number, itemId: string) {
+    if (!this.currentSessionId) {
+      throw new Error("No session available.");
+    }
+
+    const token = this.participantTokens.get(displayName);
+    if (!token) {
+      throw new Error(`No token found for participant '${displayName}'.`);
+    }
+
+    const responses: Record<string, number> = {
+      ...getDefaultSurveyResponses(),
+      [itemId]: rating,
+    };
+
+    this.lastResponse = await submitSurvey(
+      this.currentSessionId,
+      token,
+      responses,
+    );
+    this.parseLastResponse();
+  },
+);
+
+When(
+  "participant {string} submits a perception survey with {int}-word comments",
+  async function (this: TestWorld, displayName: string, wordCount: number) {
+    if (!this.currentSessionId) {
+      throw new Error("No session available.");
+    }
+
+    const token = this.participantTokens.get(displayName);
+    if (!token) {
+      throw new Error(`No token found for participant '${displayName}'.`);
+    }
+
+    const responses = getDefaultSurveyResponses();
+    const comments = Array.from({ length: wordCount }).fill("word").join(" ");
+
+    this.lastResponse = await submitSurvey(
+      this.currentSessionId,
+      token,
+      responses,
+      comments,
+    );
+    this.parseLastResponse();
+  },
+);
+
+When(
+  "the instructor attempts to submit a perception survey",
+  async function (this: TestWorld) {
+    if (!this.currentSessionId || !this.instructorToken) {
+      throw new Error("No session or instructor token available.");
+    }
+
+    const responses = getDefaultSurveyResponses();
+
+    this.lastResponse = await submitSurvey(
+      this.currentSessionId,
+      this.instructorToken,
+      responses,
+    );
+    this.parseLastResponse();
+  },
+);
+
 Then(
   "the response should contain recordedItemCount",
   function (this: TestWorld) {

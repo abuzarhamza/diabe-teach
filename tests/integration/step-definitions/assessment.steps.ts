@@ -96,6 +96,82 @@ When(
 );
 
 When(
+  "participant {string} submits an incomplete pretest assessment",
+  async function (this: TestWorld, displayName: string) {
+    if (!this.currentSessionId) {
+      throw new Error("No session available.");
+    }
+
+    const token = this.participantTokens.get(displayName);
+    if (!token) {
+      throw new Error(`No token found for participant '${displayName}'.`);
+    }
+
+    const partialAnswers: Record<string, 0 | 1 | 2 | 3 | "I_DONT_KNOW"> = {
+      "dm-mcq-01": 0,
+      "dm-mcq-02": 1,
+      "dm-mcq-03": 2,
+      "dm-mcq-04": 3,
+      "dm-mcq-05": "I_DONT_KNOW",
+    };
+
+    this.lastResponse = await submitAssessment(
+      this.currentSessionId,
+      "pretest",
+      token,
+      partialAnswers,
+    );
+    this.parseLastResponse();
+  },
+);
+
+When(
+  "participant {string} submits a pretest assessment with invalid answer choice {int} for question {string}",
+  async function (this: TestWorld, displayName: string, invalidChoice: number, questionId: string) {
+    if (!this.currentSessionId) {
+      throw new Error("No session available.");
+    }
+
+    const token = this.participantTokens.get(displayName);
+    if (!token) {
+      throw new Error(`No token found for participant '${displayName}'.`);
+    }
+
+    const answers: Record<string, unknown> = {
+      ...getDefaultAssessmentAnswers(),
+      [questionId]: invalidChoice,
+    };
+
+    this.lastResponse = await submitAssessment(
+      this.currentSessionId,
+      "pretest",
+      token,
+      answers as Record<string, 0 | 1 | 2 | 3 | "I_DONT_KNOW">,
+    );
+    this.parseLastResponse();
+  },
+);
+
+When(
+  "the instructor attempts to submit pretest answers",
+  async function (this: TestWorld) {
+    if (!this.currentSessionId || !this.instructorToken) {
+      throw new Error("No session or instructor token available.");
+    }
+
+    const answers = getDefaultAssessmentAnswers();
+
+    this.lastResponse = await submitAssessment(
+      this.currentSessionId,
+      "pretest",
+      this.instructorToken,
+      answers,
+    );
+    this.parseLastResponse();
+  },
+);
+
+When(
   "the instructor advances to the posttest phase",
   async function (this: TestWorld) {
     if (!this.currentSessionId || !this.instructorToken) {
