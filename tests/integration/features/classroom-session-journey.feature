@@ -273,3 +273,45 @@ Feature: Classroom Game Session Journey
     And participant "Alice" retrieves the session state
     Then the response status should be 200
     And the session phase should be "pretest"
+
+  @adjudication @standings @error-handling
+  Scenario: Peer voting, instructor final ruling lock, and round standings
+    When the instructor creates a classroom session with pack "diabe-teach"
+    And participants "Alice" and "Bob" join using the room code
+    And the instructor advances the phase 2 times
+    Then the session phase should be "round-1:chain-mapping"
+    When participant "Alice" submits a concept chain for round 1
+    Then the response status should be 201
+    When the instructor advances the phase
+    Then the session phase should be "round-1:peer-adjudication"
+    When participant "Bob" peer-approves the last submitted chain
+    Then the response status should be 200
+    And the response should contain a chain with status "pending-review"
+    When participant "Bob" attempts to issue an instructor approval on the last submitted chain
+    Then the response status should be 403
+    And the response error code should be "FORBIDDEN_ROLE"
+    And the response should be a standard error body
+    When the instructor attempts to adjudicate non-existent chain "no-such-chain" in round 1
+    Then the response status should be 404
+    And the response error code should be "CHAIN_NOT_FOUND"
+    And the response should be a standard error body
+    When the instructor finalizes adjudication on the last chain with score 8
+    Then the response status should be 200
+    And the response should contain a chain with status "approved"
+    And the chain verdict should be locked
+    When participant "Bob" peer-approves the last submitted chain
+    Then the response status should be 409
+    And the response error code should be "ADJUDICATION_LOCKED_BY_INSTRUCTOR"
+    And the response should be a standard error body
+    When the instructor finalizes adjudication on the last chain with score 9
+    Then the response status should be 409
+    And the response error code should be "ADJUDICATION_LOCKED_BY_INSTRUCTOR"
+    And the response should be a standard error body
+    When the instructor retrieves standings for round 1
+    Then the response status should be 200
+    And the response should contain standings
+    And the standings should rank participant "Alice" at rank 1 with chain length 4
+    When participant "Alice" retrieves standings for round 1
+    Then the response status should be 200
+    And the response should contain standings
+    And the standings should rank participant "Alice" at rank 1 with chain length 4

@@ -240,6 +240,65 @@ When(
 );
 
 When(
+  "participant {string} attempts to issue an instructor approval on the last submitted chain",
+  async function (this: TestWorld, displayName: string) {
+    if (!this.currentSessionId || !this.lastChainId) {
+      throw new Error("No session or chain available.");
+    }
+
+    const token = this.participantTokens.get(displayName);
+    if (!token) {
+      throw new Error(`No token found for participant '${displayName}'.`);
+    }
+
+    this.lastResponse = await adjudicateChain(
+      this.currentSessionId,
+      1,
+      this.lastChainId,
+      token,
+      {
+        action: "instructor-approve",
+        qualityScore: 8,
+        feedback: "Learner trying to issue an instructor ruling.",
+      },
+    );
+    this.parseLastResponse();
+  },
+);
+
+When(
+  "the instructor attempts to adjudicate non-existent chain {string} in round {int}",
+  async function (this: TestWorld, chainId: string, roundNumber: number) {
+    if (!this.currentSessionId || !this.instructorToken) {
+      throw new Error("No session or instructor token available.");
+    }
+
+    this.lastResponse = await adjudicateChain(
+      this.currentSessionId,
+      roundNumber,
+      chainId,
+      this.instructorToken,
+      {
+        action: "instructor-approve",
+        qualityScore: 8,
+        feedback: "Adjudicating a missing chain.",
+      },
+    );
+    this.parseLastResponse();
+  },
+);
+
+Then(
+  "the chain verdict should be locked",
+  function (this: TestWorld) {
+    const body = this.lastResponseBody as {
+      chain?: { verdict?: { isApproved?: boolean; isLocked?: boolean } };
+    };
+    expect(body.chain?.verdict?.isLocked).to.equal(true);
+  },
+);
+
+When(
   "the instructor retrieves standings for round {int}",
   async function (this: TestWorld, roundNumber: number) {
     if (!this.currentSessionId || !this.instructorToken) {

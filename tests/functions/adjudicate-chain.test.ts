@@ -224,4 +224,79 @@ describe("post /api/v1/sessions/{sessionId}/rounds/{n}/chains/{chainId}/adjudica
 
     expect(response.statusCode).toBe(403);
   });
+
+  it("returns 409 ADJUDICATION_LOCKED_BY_INSTRUCTOR when a peer vote or second instructor ruling targets a locked chain", async () => {
+    const { session, chain } = makeSessionWithChain();
+    const voter = session.addParticipant("Bob");
+    const sessionRepo = new InMemoryGameSessionRepository([session]);
+    const tokenAdapter = new FakeCapabilityTokenAdapter();
+
+    const instructorToken = await tokenAdapter.signToken({
+      role: "instructor",
+      sessionId: session.sessionId.value,
+    });
+    const participantToken = await tokenAdapter.signToken({
+      role: "participant",
+      sessionId: session.sessionId.value,
+      participantId: voter.participantId,
+    });
+
+    const handler = createAdjudicateChainHandler({
+      sessionRepo,
+      tokenVerifier: tokenAdapter,
+    });
+
+    const lockResponse = await handler(
+      makeEvent(
+        session.sessionId.value,
+        1,
+        chain.chainId,
+        {
+          action: "instructor-approve",
+          feedback: "Solid mechanism chain.",
+          qualityScore: 8,
+        },
+        { authorization: `Bearer ${instructorToken}` },
+      ),
+      {} as any,
+    );
+    expect(lockResponse.statusCode).toBe(200);
+
+    const peerVoteAfterLock = await handler(
+      makeEvent(
+        session.sessionId.value,
+        1,
+        chain.chainId,
+        { action: "peer-approve" },
+        { authorization: `Bearer ${participantToken}` },
+      ),
+      {} as any,
+    );
+    expect(peerVoteAfterLock.statusCode).toBe(409);
+    expect(JSON.parse(peerVoteAfterLock.body)).toEqual({
+      code: "ADJUDICATION_LOCKED_BY_INSTRUCTOR",
+      message: expect.any(String),
+      details: { chainId: chain.chainId },
+    });
+
+    const secondRulingAfterLock = await handler(
+      makeEvent(
+        session.sessionId.value,
+        1,
+        chain.chainId,
+        {
+          action: "instructor-reject",
+          feedback: "Changed my mind.",
+        },
+        { authorization: `Bearer ${instructorToken}` },
+      ),
+      {} as any,
+    );
+    expect(secondRulingAfterLock.statusCode).toBe(409);
+    expect(JSON.parse(secondRulingAfterLock.body)).toEqual({
+      code: "ADJUDICATION_LOCKED_BY_INSTRUCTOR",
+      message: expect.any(String),
+      details: { chainId: chain.chainId },
+    });
+  });
 });

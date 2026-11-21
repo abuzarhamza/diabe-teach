@@ -226,6 +226,25 @@ Then(
 );
 
 Then(
+  "the standings should rank participant {string} at rank {int} with chain length {int}",
+  function (this: TestWorld, displayName: string, expectedRank: number, expectedLength: number) {
+    const body = this.lastResponseBody as {
+      standings?: Array<{
+        participantId: string;
+        displayName: string;
+        longestValidChainLength: number;
+        rank: number;
+      }>;
+    };
+    expect(body.standings).to.be.an("array");
+    const entry = (body.standings ?? []).find(s => s.displayName === displayName);
+    expect(entry !== undefined, `no standings entry for ${displayName}`).to.equal(true);
+    expect(entry?.rank).to.equal(expectedRank);
+    expect(entry?.longestValidChainLength).to.equal(expectedLength);
+  },
+);
+
+Then(
   "the active round number should be {int}",
   function (this: TestWorld, expectedRound: number) {
     const body = this.lastResponseBody as {
