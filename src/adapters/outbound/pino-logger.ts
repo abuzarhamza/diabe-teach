@@ -3,6 +3,7 @@ import type { LogFields, LoggerPort, LogLevel } from "../../application/ports/lo
 import type { PinoLoggerOptions, PrettyStreamFactory } from "./pino-logger.types.js";
 import { createRequire } from "node:module";
 import { pino } from "pino";
+import { MongoCredentialStripper } from "./mongo-credential-stripper.js";
 
 export const LOG_SERVICE_NAME = "diabe-teach-api";
 
@@ -15,6 +16,38 @@ export const LOG_LEVELS: readonly LogLevel[] = [
   "fatal",
   "silent",
 ];
+
+/**
+ * Keys whose values never reach the logs. A safety net only: call sites log
+ * ids and outcomes, never these (see `LoggerPort`).
+ */
+export const REDACTED_KEYS: readonly string[] = [
+  "authorization",
+  "token",
+  "accountToken",
+  "instructorToken",
+  "participantToken",
+  "password",
+  "passwordHash",
+  "email",
+  "body",
+  "mongodbUri",
+  "uri",
+];
+
+/**
+ * pino `redact` paths for `REDACTED_KEYS`. In pino's path syntax each `*`
+ * stands for exactly one key: `*.email` matches `{ account: { email } }` but
+ * neither a top-level `email` nor `{ a: { b: { email } } }`. So every key is
+ * listed at depth 0, 1 and 2 (`email`, `*.email`, `*.*.email`), which covers
+ * `{ req: { headers: { authorization } } }`. Deeper nesting and values inside
+ * arrays are not matched.
+ */
+export const REDACT_PATHS: readonly string[] = REDACTED_KEYS.flatMap(key => [
+  key,
+  `*.${key}`,
+  `*.*.${key}`,
+]);
 
 /**
  * pino behind the `LoggerPort`. One JSON object per line, written
@@ -37,10 +70,29 @@ export class PinoLogger implements LoggerPort {
         formatters: {
           level: label => ({ level: label }),
         },
+        redact: {
+          paths: [
+            ...(options.redactPaths ?? REDACT_PATHS),
+          ],
+          remove: true,
+        },
+        serializers: { err: PinoLogger.#serializeError },
       },
       PinoLogger.#destination(options),
     );
     return new PinoLogger(logger);
+  }
+
+  /** pino's error serializer, with MongoDB credentials stripped from the message and stack. */
+  static #serializeError(err: Error): ReturnType<typeof pino.stdSerializers.err> {
+    const serialized = pino.stdSerializers.err(err);
+    if (typeof serialized.message === "string") {
+      serialized.message = MongoCredentialStripper.strip(serialized.message);
+    }
+    if (typeof serialized.stack === "string") {
+      serialized.stack = MongoCredentialStripper.strip(serialized.stack);
+    }
+    return serialized;
   }
 
   public static isLogLevel(value: string): value is LogLevel {

@@ -10,6 +10,8 @@ export interface PinoLoggerOptions {
    * `pino.destination`. Tests pass an in-memory stream.
    */
   readonly destination?: NodeJS.WritableStream;
+  /** Overrides the default `REDACT_PATHS`; only tests set it (to prove the redaction test bites). */
+  readonly redactPaths?: readonly string[];
 }
 
 /** The part of pino-pretty's default export this adapter uses. */
