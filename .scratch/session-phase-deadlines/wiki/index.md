@@ -2,7 +2,7 @@
 
 Chief-of-staff memory for the session phase deadline effort. It is a historical record: every claim is dated or cites a commit.
 
-Sources: [spec](../spec.md), [tickets](../issues/). Later efforts that reuse this wiki: [server-owned-board](../../server-owned-board/spec.md), [teacher-login](../../teacher-login/spec.md), [list-round-chains](../../list-round-chains/spec.md), [api-hardening](../../api-hardening/spec.md), [api-completion](../../api-completion/spec.md), [structured-logging](../../structured-logging/spec.md), [bdd-non-happy-path-coverage](../../bdd-non-happy-path-coverage/spec.md), [bruno-api-docs](../../bruno-api-docs/spec.md).
+Sources: [spec](../spec.md), [tickets](../issues/). Later efforts that reuse this wiki: [server-owned-board](../../server-owned-board/spec.md), [teacher-login](../../teacher-login/spec.md), [list-round-chains](../../list-round-chains/spec.md), [api-hardening](../../api-hardening/spec.md), [api-completion](../../api-completion/spec.md), [structured-logging](../../structured-logging/spec.md), [bdd-non-happy-path-coverage](../../bdd-non-happy-path-coverage/spec.md), [bruno-api-docs](../../bruno-api-docs/spec.md), [react-web-setup](../../react-web-setup/spec.md).
 
 ## Decisions
 - [Timed or instructor-driven phases](decision-timed-or-instructor-driven-phases.md): per-phase timer, null means instructor-driven, enforcement with 5s grace, no auto-advance.

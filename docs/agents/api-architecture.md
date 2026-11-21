@@ -4,7 +4,7 @@ How the backend is built **today**. Read this before designing, implementing or 
 
 Checked against the code at commit `b8ef47c` (2026-11-19; the last code change is `bcab708`, api-hardening 01). Source and tests win over this page: if they disagree, trust the code and fix this page.
 
-Decision records: ADR-0001 (subject-agnostic packs), ADR-0002 (hexagonal layers, Netlify, MongoDB), ADR-0004 (fail-closed bearer tokens, JWT), ADR-0005 (npm-first, middy), ADR-0006 (pack lifecycle), ADR-0007 (Instructor Accounts, Account Token, Pack Version pinning). ADR-0002 and ADR-0004 also describe an `OpenApiHttpApp` router and a single `api.ts` entrypoint that commit `3c5f131` removed; see the "Superseded in part" note at the top of each.
+Decision records: ADR-0001 (subject-agnostic packs), ADR-0002 (hexagonal layers, Netlify, MongoDB), ADR-0004 (fail-closed bearer tokens, JWT), ADR-0005 (npm-first, middy), ADR-0006 (pack lifecycle), ADR-0007 (Instructor Accounts, Account Token, Pack Version pinning), ADR-0008 (Simple 3-layer DDD React + Vite frontend under `web/src/{domain,api,features}`). ADR-0002 and ADR-0004 also describe an `OpenApiHttpApp` router and a single `api.ts` entrypoint that commit `3c5f131` removed; see the "Superseded in part" note at the top of each.
 
 **There is no central router.** There is no `OpenApiHttpApp`, no `openapi-backend`, no `src/adapters/inbound/http/create-app.ts`, no `netlify/functions/api.ts`, no `BaseHttpHandler`, and no SSE stream route. `docs/api/openapi.yaml` is the API contract, but nothing reads it at runtime.
 
