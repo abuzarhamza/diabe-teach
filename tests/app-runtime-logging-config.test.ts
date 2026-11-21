@@ -135,4 +135,9 @@ describe("appRuntime.buildLogger (structured-logging ticket 01)", () => {
     expect(deps.logger).toBeDefined();
     expect(typeof deps.logger?.child).toBe("function");
   });
+
+  it("vitest setup defaults process.env.LOG_LEVEL to silent unless already set (ticket 05)", () => {
+    expect(process.env.LOG_LEVEL).toBe("silent");
+    expect(AppRuntime.loadEnvConfig().logLevel).toBe("silent");
+  });
 });

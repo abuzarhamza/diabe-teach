@@ -28,6 +28,15 @@
  * `BDD_FEATURE_TIMEOUT_MS`). A feature that runs past it is killed and counted
  * as failed, and the runner points at the server log (`.netlify/dev-local.log`,
  * written by `npm run dev:local`), instead of waiting on a hung request.
+ *
+ * Logging:
+ * - This runner defaults `LOG_LEVEL=silent` for each spawned cucumber process
+ *   unless `LOG_LEVEL` is already set in the environment.
+ * - Because `npm run dev:local` runs in a separate process (defaulting to
+ *   `LOG_LEVEL=debug`, `LOG_PRETTY=true` and writing to `.netlify/dev-local.log`),
+ *   pass `LOG_LEVEL=silent npm run dev:local` for a quiet server log during BDD,
+ *   or `LOG_LEVEL=debug` (on `dev:local` or `npm run test:bdd`) when debugging
+ *   one run.
  */
 
 import { spawn } from "node:child_process";
@@ -46,6 +55,8 @@ const HEALTH_TIMEOUT_MS = 10_000;
 const FEATURE_TIMEOUT_MS = Number(process.env.BDD_FEATURE_TIMEOUT_MS) || 5 * 60_000;
 const KILL_GRACE_MS = 5_000;
 const SERVER_LOG = ".netlify/dev-local.log";
+
+process.env.LOG_LEVEL ??= "silent";
 
 interface FeatureResult {
   readonly feature: string;

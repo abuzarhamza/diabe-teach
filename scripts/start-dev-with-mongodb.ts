@@ -20,6 +20,8 @@
  *   npx tsx scripts/start-dev-with-mongodb.ts
  *   # or via npm script:
  *   npm run dev:local
+ *   LOG_PRETTY=false npm run dev:local   # raw JSON lines instead of pino-pretty
+ *   LOG_LEVEL=silent npm run dev:local   # quiet server logs during BDD runs
  *
  * `--no-api-key` (`npm run dev:prototype`) starts the same server with the
  * x-api-key check turned off, so the Concept Chain prototype pages at

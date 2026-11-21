@@ -24,13 +24,15 @@ src/
 │   ├── use-cases/*.use-case.ts
 │   ├── services/             SessionPackLoader, GameSessionUpdateRetrier, pack validator
 │   └── dtos/                 *.dto.ts contracts + projector classes (role-aware redaction)
-└── adapters/
-    ├── inbound/http/
-    │   ├── middy/            createApiHandler (api-handler.ts) + its four middlewares
-    │   ├── lambda-to-v2-wrapper.ts   wrapLambdaHandler(handler, config): Netlify v2 Request <-> Lambda event/result
-    │   └── json-object-body.ts       readJsonObjectBody / readOptionalJsonObjectBody
-    └── outbound/             Mongo (mongoose) + in-memory repositories, token adapters,
-                              clock, id/seed generators, argon2 hasher, YAML env loader
+├── adapters/
+│   ├── inbound/http/
+│   │   ├── middy/            createApiHandler (api-handler.ts) + its four middlewares
+│   │   ├── lambda-to-v2-wrapper.ts   wrapLambdaHandler(handler, config): Netlify v2 Request <-> Lambda event/result
+│   │   ├── request-logger.ts         requestLoggerOf(event): per-invocation child logger (defaults to SilentLogger)
+│   │   └── json-object-body.ts       readJsonObjectBody / readOptionalJsonObjectBody
+│   └── outbound/             Mongo (mongoose) + in-memory repositories, token adapters,
+│                             clock, id/seed generators, argon2 hasher, YAML env loader,
+│                             PinoLogger + MongoCredentialStripper
 netlify/functions/
 ├── <route>.ts                One per route: declares `config` (path + method), default-exports wrapLambdaHandler(lambdaHandler, config)
 ├── packs/<route>.ts          Handler implementations for pack routes
@@ -61,7 +63,7 @@ The composition roots are `src/app-runtime.ts`, the handler files under `netlify
 
 - **Aggregates**: `GameSession` (participants, rounds, chains, verdicts, assessments, survey, phase state machine, pinned `packVersion`), `CurriculumPack` (identified by `PackId` + `version`; system/archived flags, `createdBy`), `InstructorAccount` (email, password hash, sign-in lock).
 - Domain code returns values or throws `DomainError` subclasses (`src/domain/errors/domain-errors.ts`), never HTTP status codes.
-- **Outbound ports** (`src/application/ports/`): `CurriculumPackRepositoryPort`, `GameSessionRepositoryPort`, `InstructorAccountRepositoryPort`, `CapabilityTokenPort` / `CapabilityTokenSignerPort`, `AccountTokenSignerPort` / `AccountTokenVerifierPort`, `PasswordHasherPort`, `ClockPort`, `IdGeneratorPort`, `SeededRandomPort` / `BoardSeedGeneratorPort`. There is no narrative-adjudicator or event-publisher port.
+- **Outbound ports** (`src/application/ports/`): `CurriculumPackRepositoryPort`, `GameSessionRepositoryPort`, `InstructorAccountRepositoryPort`, `CapabilityTokenPort` / `CapabilityTokenSignerPort`, `AccountTokenSignerPort` / `AccountTokenVerifierPort`, `PasswordHasherPort`, `ClockPort`, `IdGeneratorPort`, `SeededRandomPort` / `BoardSeedGeneratorPort`, `LoggerPort`. There is no narrative-adjudicator or event-publisher port.
 - **Role-aware projection**: `curriculum-pack-projector.ts` and `public-session-state-projector.ts` strip answers (`correctIndex`, `explanation`) and private state unless the caller's token allows it. Never mutate the aggregate to hide fields.
 - **Pack Version pinning** (ADR-0007): sessions store `packVersion`; `SessionPackLoader` loads the pinned version and falls back to the latest one for old sessions.
 
@@ -107,8 +109,8 @@ Every `/api/v1` route uses this one middy chain. `before` steps run in this orde
 ## 4. Composition root and persistence
 
 - `AppRuntime` (`src/app-runtime.ts`) is a static class:
-  - `loadEnvConfig` reads env vars, falling back to `.env.dev.yaml` through `EnvYamlConfigLoader`: `MONGODB_URI`, `MONGODB_DB_NAME`, `CAPABILITY_TOKEN_SECRET`, `ACCOUNT_TOKEN_SECRET`, `API_KEY`;
-  - `buildProductionDependencies` wires the Mongo repositories, token adapters, clock, seed/random, argon2 hasher and id generator;
+  - `loadEnvConfig` reads env vars, falling back to `.env.dev.yaml` through `EnvYamlConfigLoader`: `MONGODB_URI`, `MONGODB_DB_NAME`, `CAPABILITY_TOKEN_SECRET`, `ACCOUNT_TOKEN_SECRET`, `API_KEY`, `LOG_LEVEL` (`logging.level`), `LOG_PRETTY` (`logging.pretty`);
+  - `buildProductionDependencies` wires the Mongo repositories, token adapters, clock, seed/random, argon2 hasher, id generator and `PinoLogger` (`buildLogger`);
   - `getProductionDependencies` caches that wiring per warm container;
   - `setProductionDependencies` lets tests swap it.
 - Many `ProductionDependencies` fields are optional, and handlers force them with `!`. A missing dependency therefore fails at runtime, not at compile time (environment backlog, 2026-11-19).
@@ -143,4 +145,97 @@ Every `/api/v1` route uses this one middy chain. `before` steps run in this orde
 - `npm run dev:prototype`: the same server with the x-api-key check off (`DEV_DISABLE_API_KEY=true`, honoured by `AppRuntime.loadEnvConfig` only when `NETLIFY_DEV=true`). It serves the Concept Chain prototype from the repo root on the same origin: http://localhost:8888/claudPoc/concept-chain/login.html. Its pages call the account and pack routes and never hold the API key. Don't run BDD against it; stop it with `npm run dev:local:stop`.
 - `npm run dev:local:stop`: stops the whole dev process tree and checks that port 8888 is free. Always run it when you are done; `pkill -f "netlify dev"` leaves processes behind.
 - `npx vitest run --no-file-parallelism`: unit, handler and contract tests, one file at a time (parallel runs have exhausted memory on dev machines).
-- `npm run typecheck`, `npm run lint` (baseline 96 errors as of `484cbab`), `npm run lint:boundaries` (baseline 6).
+- `npm run typecheck`, `npm run lint` (baseline ≤ 29 errors; ESLint `no-console` is an error in `src/**` and `netlify/**`), `npm run lint:boundaries` (baseline ≤ 6).
+
+## 8. Logging
+
+See `.scratch/structured-logging/spec.md` and the research note `.scratch/research/netlify-logging-and-log-services.md`.
+
+### Port and adapters
+
+- **`LoggerPort`** (`src/application/ports/logger.port.ts`): outbound port with `debug`, `info`, `warn` and `error` taking `(fields: LogFields, msg: string)`, plus `child(fields)` returning a logger that attaches those fields to every line. Domain code (`src/domain/`) never imports a logger; application use cases and services depend only on `LoggerPort`.
+- **`PinoLogger`** (`src/adapters/outbound/pino-logger.ts`): production adapter backed by `pino`, writing one JSON object per line synchronously to stdout (`pino.destination({ dest: 1, sync: true })`), with no worker-thread transports. Every line carries `level` (as a string label: `"debug"`, `"info"`, `"warn"`, `"error"`), `time`, `msg`, and `service: "diabe-teach-api"` (`pid` and `hostname` are omitted). Under `NETLIFY_DEV=true` with pretty mode enabled, it loads `pino-pretty` dynamically via `createRequire` as an in-process synchronous stream (`pretty({ sync: true, colorize })`) and falls back to JSON if `pino-pretty` is absent.
+- **`SilentLogger`** (`src/application/services/silent-logger.ts`): no-op implementation used as the default in `wrapLambdaHandler`, middlewares, use cases and application services so existing unit and handler tests require no logger setup.
+- **`requestLoggerOf(event)`** (`src/adapters/inbound/http/request-logger.ts`): reads the per-invocation child logger from `event.logger` (falling back to `SilentLogger` when a handler is called directly in tests) so route handlers can pass it into use cases and services.
+
+### Request correlation and summary line
+
+- `wrapLambdaHandler(handler, config, AppRuntime.invocationOptions)` creates one child logger per invocation with `{ requestId: context.requestId, route: config.path, method: request.method }` and attaches it to `event.logger`. Every log line written during the request carries those three fields.
+- When the invocation finishes, `wrapLambdaHandler` logs one `"request completed"` summary line with `{ status, durationMs }` and, when `domainErrorMiddleware` mapped a `DomainError`, `{ errorCode }`.
+- Status `>= 500` logs `"request completed"` at `error` (alongside `unexpectedErrorMiddleware`'s `"unhandled error in API handler"` line with `{ err }` class, message and stack); `2xx` and `4xx` responses log `"request completed"` at `info` because a `4xx` is an expected domain/auth refusal, not a server incident.
+
+### Environment variables and defaults
+
+| Variable | YAML key (`.env.dev.yaml`) | Allowed values | Defaults | Notes |
+|---|---|---|---|---|
+| `LOG_LEVEL` | `logging.level` | `trace`, `debug`, `info`, `warn`, `error`, `fatal`, `silent` | Deployed: `info`<br>`netlify dev` (`NETLIFY_DEV=true`): `debug`<br>Vitest (`tests/support/vitest-setup.ts`) & BDD runner (`scripts/run-bdd-sequential.ts`): `silent` | Env var wins over `.env.dev.yaml`. Any unknown value falls back to `info` and writes one `warn` line (`"LOG_LEVEL is not a known level; using info"` with `{ invalidLogLevel, logLevel: "info" }`). `netlify.toml` sets no `LOG_LEVEL`, keeping the deployed default at `info`. |
+| `LOG_PRETTY` | `logging.pretty` | `true`, `false` | `netlify dev` (`NETLIFY_DEV=true`): `true`<br>Everywhere else: `false` | Guarded by `NETLIFY_DEV === "true"` (same pattern as `DEV_DISABLE_API_KEY`). Outside `netlify dev`, `LOG_PRETTY` and `logging.pretty` are ignored so deployed functions always emit single-line JSON. Use `LOG_PRETTY=false npm run dev:local` to emit raw JSON locally, or `LOG_LEVEL=silent npm run dev:local` for quiet server logs during BDD runs. |
+
+### Never-log rule and redaction safety net
+
+- **Call-site rule:** log identifiers (`sessionId`, `packId`, `accountId`, `participantId`, `chainId`, `roundNumber`) and outcomes (`status`, `errorCode`, `durationMs`, `mode`, `from`, `to`, `approved`, `decision`) only. **Never** pass `event`, `headers`, request or response `body`, whole domain objects, Capability Tokens, Account Tokens, `Authorization` headers, passwords, password hashes, teacher emails, learner display names, chain narratives, or MongoDB connection strings.
+- **Pino `redact` backstop:** `PinoLogger` configures `redact: { paths: REDACT_PATHS, remove: true }` across 11 sensitive key names (`authorization`, `token`, `accountToken`, `instructorToken`, `participantToken`, `password`, `passwordHash`, `email`, `body`, `mongodbUri`, `uri`) at depths 0, 1 and 2 (`key`, `*.key`, `*.*.key` — 33 paths total, including `headers.authorization` and `req.headers.authorization`). This is a safety net for accidental nesting up to two objects deep, not permission to log raw objects.
+- **MongoDB credential stripping:** `MongoCredentialStripper.strip(text)` (`src/adapters/outbound/mongo-credential-stripper.ts`) replaces `mongodb(+srv)://<userinfo>@` with `mongodb(+srv)://<redacted>@` in error messages and stacks inside `PinoLogger`'s `err` serializer before any error is written.
+
+### Event catalogue (Ticket 06)
+
+Every line below is emitted through the request's child logger, so it also carries `service`, `requestId`, `route` and `method`:
+
+**`info` — business events and request summary**
+
+| Area | `msg` | Fields |
+|---|---|---|
+| HTTP wrapper | `"request completed"` | `status`, `durationMs`, optional `errorCode` (`5xx` logs at `error`) |
+| Accounts | `"instructor signed up"` | `accountId` |
+| Accounts | `"instructor signed in"` | `accountId` |
+| Accounts | `"sign-in wrong password"` | `accountId`, `failedCount` |
+| Accounts | `"instructor account locked"` | `accountId`, `lockedUntil` |
+| Packs | `"pack registered"` | `packId`, `version`, `accountId` |
+| Packs | `"pack archived"` / `"pack unarchived"` | `packId`, `accountId` |
+| Sessions | `"session created"` | `sessionId`, `mode`, `packId`, `packVersion` |
+| Sessions | `"learner joined"` / `"learner left"` | `sessionId`, `participantId` |
+| Sessions | `"session phase changed"` | `sessionId`, `from`, `to` |
+| Sessions | `"session phase extended"` | `sessionId`, `phase`, `newEndsAt` |
+| Sessions | `"session ended"` | `sessionId`, `fromPhase` |
+| Chains | `"chain submitted"` | `sessionId`, `roundNumber`, `chainId`, `length` |
+| Chains | `"chain peer vote"` | `sessionId`, `chainId`, `decision` |
+| Chains | `"chain instructor ruling"` | `sessionId`, `chainId`, `approved` |
+| Assessments | `"assessment submitted"` | `sessionId`, `participantId`, `stage` |
+| Survey | `"survey submitted"` | `sessionId`, `participantId` |
+
+**`debug` — diagnostics (on in `netlify dev`, off by default when deployed)**
+
+| Area | `msg` | Fields |
+|---|---|---|
+| Board deal | `"board dealt"` | `sessionId`, `roundNumber`, `seed`, `rows`, `cols` |
+| Concurrency | `"session write conflict; retrying"` | `sessionId`, `attempt` |
+| Pack loader | `"session pack loaded"` | `packId`, `packVersion`, `fellBackToLatest` |
+| Pack validator | `"pack validated"` | `packId`, `errorCount` |
+| Request schema | `"request body rejected"` | `field`, `reason` |
+| Chain visibility | `"chain visibility applied"` | `sessionId`, `roundNumber`, `viewer`, `count` |
+| Mongo lifecycle | `"mongo connection opened"` / `"mongo connection reused"` / `"mongo connection closed"` | `dbName` (never the URI) |
+
+**`warn` — recoverable anomalies and suspicious refusals**
+
+| Area | `msg` | Fields |
+|---|---|---|
+| Auth middleware | `"bearer token refused"` | `scheme`, `claimedKind` (cross-kind token attempt) |
+| Accounts | `"sign-in refused: account locked"` | `accountId`, `lockedUntil` |
+| URL vs params | `"route parameters from URL and context.params disagree; using the URL"` | `pathname` |
+| Config | `"LOG_LEVEL is not a known level; using info"` | `invalidLogLevel`, `logLevel` |
+
+### Querying JSON logs with `netlify logs` and `jq`
+
+Locally with `LOG_PRETTY=false npm run dev:local` (reading `.netlify/dev-local.log`) or against a deployed site with `netlify logs --json`:
+
+```bash
+# Follow all lines for one request ID
+netlify logs --json | jq -c 'select(.requestId == "01M7Y2KMQKYKSZEDNWNZEE0P5Z")'
+
+# Filter refused requests by domain errorCode
+netlify logs --json | jq -c 'select(.errorCode == "PACK_IS_SYSTEM_PACK")'
+
+# Filter by log level (warn and error only)
+netlify logs --json | jq -c 'select(.level == "warn" or .level == "error")'
+```
+
