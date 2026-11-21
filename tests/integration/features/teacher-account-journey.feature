@@ -106,3 +106,98 @@ Feature: Teacher account journey
     When someone opens a pack that does not exist
     Then the response status should be 404
     And the response error code should be "PACK_NOT_FOUND"
+
+  @smoke @account-auth
+  Scenario: Teacher inspects their current account with /accounts/me and non-Account Tokens are refused
+    When someone who has not signed in checks their current account
+    Then the response status should be 401
+    And the response error code should be "UNAUTHORIZED_TOKEN"
+    Given a teacher with a new email address
+    When the teacher signs up with the password "correct horse battery"
+    Then the response status should be 201
+    When the teacher checks their current account
+    Then the response status should be 200
+    And the current account response should match the signed-up teacher
+    When the instructor creates a classroom session with pack "diabe-teach"
+    Then the response status should be 201
+    When the teacher checks their current account using the session's instructorToken
+    Then the response status should be 401
+    And the response error code should be "UNAUTHORIZED_TOKEN"
+    When the teacher tries to register a new pack using the session's instructorToken
+    Then the response status should be 401
+    And the response error code should be "UNAUTHORIZED_TOKEN"
+
+  @validation @error-handling
+  Scenario: Duplicate email sign-up and invalid email or short password are refused
+    Given a teacher with a new email address
+    When the teacher signs up with email "not-an-email" and the password "correct horse battery"
+    Then the response status should be 400
+    And the response error code should be "INVALID_REQUEST_BODY"
+    And the error should name the field "email"
+    When the teacher signs up with the password "short1234"
+    Then the response status should be 400
+    And the response error code should be "INVALID_REQUEST_BODY"
+    And the error should name the field "password"
+    When the teacher signs up with the password "correct horse battery"
+    Then the response status should be 201
+    When the teacher signs up again with their email in uppercase with surrounding spaces and the password "another valid password"
+    Then the response status should be 409
+    And the response error code should be "EMAIL_ALREADY_REGISTERED"
+
+  @account-lock @error-handling
+  Scenario: Five wrong passwords lock the Instructor Account with 423 even for the right password
+    Given a teacher with a new email address
+    When the teacher signs up with the password "correct horse battery"
+    Then the response status should be 201
+    When the teacher signs in with the password "wrong password"
+    Then the response status should be 401
+    And the response error code should be "INVALID_CREDENTIALS"
+    When the teacher signs in with the password "wrong password"
+    Then the response status should be 401
+    And the response error code should be "INVALID_CREDENTIALS"
+    When the teacher signs in with the password "wrong password"
+    Then the response status should be 401
+    And the response error code should be "INVALID_CREDENTIALS"
+    When the teacher signs in with the password "wrong password"
+    Then the response status should be 401
+    And the response error code should be "INVALID_CREDENTIALS"
+    When the teacher signs in with the password "wrong password"
+    Then the response status should be 423
+    And the response error code should be "ACCOUNT_TEMPORARILY_LOCKED"
+    And the error details should include a lockedUntil timestamp
+    When the teacher signs in with the password "correct horse battery"
+    Then the response status should be 423
+    And the response error code should be "ACCOUNT_TEMPORARILY_LOCKED"
+    And the error details should include a lockedUntil timestamp
+
+  @packs @validation
+  Scenario: Pack validation and registration refuse duplicate versions, System Pack updates, and undersized card decks
+    Given a teacher with a new email address
+    When the teacher signs up with the password "correct horse battery"
+    Then the response status should be 201
+    When the teacher validates an undersized draft pack with 8 cards for a 3x3 board
+    Then the response status should be 200
+    And the pack validation result should be invalid with error code "INSUFFICIENT_CARDS"
+    When the teacher tries to register that undersized pack
+    Then the response status should be 422
+    And the response error code should be "PACK_VALIDATION_FAILED"
+    When the teacher registers a new pack
+    Then the response status should be 201
+    When the teacher registers the same pack and version again
+    Then the response status should be 409
+    And the response error code should be "PACK_ALREADY_EXISTS"
+    When the teacher tries to register version "2.0.0" of the System Pack "diabe-teach"
+    Then the response status should be 403
+    And the response error code should be "PACK_IS_SYSTEM_PACK"
+
+  @packs @sessions @error-handling
+  Scenario: Starting a session with an unknown pack returns 404 and an oversized payload returns 413
+    Given a teacher with a new email address
+    When the teacher signs up with the password "correct horse battery"
+    Then the response status should be 201
+    When the instructor creates a classroom session with pack "no-such-pack"
+    Then the response status should be 404
+    And the response error code should be "PACK_NOT_FOUND"
+    When the teacher sends a 262145-byte pack payload
+    Then the response status should be 413
+    And the response error code should be "PAYLOAD_TOO_LARGE"

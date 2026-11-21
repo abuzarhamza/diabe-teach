@@ -248,6 +248,50 @@ export async function signInInstructor(body: { email?: string; password?: string
   return toApiGatewayResult(res);
 }
 
+/** GET /api/v1/accounts/me with an optional bearer token. */
+export async function getCurrentAccount(token?: string) {
+  const req = request(BASE_URL)
+    .get("/api/v1/accounts/me")
+    .set("x-api-key", API_KEY);
+  if (token) {
+    req.set("Authorization", `Bearer ${token}`);
+  }
+  const res = await req;
+
+  return toApiGatewayResult(res);
+}
+
+/** POST /api/v1/packs/validate with an optional bearer token. */
+export async function validatePack(body: Record<string, unknown>, token?: string) {
+  const req = request(BASE_URL)
+    .post("/api/v1/packs/validate")
+    .set("Content-Type", "application/json")
+    .set("x-api-key", API_KEY);
+  if (token) {
+    req.set("Authorization", `Bearer ${token}`);
+  }
+  const res = await req.send(body);
+
+  return toApiGatewayResult(res);
+}
+
+/** POST /api/v1/packs with a raw JSON string of `byteLength` UTF-8 bytes. */
+export async function postOversizedPackPayload(byteLength: number, token?: string) {
+  const shell = "{\"padding\":\"\"}";
+  const paddingLength = Math.max(0, byteLength - shell.length);
+  const rawBody = `{"padding":"${"a".repeat(paddingLength)}"}`;
+  const req = request(BASE_URL)
+    .post("/api/v1/packs")
+    .set("Content-Type", "application/json")
+    .set("x-api-key", API_KEY);
+  if (token) {
+    req.set("Authorization", `Bearer ${token}`);
+  }
+  const res = await req.send(rawBody);
+
+  return toApiGatewayResult(res);
+}
+
 /** POST /api/v1/packs, the documented registration path, with an optional bearer token. */
 export async function registerPack(body: Record<string, unknown>, token?: string) {
   const req = request(BASE_URL)

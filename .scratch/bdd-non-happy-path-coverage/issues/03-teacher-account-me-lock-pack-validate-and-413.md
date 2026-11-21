@@ -26,11 +26,17 @@ See spec: `.scratch/bdd-non-happy-path-coverage/spec.md`.
 
 **Blocked by:** None (can start immediately; runs after 02 under the one-agent-at-a-time policy)
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] BDD teacher-account scenario: `/api/v1/accounts/me` returns `401` unauthenticated, `200` with an Account Token, and `401 UNAUTHORIZED_TOKEN` when given a session Capability Token (and `POST /api/v1/packs` also refuses a Capability Token with `401`)
-- [ ] BDD teacher-account scenario: sign-up refuses bad email (`400` naming `email`), short password (`400` naming `password`), and duplicate email with case/whitespace normalization (`409 EMAIL_ALREADY_REGISTERED`)
-- [ ] BDD teacher-account scenario: 4 wrong passwords return `401 INVALID_CREDENTIALS`, the 5th returns `423 ACCOUNT_TEMPORARILY_LOCKED` with `details.lockedUntil`, and an immediate sign-in with the right password also returns `423`
-- [ ] BDD teacher-account scenario: `/api/v1/packs/validate` returns `200` (`valid: false`, `INSUFFICIENT_CARDS`) on an undersized deck, registering it returns `422 PACK_VALIDATION_FAILED`, re-registering an existing `id@version` returns `409 PACK_ALREADY_EXISTS`, and registering a new version of `diabe-teach` returns `403 PACK_IS_SYSTEM_PACK`
-- [ ] BDD teacher-account scenario: creating a session with an unknown `packId` returns `404 PACK_NOT_FOUND`, and sending a >256 KB body returns `413 PAYLOAD_TOO_LARGE`
-- [ ] Typecheck, vitest (`--no-file-parallelism`), BDD (`teacher-account-journey`), lint (≤ 29) and boundaries (≤ 6) are no worse
+- [x] BDD teacher-account scenario: `/api/v1/accounts/me` returns `401` unauthenticated, `200` with an Account Token, and `401 UNAUTHORIZED_TOKEN` when given a session Capability Token (and `POST /api/v1/packs` also refuses a Capability Token with `401`)
+- [x] BDD teacher-account scenario: sign-up refuses bad email (`400` naming `email`), short password (`400` naming `password`), and duplicate email with case/whitespace normalization (`409 EMAIL_ALREADY_REGISTERED`)
+- [x] BDD teacher-account scenario: 4 wrong passwords return `401 INVALID_CREDENTIALS`, the 5th returns `423 ACCOUNT_TEMPORARILY_LOCKED` with `details.lockedUntil`, and an immediate sign-in with the right password also returns `423`
+- [x] BDD teacher-account scenario: `/api/v1/packs/validate` returns `200` (`valid: false`, `INSUFFICIENT_CARDS`) on an undersized deck, registering it returns `422 PACK_VALIDATION_FAILED`, re-registering an existing `id@version` returns `409 PACK_ALREADY_EXISTS`, and registering a new version of `diabe-teach` returns `403 PACK_IS_SYSTEM_PACK`
+- [x] BDD teacher-account scenario: creating a session with an unknown `packId` returns `404 PACK_NOT_FOUND`, and sending a >256 KB body returns `413 PAYLOAD_TOO_LARGE`
+- [x] Typecheck, vitest (`--no-file-parallelism`), BDD (`teacher-account-journey`), lint (≤ 29) and boundaries (≤ 6) are no worse
+
+## Resolution
+
+- Added `getCurrentAccount`, `validatePack`, and `postOversizedPackPayload` HTTP client helpers in `tests/integration/support/http-client.ts`.
+- Added step definitions in `tests/integration/step-definitions/teacher-account.steps.ts` and `tests/integration/step-definitions/pack-library.steps.ts` for `/api/v1/accounts/me`, cross-kind session Capability Token refusals, sign-up validation & duplicate email normalization, 5-strike sign-in account locking (`423 ACCOUNT_TEMPORARILY_LOCKED` with `details.lockedUntil`), `/api/v1/packs/validate` dry-run validation (`INSUFFICIENT_CARDS`), pack registration refusals (`422 PACK_VALIDATION_FAILED`, `409 PACK_ALREADY_EXISTS`, `403 PACK_IS_SYSTEM_PACK`), and >256 KB payload rejection (`413 PAYLOAD_TOO_LARGE`).
+- Added 5 zero-sleep BDD scenarios to `tests/integration/features/teacher-account-journey.feature` (all 15 scenarios / 183 steps passing against `npm run dev:local`).
