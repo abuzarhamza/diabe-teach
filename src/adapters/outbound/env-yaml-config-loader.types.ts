@@ -9,9 +9,15 @@ export interface EnvYamlAuthConfig {
   readonly api_key?: string;
 }
 
+export interface EnvYamlLoggingConfig {
+  readonly level?: string;
+  readonly pretty?: boolean;
+}
+
 export interface EnvYamlConfig {
   readonly mongodb?: EnvYamlMongoConfig;
   readonly auth?: EnvYamlAuthConfig;
+  readonly logging?: EnvYamlLoggingConfig;
 }
 
 export interface ResolvedEnvConfig {
@@ -20,4 +26,6 @@ export interface ResolvedEnvConfig {
   readonly capabilityTokenSecret?: string;
   readonly accountTokenSecret?: string;
   readonly apiKey?: string;
+  readonly logLevel?: string;
+  readonly logPretty?: boolean;
 }
