@@ -239,3 +239,21 @@ netlify logs --json | jq -c 'select(.errorCode == "PACK_IS_SYSTEM_PACK")'
 netlify logs --json | jq -c 'select(.level == "warn" or .level == "error")'
 ```
 
+## 9. Manual Testing & Interactive API Documentation (Bruno)
+
+A Git-tracked **Bruno** collection lives under `docs/api/bruno/` (with standalone interactive HTML documentation generated at `docs/api/api-docs.html`):
+
+- **Collection structure (`docs/api/bruno/`):**
+  - `bruno.json` and `collection.bru` (sets shared `x-api-key: {{apiKey}}` and `Accept: application/json` headers and overview docs).
+  - `environments/Local Dev.bru` (`baseUrl: http://localhost:8888`, `apiKey: dev-local-api-key`) and `environments/Netlify Production.bru` (`baseUrl: https://diabe-teach.netlify.app` with sensitive keys in `vars:secret`).
+  - Numbered domain folders `01-Health` through `06-Assessments-Survey-and-Lifecycle` covering all 21 implemented endpoints (`GET /api/health` + all 20 `/api/v1/*` routes).
+  - `script:post-response` hooks automatically save `accountToken`, `accountId`, `sessionId`, `roomCode`, `instructorToken`, `participantId`, `participantToken`, and `chainId` into environment variables so requests chain top-to-bottom without copy-pasting.
+- **Generating standalone HTML documentation:**
+  ```bash
+  npm run generate:api-docs
+  ```
+  Runs `bru docs generate --all-envs --output docs/api/api-docs.html` (`scripts/generate-bruno-api-docs.ts`) to produce the single-file interactive Bruno API Docs playground.
+- **Drift & schema guard (`tests/bruno-collection-drift.test.ts`):**
+  - Parses every `.bru` file via `@usebruno/lang`, asserts a 1-to-1 match with `netlify/functions/*.ts` and `docs/api/openapi.yaml`, validates every JSON request body against `src/adapters/inbound/http/request-schemas.generated.ts`, and checks that `docs/api/api-docs.html` is up to date. When adding or changing a route, update `docs/api/bruno/` and re-run `npm run generate:api-docs`.
+
+

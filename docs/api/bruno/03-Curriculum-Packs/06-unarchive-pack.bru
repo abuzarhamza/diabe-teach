@@ -1,0 +1,37 @@
+meta {
+  name: Unarchive Curriculum Pack
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{baseUrl}}/api/v1/packs/{{customPackId}}/unarchive
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accountToken}}
+}
+
+tests {
+  test("unarchives the custom Curriculum Pack", function() {
+    expect(res.status).to.equal(200);
+    expect(res.body.isArchived).to.equal(false);
+  });
+}
+
+docs {
+  # POST /api/v1/packs/:packId/unarchive (`unarchiveCurriculumPack`)
+
+  Restores an archived **Curriculum Pack** (`{{customPackId}}`) back to active discovery in `GET /api/v1/packs`, recording `unarchivedBy` and `unarchivedAt`.
+
+  ## Authentication
+  - **`AccountAuth`**: `Authorization: Bearer {{accountToken}}`
+
+  ## Responses & Error Codes (`ApiErrorCode`)
+  - **`200 OK`**: `{ packId, isArchived: false, unarchivedAt, unarchivedBy }`
+  - **`401 UNAUTHORIZED_TOKEN`**: Missing, invalid, or non-Account bearer token.
+  - **`404 PACK_NOT_FOUND`**: Unknown `packId`.
+  - **`409 PACK_NOT_ARCHIVED`**: The pack is not currently archived.
+}

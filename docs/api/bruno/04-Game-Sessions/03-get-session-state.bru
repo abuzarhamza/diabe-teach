@@ -1,0 +1,38 @@
+meta {
+  name: Get Game Session State
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/api/v1/sessions/{{sessionId}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{instructorToken}}
+}
+
+tests {
+  test("returns the current Game Session state and participant roster", function() {
+    expect(res.status).to.equal(200);
+    expect(res.body.state.sessionId).to.be.a("string");
+    expect(res.body.state.participants).to.be.an("array");
+  });
+}
+
+docs {
+  # GET /api/v1/sessions/:sessionId (`getGameSessionState`)
+
+  Returns the public state projection of a **Game Session**, including `phase`, `activeRoundNumber`, `phaseStartedAt`, `phaseEndsAt`, `participantCount`, `participants` roster (`participantId`, `displayName`, `joinedAt`, `leftAt`), and `activeBoard` (dealt grid of Keyword Cards once a Gameplay Round begins).
+
+  ## Authentication
+  - **`BearerAuth`**: `Authorization: Bearer {{instructorToken}}` or `{{participantToken}}` belonging to this `sessionId`.
+
+  ## Responses & Error Codes (`ApiErrorCode`)
+  - **`200 OK`**: `{ state: PublicSessionState }`
+  - **`401 UNAUTHORIZED_TOKEN`**: Missing, invalid, or Account Token instead of a session Capability Token.
+  - **`403 FORBIDDEN_ROLE`**: Capability Token belongs to a different Game Session.
+  - **`404 SESSION_NOT_FOUND`**: Unknown `sessionId`.
+}

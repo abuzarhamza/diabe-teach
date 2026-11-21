@@ -1,0 +1,40 @@
+meta {
+  name: List Round Chains
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/v1/sessions/{{sessionId}}/rounds/{{roundNumber}}/chains
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{instructorToken}}
+}
+
+tests {
+  test("lists the round's Concept Chains with author and voter display names", function() {
+    expect(res.status).to.equal(200);
+    expect(res.body.roundNumber).to.be.a("number");
+    expect(res.body.chains).to.be.an("array");
+  });
+}
+
+docs {
+  # GET /api/v1/sessions/:sessionId/rounds/:roundNumber/chains (`listRoundChains`)
+
+  Lists the **Concept Chains** submitted for Gameplay Round `:roundNumber` (`1` or `2`), enriched with `participantDisplayName` and each peer vote's `voterDisplayName`.
+
+  ## Visibility Rule
+  - **Supervising Instructor (`{{instructorToken}}`)**: Sees all chains in the round at all times.
+  - **Learner (`{{participantToken}}`)**: During `round-{N}:chain-mapping`, sees **only their own** chains; from `round-{N}:peer-adjudication` onward, sees **all classmates' chains** in that round.
+
+  ## Responses & Error Codes (`ApiErrorCode`)
+  - **`200 OK`**: `{ sessionId, roundNumber, chains: SubmittedChainListItem[] }`
+  - **`400 INVALID_REQUEST_BODY`**: `:roundNumber` is not `1` or `2`.
+  - **`401 UNAUTHORIZED_TOKEN`**: Missing, invalid, or Account Token instead of a session Capability Token.
+  - **`403 FORBIDDEN_ROLE`**: Token belongs to another Game Session.
+  - **`404 SESSION_NOT_FOUND`**: Unknown `sessionId`.
+}

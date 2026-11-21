@@ -1,0 +1,64 @@
+meta {
+  name: Submit Assessment Attempt
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/v1/sessions/{{sessionId}}/assessments/{{assessmentStage}}
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{participantToken}}
+}
+
+body:json {
+  {
+    "answers": {
+      "dm-mcq-01": 0,
+      "dm-mcq-02": 1,
+      "dm-mcq-03": 2,
+      "dm-mcq-04": 3,
+      "dm-mcq-05": "I_DONT_KNOW",
+      "dm-mcq-06": 0,
+      "dm-mcq-07": 1,
+      "dm-mcq-08": 2,
+      "dm-mcq-09": 3,
+      "dm-mcq-10": "I_DONT_KNOW"
+    }
+  }
+}
+
+tests {
+  test("records the learner's Assessment Attempt and scores Uncertainty Calibration", function() {
+    expect(res.status).to.equal(201);
+    expect(res.body.attempt.stage).to.be.a("string");
+    expect(res.body.attempt.totalQuestions).to.equal(10);
+  });
+}
+
+docs {
+  # POST /api/v1/sessions/:sessionId/assessments/:stage (`submitAssessmentAttempt`)
+
+  Submits a learner's **Assessment Attempt** at either `:stage = pretest` (during the `pretest` phase) or `:stage = posttest` (during the `posttest` phase, requiring a completed Pretest from the same learner).
+
+  - Every question in the Curriculum Pack's `assessmentInstrument` must be answered with an option index (`0 | 1 | 2 | 3`) or `"I_DONT_KNOW"` (**Uncertainty Calibration**).
+  - Change `{{assessmentStage}}` from `pretest` to `posttest` when testing the `posttest` phase; a `posttest` response also includes the learner's pre/post comparison `report`.
+
+  ## Authentication
+  - **`BearerAuth` (`role: "participant"`)**: `Authorization: Bearer {{participantToken}}`
+
+  ## Responses & Error Codes (`ApiErrorCode`)
+  - **`201 Created`**: `{ attempt: AssessmentAttemptResult, report: ParticipantAnalyticsReport | null }`
+  - **`400 INVALID_REQUEST_BODY`**: Missing `answers` or answer value outside `0..3 | "I_DONT_KNOW"`.
+  - **`401 UNAUTHORIZED_TOKEN`**: Missing or invalid Capability Token.
+  - **`403 FORBIDDEN_ROLE`**: Caller is an `instructor` or holds a token for another session.
+  - **`403 PARTICIPANT_HAS_LEFT`**: Learner has left the Game Session.
+  - **`404 SESSION_NOT_FOUND`**: Unknown `sessionId`.
+  - **`409 ASSESSMENT_ALREADY_SUBMITTED`**: Learner already submitted an attempt for this stage.
+  - **`409 PHASE_CLOSED_FOR_SUBMISSIONS`**: Session is not in the matching `pretest`/`posttest` phase, or learner is attempting `posttest` without having completed `pretest`.
+  - **`413 PAYLOAD_TOO_LARGE`**: Request body exceeds 256 KB.
+  - **`422 ASSESSMENT_INCOMPLETE`**: Missing answers for one or more required assessment questions.
+}

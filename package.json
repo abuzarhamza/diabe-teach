@@ -25,7 +25,8 @@
     "complexity": "node --experimental-strip-types scripts/run-complexity.ts",
     "escomplex": "node --experimental-strip-types scripts/run-complexity.ts",
     "prepare": "husky",
-    "generate:request-schemas": "node --import tsx scripts/generate-request-schemas.ts"
+    "generate:request-schemas": "node --import tsx scripts/generate-request-schemas.ts",
+    "generate:api-docs": "node --import tsx scripts/generate-bruno-api-docs.ts"
   },
   "dependencies": {
     "@middy/core": "^7.9.2",
@@ -55,6 +56,8 @@
     "@types/semver": "^7.8.0",
     "@types/supertest": "^7.2.1",
     "@types/yaml": "^1.9.6",
+    "@usebruno/cli": "^4.3.0",
+    "@usebruno/lang": "^0.41.0",
     "@vitest/coverage-v8": "^3.0.5",
     "c8": "^12.0.0",
     "chai": "^6.3.0",

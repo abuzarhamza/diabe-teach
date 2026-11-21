@@ -1,0 +1,56 @@
+headers {
+  x-api-key: {{apiKey}}
+  Accept: application/json
+}
+
+docs {
+  # Diabe-teach Concept-Chain Educational Game Engine API
+
+  Subject-agnostic HTTP REST API for running associative concept-chaining board games, with **Diabe-teach** (Diabetes Mellitus) as the inaugural built-in **System Pack**.
+
+  ---
+
+  ## Quick Start (Local Manual Testing)
+
+  1. Start the local Netlify Functions v2 + in-memory MongoDB server:
+     ```bash
+     npm run dev:local
+     ```
+     Wait until the terminal prints `DEV READY http://localhost:8888`.
+  2. Open `docs/api/bruno/` in the **Bruno Desktop App** (or open `docs/api/api-docs.html` in a browser).
+  3. Select the **`Local Dev`** environment in the top-right dropdown (`baseUrl: http://localhost:8888`, `apiKey: dev-local-api-key`).
+  4. Walk the numbered folders **`01` through `06` top-to-bottom**. Every token and resource identifier (`accountToken`, `accountId`, `sessionId`, `roomCode`, `instructorToken`, `participantId`, `participantToken`, `chainId`) is automatically captured by `script:post-response` hooks and chained into subsequent requests—no manual copy-pasting required.
+  5. When finished, stop the local server cleanly:
+     ```bash
+     npm run dev:local:stop
+     ```
+
+  ---
+
+  ## Authentication Architecture (ADR-0007)
+
+  Every `/api/v1/*` request carries `x-api-key: {{apiKey}}` (configured at the collection level). Protected routes require one of **two distinct, non-interchangeable HS256 JWT bearer token kinds**:
+
+  | Token Kind | OpenAPI Security Scheme | Environment Variable(s) | Issued By | Accepted By |
+  |---|---|---|---|---|
+  | **Account Token** (`AccountToken`) | `AccountAuth` | `{{accountToken}}` | `POST /api/v1/accounts/sign-up`<br>`POST /api/v1/accounts/sign-in` | `GET /api/v1/accounts/me`<br>`POST /api/v1/packs/validate`<br>`POST /api/v1/packs`<br>`POST /api/v1/packs/:packId/archive`<br>`POST /api/v1/packs/:packId/unarchive`<br>`POST /api/v1/sessions` (when `mode` is `classroom` or `study-rct`) |
+  | **Capability Token** (`CapabilityToken`) | `BearerAuth` | `{{instructorToken}}` (`role: "instructor"`)<br>`{{participantToken}}` (`role: "participant"`) | `POST /api/v1/sessions`<br>`POST /api/v1/sessions/join` | All `/api/v1/sessions/:sessionId/*` routes and optional answer-key unredaction on `GET /api/v1/packs/:packId` |
+
+  ---
+
+  ## 11-Phase Game Session Lifecycle
+
+  A Game Session progresses in strict order through 11 phases via `POST /api/v1/sessions/:sessionId/phase` (`{ "action": "advance" }`):
+
+  1. `pretest` (Pretest Assessment Attempt)
+  2. `trial-orientation` (Calibration Examples)
+  3. `round-1:chain-mapping` (Server deals Round 1 board; learners submit Concept Chains)
+  4. `round-1:peer-adjudication` (Peer votes & Instructor Final Rulings)
+  5. `round-1:round-summary` (Round 1 standings)
+  6. `round-2:chain-mapping` (Server deals Round 2 board; learners submit Concept Chains)
+  7. `round-2:peer-adjudication` (Peer votes & Instructor Final Rulings)
+  8. `round-2:round-summary` (Round 2 standings)
+  9. `posttest` (Posttest Assessment Attempt & knowledge gain report)
+  10. `feedback-survey` (9-item Likert perception survey)
+  11. `completed` (Final cohort & participant analytics)
+}

@@ -23,9 +23,16 @@ See spec: `.scratch/bruno-api-docs/spec.md`.
 
 **Blocked by:** 01 (Bruno collection foundation, environments, Health, Instructor Accounts, and Curriculum Packs)
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] All 14 `.bru` request files and 3 `folder.bru` files under `04-Game-Sessions`, `05-Chains-and-Adjudication`, and `06-Assessments-Survey-and-Lifecycle` parse cleanly with Bruno's official `.bru` parser
-- [ ] Every request file has a non-empty `docs` block explaining its glossary domain concept, required token kind/role, parameters, and `ApiErrorCode`s
-- [ ] `01-create-session.bru`, `02-join-session.bru`, and `01-submit-chain.bru` include `script:post-response` blocks that auto-capture `sessionId`, `roomCode`, `instructorToken`, `participantId`, `participantToken`, and `chainId`
-- [ ] Typecheck, vitest (`--no-file-parallelism`), lint (≤ 29) and boundaries (≤ 6) are no worse
+- [x] All 14 `.bru` request files and 3 `folder.bru` files under `04-Game-Sessions`, `05-Chains-and-Adjudication`, and `06-Assessments-Survey-and-Lifecycle` parse cleanly with Bruno's official `.bru` parser
+- [x] Every request file has a non-empty `docs` block explaining its glossary domain concept, required token kind/role, parameters, and `ApiErrorCode`s
+- [x] `01-create-session.bru`, `02-join-session.bru`, and `01-submit-chain.bru` include `script:post-response` blocks that auto-capture `sessionId`, `roomCode`, `instructorToken`, `participantId`, `participantToken`, and `chainId`
+- [x] Typecheck, vitest (`--no-file-parallelism`), lint (≤ 29) and boundaries (≤ 6) are no worse
+
+## Resolution
+
+- Created `04-Game-Sessions` (`01-create-session.bru`, `02-join-session.bru`, `03-get-session-state.bru`, `04-transition-phase.bru`, `05-extend-phase.bru` + `folder.bru`).
+- Created `05-Chains-and-Adjudication` (`01-submit-chain.bru`, `02-list-round-chains.bru`, `03-adjudicate-chain.bru`, `04-get-round-standings.bru` + `folder.bru`).
+- Created `06-Assessments-Survey-and-Lifecycle` (`01-submit-assessment.bru`, `02-get-session-analytics.bru`, `03-submit-survey.bru`, `04-leave-session.bru`, `05-end-session.bru` + `folder.bru`).
+- Wired `script:post-response` variable chaining on `01-create-session.bru`, `02-join-session.bru`, and `01-submit-chain.bru`.

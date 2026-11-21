@@ -17,10 +17,16 @@ See spec: `.scratch/bruno-api-docs/spec.md`.
 
 **Blocked by:** 02 (Game Sessions, Concept Chains & Adjudication, and Assessments, Survey & Lifecycle)
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] `npm run generate:api-docs` generates `docs/api/api-docs.html` cleanly from `docs/api/bruno/`
-- [ ] `tests/bruno-collection-drift.test.ts` passes: all `.bru` files parse via `@usebruno/lang`, all 21 implemented routes match 1-to-1 with `netlify/functions/*.ts` and `docs/api/openapi.yaml`, all JSON request bodies pass Ajv request schema validation, all `.bru` files have `docs`, and `docs/api/api-docs.html` is up to date
-- [ ] `tests/no-committed-secrets.test.ts` passes 3/3
-- [ ] `docs/agents/api-architecture.md` documents `docs/api/bruno/`, `npm run generate:api-docs`, and the drift test
-- [ ] Full sequential verification: `npm run typecheck`, `npx vitest run --no-file-parallelism`, `npm run test:bdd` (against `dev:local`, followed by `dev:local:stop`), `npm run lint` (≤ 29), and `npm run lint:boundaries` (≤ 6)
+- [x] `npm run generate:api-docs` generates `docs/api/api-docs.html` cleanly from `docs/api/bruno/`
+- [x] `tests/bruno-collection-drift.test.ts` passes: all `.bru` files parse via `@usebruno/lang`, all 21 implemented routes match 1-to-1 with `netlify/functions/*.ts` and `docs/api/openapi.yaml`, all JSON request bodies pass Ajv request schema validation, all `.bru` files have `docs`, and `docs/api/api-docs.html` is up to date
+- [x] `tests/no-committed-secrets.test.ts` passes 3/3
+- [x] `docs/agents/api-architecture.md` documents `docs/api/bruno/`, `npm run generate:api-docs`, and the drift test
+- [x] Full sequential verification: `npm run typecheck`, `npx vitest run --no-file-parallelism`, `npm run test:bdd` (against `dev:local`, followed by `dev:local:stop`), `npm run lint` (≤ 29), and `npm run lint:boundaries` (≤ 6)
+
+## Resolution
+
+- Added `scripts/generate-bruno-api-docs.ts` and `"generate:api-docs"` in `package.json`, invoking `@usebruno/cli` (`bru docs generate --all-envs --output docs/api/api-docs.html`) to build the standalone interactive HTML documentation at `docs/api/api-docs.html`.
+- Added `tests/bruno-collection-drift.test.ts` (7 tests) verifying that all `.bru` files parse cleanly via `@usebruno/lang`, match all 21 implemented routes 1-to-1 against `netlify/functions/*.ts` and `docs/api/openapi.yaml`, include non-empty `docs` blocks and `script:post-response` variable chaining, pass compiled Ajv 2020-12 request schema validation, and keep `docs/api/api-docs.html` complete.
+- Documented the Bruno collection and `npm run generate:api-docs` workflow in Section 9 of `docs/agents/api-architecture.md`.

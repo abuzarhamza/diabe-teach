@@ -20,9 +20,15 @@ See spec: `.scratch/bruno-api-docs/spec.md`.
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] Official `@usebruno/*` package(s) installed in `devDependencies`
-- [ ] `bruno.json`, `collection.bru`, `environments/Local Dev.bru`, and `environments/Netlify Production.bru` created with zero real secrets (`tests/no-committed-secrets.test.ts` passes)
-- [ ] All 10 `.bru` request files and 3 `folder.bru` files under `01-Health`, `02-Instructor-Accounts`, and `03-Curriculum-Packs` parse cleanly with Bruno's official `.bru` parser and include non-empty `docs` blocks and `script:post-response` token chaining on sign-up/sign-in
-- [ ] Typecheck, vitest (`--no-file-parallelism`), lint (≤ 29) and boundaries (≤ 6) are no worse
+- [x] Official `@usebruno/*` package(s) installed in `devDependencies`
+- [x] `bruno.json`, `collection.bru`, `environments/Local Dev.bru`, and `environments/Netlify Production.bru` created with zero real secrets (`tests/no-committed-secrets.test.ts` passes)
+- [x] All 10 `.bru` request files and 3 `folder.bru` files under `01-Health`, `02-Instructor-Accounts`, and `03-Curriculum-Packs` parse cleanly with Bruno's official `.bru` parser and include non-empty `docs` blocks and `script:post-response` token chaining on sign-up/sign-in
+- [x] Typecheck, vitest (`--no-file-parallelism`), lint (≤ 29) and boundaries (≤ 6) are no worse
+
+## Resolution
+
+- Installed `@usebruno/lang` and `@usebruno/cli` in `devDependencies`.
+- Created `docs/api/bruno/bruno.json`, `docs/api/bruno/collection.bru`, `docs/api/bruno/environments/Local Dev.bru`, and `docs/api/bruno/environments/Netlify Production.bru` (using `vars:secret` and placeholders only).
+- Created folders `01-Health` (`01-health-check.bru`), `02-Instructor-Accounts` (`01-sign-up-instructor.bru`, `02-sign-in-instructor.bru`, `03-get-current-account.bru` with `script:post-response` saving `accountToken` and `accountId`), and `03-Curriculum-Packs` (`01-list-packs.bru`, `02-get-pack-by-id.bru`, `03-validate-pack.bru`, `04-register-pack.bru`, `05-archive-pack.bru`, `06-unarchive-pack.bru`) along with `folder.bru` overview docs.

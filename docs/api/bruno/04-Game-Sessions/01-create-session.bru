@@ -1,0 +1,78 @@
+meta {
+  name: Create Game Session
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/v1/sessions
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accountToken}}
+}
+
+body:json {
+  {
+    "packId": "{{packId}}",
+    "mode": "classroom",
+    "adjudicationMode": "peer-instructor",
+    "creatorDisplayName": "Dr. S. Rahman",
+    "timerConfig": {
+      "pretestSec": 900,
+      "trialOrientationSec": 900,
+      "roundMappingSec": 1200,
+      "roundAdjudicationSec": 600,
+      "posttestSec": 900,
+      "feedbackSurveySec": 900
+    }
+  }
+}
+
+script:post-response {
+  if (res.status === 201 && res.body) {
+    bru.setEnvVar("sessionId", res.body.sessionId);
+    bru.setEnvVar("roomCode", res.body.roomCode);
+    if (res.body.instructorToken) {
+      bru.setEnvVar("instructorToken", res.body.instructorToken);
+    }
+    if (res.body.participantToken) {
+      bru.setEnvVar("participantToken", res.body.participantToken);
+    }
+  }
+}
+
+tests {
+  test("creates a Classroom Game Session and issues an instructor Capability Token", function() {
+    expect(res.status).to.equal(201);
+    expect(res.body.sessionId).to.be.a("string");
+    expect(res.body.roomCode).to.match(/^[A-Z0-9]{6}$/);
+    expect(res.body.instructorToken).to.be.a("string");
+  });
+}
+
+docs {
+  # POST /api/v1/sessions (`createGameSession`)
+
+  Starts a new **Game Session** pinned to the latest **Pack Version** of `packId` (`{{packId}}`), starting in the `pretest` phase and generating a 6-character alphanumeric `roomCode`.
+
+  - When `mode` is `"classroom"` or `"study-rct"`, an **Account Token** (`{{accountToken}}`) is required and the response returns an `instructorToken` (**Capability Token**).
+  - When `mode` is `"solo"`, no Account Token is needed and the caller receives a `participantToken` (plus `instructorToken` for phase transitions).
+  - Setting any `timerConfig` duration to `null` makes that phase instructor-driven (`phaseEndsAt: null`).
+
+  ## Automatic Variable Chaining
+  On `201 Created`, `script:post-response` saves:
+  - `{{sessionId}}`
+  - `{{roomCode}}`
+  - `{{instructorToken}}`
+
+  ## Responses & Error Codes (`ApiErrorCode`)
+  - **`201 Created`**: `{ sessionId, roomCode, instructorToken, participantId, participantToken, state }`
+  - **`400 INVALID_REQUEST_BODY`**: Invalid `mode`, `adjudicationMode`, `seed`, or `timerConfig` bounds (must be `1..86400` or `null`).
+  - **`401 UNAUTHORIZED_TOKEN`**: Missing or invalid Account Token for a `classroom` or `study-rct` session.
+  - **`404 PACK_NOT_FOUND`**: Unknown `packId`.
+  - **`413 PAYLOAD_TOO_LARGE`**: Request body exceeds 256 KB.
+  - **`422 PACK_VALIDATION_FAILED`**: Stored pack has fewer Keyword Cards than `rows * cols`.
+}
