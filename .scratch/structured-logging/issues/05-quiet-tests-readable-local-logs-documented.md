@@ -6,11 +6,11 @@
 - **Deploy:** `netlify.toml` sets no `LOG_LEVEL`, so the deployed default stays `info`.
 - **Docs:**
   - `.env.dev.yaml.example` gains `logging.level` and `logging.pretty`, with comments;
-  - `docs/agents/api-architecture.md` gains a "Logging" section covering the port, the summary line, the env variables with their defaults, the never-log list, and `netlify logs --json | jq` examples (filter by `requestId`, by `errorCode`, by `level`).
+  - `docs/agents/api-architecture.md` gains a "Logging" section covering the port, the summary line, the env variables with their defaults, the never-log list, the event catalogue from ticket 06, and `netlify logs --json | jq` examples (filter by `requestId`, by `errorCode`, by `level`).
 
 See spec: `.scratch/structured-logging/spec.md`. Research: `.scratch/research/netlify-logging-and-log-services.md`.
 
-**Blocked by:** 02 (Every request logs one summary line), 03 (No console.* left in the API)
+**Blocked by:** 02 (Every request logs one summary line), 03 (No console.* left in the API), 06 (Key events log at info, diagnostics at debug)
 
 **Status:** ready-for-agent
 
