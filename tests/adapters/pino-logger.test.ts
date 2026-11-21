@@ -1,7 +1,7 @@
 import type { LogLevel } from "../../src/application/ports/logger.port.js";
 import { describe, expect, it } from "vitest";
 import { PinoLogger } from "../../src/adapters/outbound/pino-logger.js";
-import { SilentLogger } from "../../src/adapters/outbound/silent-logger.js";
+import { SilentLogger } from "../../src/application/services/silent-logger.js";
 import { InMemoryLogSink } from "../support/in-memory-log-sink.js";
 
 const WRITE_METHODS = ["debug", "info", "warn", "error"] as const;

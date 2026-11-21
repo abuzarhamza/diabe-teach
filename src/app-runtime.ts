@@ -39,9 +39,14 @@ export class AppRuntime {
    * Passed by every route to `wrapLambdaHandler`. Under `netlify dev`, the
    * Mongo connections are closed after each invocation so the worker thread
    * netlify-cli started for it can exit (see `MongoDevWorkerRelease`).
+   * `logger` is read per invocation (a getter), so it is the production
+   * logger currently cached, built on first use.
    */
   public static readonly invocationOptions: WrapLambdaHandlerOptions = {
     afterInvocation: async () => MongoDevWorkerRelease.afterInvocation(),
+    get logger(): LoggerPort | undefined {
+      return AppRuntime.getProductionDependencies().logger;
+    },
   };
 
   public static loadEnvConfig(

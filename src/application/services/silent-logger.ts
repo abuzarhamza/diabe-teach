@@ -1,4 +1,4 @@
-import type { LogFields, LoggerPort } from "../../application/ports/logger.port.js";
+import type { LogFields, LoggerPort } from "../ports/logger.port.js";
 
 /** A logger that writes nothing: the default when no logger is given. */
 export class SilentLogger implements LoggerPort {

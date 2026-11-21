@@ -1,4 +1,5 @@
 import type { MiddlewareObj } from "@middy/core";
+import type { RequestLogFields } from "../lambda-to-v2-wrapper.types.js";
 import {
   AccountTemporarilyLockedError,
   AdjudicationLockedError,
@@ -39,6 +40,17 @@ import {
   SurveyCommentsTooLongError,
   UnauthorizedTokenError,
 } from "../../../../domain/errors/domain-errors.js";
+
+/**
+ * Tells the wrapper's `request completed` line which DomainError refused the
+ * request. Events built without the wrapper (handler tests) carry no
+ * `requestOutcome`, so there is nothing to report.
+ */
+function reportErrorCode(event: Partial<RequestLogFields> | undefined, code: string): void {
+  if (event?.requestOutcome) {
+    event.requestOutcome.errorCode = code;
+  }
+}
 
 export function domainErrorMiddleware(): MiddlewareObj<any, any> {
   return {
@@ -114,6 +126,8 @@ export function domainErrorMiddleware(): MiddlewareObj<any, any> {
         ) {
           statusCode = 422;
         }
+
+        reportErrorCode(request.event, error.code);
 
         const payload = {
           code: error.code,
