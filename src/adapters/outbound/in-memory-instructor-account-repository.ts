@@ -45,6 +45,20 @@ export class InMemoryInstructorAccountRepository implements InstructorAccountRep
     );
   }
 
+  public async recordFailedSignIn(accountId: string, now: Date): Promise<InstructorAccount | null> {
+    // No await between the read and the write, so each call is atomic.
+    const stored = this.#accountsById.get(accountId);
+    if (!stored) {
+      return null;
+    }
+    const account = InMemoryInstructorAccountRepository.#copy(stored);
+    if (!account.isLockedAt(now)) {
+      account.recordFailedSignIn(now);
+      this.#accountsById.set(accountId, InMemoryInstructorAccountRepository.#copy(account));
+    }
+    return account;
+  }
+
   /** Every stored record, as plain props: for tests that inspect storage. */
   public storedRecords(): ReadonlyArray<Readonly<Record<string, unknown>>> {
     return [

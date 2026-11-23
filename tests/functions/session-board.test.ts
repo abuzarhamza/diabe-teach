@@ -7,11 +7,14 @@ import type { SessionId } from "../../src/domain/game-session/session-id.js";
 import { describe, expect, it } from "vitest";
 import { createGetSessionHandler } from "../../netlify/functions/sessions/get-session.js";
 import { createJoinSessionHandler } from "../../netlify/functions/sessions/join-session.js";
+import { createSubmitChainHandler } from "../../netlify/functions/sessions/submit-chain.js";
 import { createTransitionPhaseHandler } from "../../netlify/functions/sessions/transition-phase.js";
 import { FakeCapabilityTokenAdapter } from "../../src/adapters/outbound/fake-capability-token-adapter.js";
 import { InMemoryCurriculumPackRepository } from "../../src/adapters/outbound/in-memory-curriculum-pack-repository.js";
 import { InMemoryGameSessionRepository } from "../../src/adapters/outbound/in-memory-game-session-repository.js";
 import { DIABE_TEACH_PACK } from "../../src/domain/curriculum-pack/diabe-teach-pack.js";
+import { GameSession as GameSessionAggregate } from "../../src/domain/game-session/game-session.js";
+import { SessionId as SessionIdValue } from "../../src/domain/game-session/session-id.js";
 import { createSignedInCreateSessionHandler } from "./support/signed-in-teacher.js";
 
 interface BoardCellView {
@@ -133,6 +136,11 @@ function makeHandlers(options: {
     create: createSignedInCreateSessionHandler({ packRepo, sessionRepo, tokenSigner: tokenAdapter }),
     join: createJoinSessionHandler({ sessionRepo, tokenSigner: tokenAdapter }),
     get: createGetSessionHandler({ sessionRepo, tokenVerifier: tokenAdapter }),
+    submit: createSubmitChainHandler({
+      packRepo: new InMemoryCurriculumPackRepository(),
+      sessionRepo,
+      tokenVerifier: tokenAdapter,
+    }),
     transition: createTransitionPhaseHandler({
       packRepo,
       sessionRepo,
@@ -284,6 +292,42 @@ describe("server-dealt round board (activeBoard)", () => {
     expect(round1.activeBoard!.seed).toBe("generated-1");
   });
 
+  it("gives two sessions on the same pack and version the same board for the same transition seed, and different boards for different seeds", async () => {
+    const seedGenerator = new CountingSeedGenerator();
+    const handlers = makeHandlers({ seedGenerator });
+    const first = await createSession(handlers);
+    const second = await createSession(handlers);
+    const other = await createSession(handlers);
+    expect(second.created.state.packVersion).toBe(first.created.state.packVersion);
+    expect(other.created.state.packVersion).toBe(first.created.state.packVersion);
+
+    const enterRound = async (session: Awaited<ReturnType<typeof createSession>>, phase: string, seed: string) => {
+      const state = await session.transition({ action: "advance", seed });
+      expect(state.currentPhase).toBe(phase);
+      return state.activeBoard;
+    };
+    const roundsFor = async (session: Awaited<ReturnType<typeof createSession>>, seed: string) => {
+      await session.advanceTo("trial-orientation");
+      const round1 = await enterRound(session, "round-1:chain-mapping", seed);
+      await session.advanceTo("round-1:round-summary");
+      const round2 = await enterRound(session, "round-2:chain-mapping", seed);
+      return { round1, round2 };
+    };
+
+    const firstBoards = await roundsFor(first, "study-arm-a");
+    const secondBoards = await roundsFor(second, "study-arm-a");
+    const otherBoards = await roundsFor(other, "study-arm-b");
+
+    expect(firstBoards.round1!.seed).toBe("study-arm-a");
+    expect(firstBoards.round2!.seed).toBe("study-arm-a");
+    expect(secondBoards.round1).toEqual(firstBoards.round1);
+    expect(secondBoards.round2).toEqual(firstBoards.round2);
+    expect(otherBoards.round1!.seed).toBe("study-arm-b");
+    expect(cardIds(otherBoards.round1)).not.toEqual(cardIds(firstBoards.round1));
+    expect(cardIds(otherBoards.round2)).not.toEqual(cardIds(firstBoards.round2));
+    expect(seedGenerator.calls).toBe(0);
+  });
+
   it("reproduces a known board from a transition seed, which overrides the creation seed", async () => {
     const handlers = makeHandlers();
     const known = await createSession(handlers, "known-board");
@@ -375,5 +419,166 @@ describe("server-dealt round board (activeBoard)", () => {
     }));
     expect(transitioned.statusCode).toBe(400);
     expect(transitioned.body.code).toBe("INVALID_REQUEST_BODY");
+  });
+});
+
+describe("concept Chains checked against the round's board", () => {
+  const ON_BOARD_PATH = [
+    { row: 0, col: 0 },
+    { row: 0, col: 1 },
+    { row: 1, col: 1 },
+    { row: 1, col: 2 },
+  ];
+
+  /** A session in round 1's chain-mapping with one joined participant. */
+  async function roundOneWithParticipant() {
+    const sessionRepo = new InMemoryGameSessionRepository();
+    const handlers = makeHandlers({ sessionRepo });
+    const session = await createSession(handlers, "chain-check");
+    const round1 = await session.advanceTo("round-1:chain-mapping");
+    const joined = await invoke(handlers.join, makeEvent("POST", "/api/v1/sessions/join", {
+      body: { roomCode: session.roomCode, displayName: "Alice" },
+    }));
+    expect(joined.statusCode).toBe(200);
+    const participantToken = joined.body.participantToken as string;
+
+    const submit = (body: object) => invoke(handlers.submit, makeEvent("POST", `/api/v1/sessions/${session.sessionId}/rounds/1/chains`, {
+      body,
+      pathParameters: { sessionId: session.sessionId, roundNumber: "1" },
+      token: participantToken,
+    }));
+    const storedChains = async () =>
+      (await sessionRepo.findById(SessionIdValue.from(session.sessionId)))!.chains;
+
+    return { board: round1.activeBoard!, submit, storedChains };
+  }
+
+  const cardsAt = (board: BoardGridView, path: readonly { row: number; col: number }[]) =>
+    path.map(cell => board.cells[cell.row]![cell.col]!.card.id);
+
+  it("rejects a path with a cell outside the board with 422 CHAIN_TOPOLOGY_INVALID and records nothing", async () => {
+    const { board, submit, storedChains } = await roundOneWithParticipant();
+    const lastRow = board.rows - 1;
+    const offBoard = [
+      { row: lastRow - 2, col: 0 },
+      { row: lastRow - 1, col: 0 },
+      { row: lastRow, col: 0 },
+      { row: lastRow + 1, col: 0 },
+    ];
+
+    const rejected = await submit({ path: offBoard, narrativeExplanation: "Off the edge" });
+
+    expect(rejected.statusCode).toBe(422);
+    expect(rejected.body.code).toBe("CHAIN_TOPOLOGY_INVALID");
+    expect(await storedChains()).toHaveLength(0);
+  });
+
+  it("rejects a cell past the last column too", async () => {
+    const { board, submit, storedChains } = await roundOneWithParticipant();
+    const lastCol = board.cols - 1;
+    const rejected = await submit({
+      path: [
+        { row: 0, col: lastCol - 2 },
+        { row: 0, col: lastCol - 1 },
+        { row: 0, col: lastCol },
+        { row: 0, col: lastCol + 1 },
+      ],
+      narrativeExplanation: "Off the side",
+    });
+
+    expect(rejected.statusCode).toBe(422);
+    expect(rejected.body.code).toBe("CHAIN_TOPOLOGY_INVALID");
+    expect(await storedChains()).toHaveLength(0);
+  });
+
+  it("records and returns the board's cards when the client sends wrong keywordIds", async () => {
+    const { board, submit } = await roundOneWithParticipant();
+
+    const response = await submit({
+      path: ON_BOARD_PATH,
+      keywordIds: [
+        "not-a-card",
+        "also-wrong",
+        "nope",
+        "never",
+      ],
+      narrativeExplanation: "Wrong ids on purpose",
+    });
+
+    expect(response.statusCode).toBe(201);
+    expect(response.body.chain.keywordIds).toEqual(cardsAt(board, ON_BOARD_PATH));
+  });
+
+  it("accepts a path without keywordIds and derives them from the board", async () => {
+    const { board, submit } = await roundOneWithParticipant();
+    const path = [
+      { row: 2, col: 2 },
+      { row: 3, col: 3 },
+      { row: 4, col: 3 },
+      { row: 4, col: 4 },
+    ];
+
+    const response = await submit({ path, narrativeExplanation: "No ids sent" });
+
+    expect(response.statusCode).toBe(201);
+    expect(response.body.chain.keywordIds).toEqual(cardsAt(board, path));
+  });
+
+  it("stores the board-derived ids on the session", async () => {
+    const { board, submit, storedChains } = await roundOneWithParticipant();
+
+    const response = await submit({
+      path: ON_BOARD_PATH,
+      keywordIds: ["x", "y", "z", "w"],
+      narrativeExplanation: "Stored",
+    });
+
+    expect(response.statusCode).toBe(201);
+    expect((await storedChains()).map(chain => [...chain.keywordIds])).toEqual([
+      cardsAt(board, ON_BOARD_PATH),
+    ]);
+  });
+
+  it("keeps a legacy session's behaviour when its round has no board", async () => {
+    const legacy = GameSessionAggregate.create({
+      packId: "diabe-teach",
+      mode: "classroom",
+      adjudicationMode: "peer-instructor",
+    });
+    legacy.transitionTo("trial-orientation", new Date());
+    legacy.transitionTo("round-1:chain-mapping", new Date());
+    const participant = legacy.addParticipant("Legacy Lee");
+    const sessionRepo = new InMemoryGameSessionRepository([legacy]);
+    const tokenAdapter = new FakeCapabilityTokenAdapter();
+    const token = await tokenAdapter.signToken({
+      role: "participant",
+      sessionId: legacy.sessionId.value,
+      participantId: participant.participantId,
+    });
+    const submit = createSubmitChainHandler({
+      packRepo: new InMemoryCurriculumPackRepository(),
+      sessionRepo,
+      tokenVerifier: tokenAdapter,
+    });
+    const farAway = [
+      { row: 50, col: 3 },
+      { row: 51, col: 4 },
+      { row: 52, col: 5 },
+      { row: 53, col: 6 },
+    ];
+
+    const response = await invoke(submit, makeEvent("POST", `/api/v1/sessions/${legacy.sessionId.value}/rounds/1/chains`, {
+      body: {
+        path: farAway,
+        keywordIds: ["kw-1", "kw-2", "kw-3", "kw-4"],
+        narrativeExplanation: "Legacy",
+      },
+      pathParameters: { sessionId: legacy.sessionId.value, roundNumber: "1" },
+      token,
+    }));
+
+    expect(response.statusCode).toBe(201);
+    expect(response.body.chain.keywordIds).toEqual(["kw-1", "kw-2", "kw-3", "kw-4"]);
+    expect(response.body.chain.path).toEqual(farAway);
   });
 });

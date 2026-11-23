@@ -4,7 +4,9 @@
 
 **Blocked by:** 01-game-session-aggregate, 02-create-session-endpoint, 06-submit-chain-endpoint
 
-**Status:** ready-for-agent
+**Status:** resolved
+
+Resolved 2026-11-20: route `POST /api/v1/sessions/{sessionId}/rounds/{roundNumber}/chains/{chainId}/adjudicate` (`netlify/functions/adjudicate-chain.ts`), added in `b368e85`, with handler tests under `tests/functions/`.
 
 - [ ] `AdjudicateConceptChainUseCase` in `src/application/use-cases/`
 - [ ] Port definition with discriminated union `AdjudicateChainRequest` (peer-approve | peer-challenge | ai-evaluate | instructor-approve | instructor-reject)

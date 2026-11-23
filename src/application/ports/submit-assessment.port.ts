@@ -1,7 +1,10 @@
 import type { McqAnswerChoice } from "../../domain/game-session/game-session.types.js";
+import type { LearnerMetacognitiveReport } from "../dtos/session-analytics.dto.js";
 import type { VerifiedCapability } from "./capability-token.port.js";
 import type { CurriculumPackRepositoryPort } from "./curriculum-pack-repository.port.js";
 import type { GameSessionRepositoryPort } from "./game-session-repository.port.js";
+
+export type { AssessmentStageSummary, LearnerMetacognitiveReport } from "../dtos/session-analytics.dto.js";
 
 export interface SubmitAssessmentDependencies {
   readonly sessionRepo: GameSessionRepositoryPort;
@@ -37,36 +40,6 @@ export interface QuestionReviewItem {
   readonly explanation: string | null;
   readonly pretestChoice: McqAnswerChoice | null;
   readonly posttestChoice: McqAnswerChoice;
-}
-
-/**
- * Metacognitive report computed from pretest/posttest comparison.
- * Matches the OpenAPI LearnerMetacognitiveReport schema.
- */
-export interface LearnerMetacognitiveReport {
-  readonly participantId: string;
-  readonly pretest: AssessmentStageSummary | null;
-  readonly posttest: AssessmentStageSummary | null;
-  readonly knowledgeGainDelta: number | null;
-  readonly guessingReductionDelta: number | null;
-  readonly chainDiversityIndex: number;
-  readonly neglectedKeywordIds: readonly string[];
-}
-
-/**
- * Summary metrics for a single assessment stage.
- * Matches the OpenAPI AssessmentStageSummary schema.
- */
-export interface AssessmentStageSummary {
-  readonly stage: "pretest" | "posttest";
-  readonly totalQuestions: number;
-  readonly correctCount: number;
-  readonly wrongGuessCount: number;
-  readonly iDontKnowCount: number;
-  readonly correctPercentage: number;
-  readonly wrongGuessPercentage: number;
-  readonly iDontKnowPercentage: number;
-  readonly uncertaintyCalibrationRatio: number;
 }
 
 /**

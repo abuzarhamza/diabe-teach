@@ -27,4 +27,23 @@ export class MongoConnectionManager {
     }
     return connPromise;
   }
+
+  /**
+   * Closes every cached connection and forgets it; the next `getConnection`
+   * opens a fresh one. A connection that never opened is skipped.
+   */
+  public static async closeAll(): Promise<void> {
+    const pending = [
+      ...MongoConnectionManager.#cachedConnections.values(),
+    ];
+    MongoConnectionManager.#cachedConnections.clear();
+    await Promise.all(pending.map(async (connPromise) => {
+      try {
+        await (await connPromise).close();
+      }
+      catch {
+        // It failed to open, so there is nothing to close.
+      }
+    }));
+  }
 }

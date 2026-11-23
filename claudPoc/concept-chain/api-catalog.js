@@ -23,13 +23,25 @@
 //
 // Pages mark elements with data-api="<letter>" | "<letter>.<detail>" | "gap.<key>" | "nav.<key>"
 // and data-api-io="write" (sends a request, dashed) | "read" (shows API data, solid).
-/* eslint-disable */
+/* eslint-disable antfu/reasonable-newline, antfu/consistent-list-newline, antfu/if-newline, antfu/consistent-chaining, style/arrow-parens, style/quote-props, style/max-statements-per-line, style/multiline-ternary, one-var -- compact browser data script, kept in the screens' own style */
 (function (root) {
-  // PublicSessionState as the backend returns it today (no activeBoard key at all).
+  // A round's board (BoardGridView) as the server deals it, trimmed here to two cells: the real `cells` is rows × cols.
+  const sampleBoard = {
+    seed: "k3v9q2",
+    rows: 7,
+    cols: 7,
+    cells: [[
+      { row: 0, col: 0, card: { id: "insulin", verbatimLabel: "Insulin", displayLabel: "Insulin", aliases: [], domainId: "anatomy-pathophysiology", summary: "Hormone from pancreatic beta cells that lowers blood glucose." } },
+      { row: 0, col: 1, card: { id: "glut4", verbatimLabel: "GLUT4", displayLabel: "GLUT4", aliases: [], domainId: "anatomy-pathophysiology", summary: "Insulin-regulated glucose transporter in muscle and fat cells." } },
+    ]],
+  };
+
+  // PublicSessionState as the backend returns it (`activeBoard` is null outside a round's phases).
   const sampleState = {
     sessionId: "<sessionId>",
     roomCode: "K7QX2M",
     packId: "diabe-teach",
+    packVersion: "1.0.0",
     mode: "classroom",
     adjudicationMode: "peer-instructor",
     currentPhase: "round-1:chain-mapping",
@@ -37,6 +49,12 @@
     phaseStartedAt: "2026-11-17T09:00:00.000Z",
     phaseEndsAt: "2026-11-17T09:20:00.000Z",
     participantCount: 3,
+    participants: [
+      { participantId: "<participantId>", displayName: "Amira", joinedAt: "2026-11-17T08:58:00.000Z", leftAt: null },
+      { participantId: "<otherParticipantId>", displayName: "Ben", joinedAt: "2026-11-17T08:59:00.000Z", leftAt: null },
+      { participantId: "<thirdParticipantId>", displayName: "Chen", joinedAt: "2026-11-17T09:01:00.000Z", leftAt: null },
+    ],
+    activeBoard: sampleBoard,
   };
 
   const sampleChain = {
@@ -326,20 +344,20 @@
         request: samplePackInput,
         response: {
           status: 200,
-          body: { valid: false, issues: [{ jsonPointer: "/adjudicationRubric/chainContinuityCriteria", rule: "minItems", message: "At least one chain continuity criterion is required." }] },
+          body: { valid: false, errors: [{ path: "cards", code: "INSUFFICIENT_CARDS", message: "Pack has 20 Keyword Cards but its 5×5 board needs at least 25 (5 short)." }], warnings: [] },
         },
         errors: [
           { status: 400, code: "INVALID_REQUEST_BODY" },
           { status: 401, code: "UNAUTHORIZED_TOKEN" },
         ],
-        status: "partial",
+        status: "implemented",
         notes: [
           "Checks a draft CurriculumPackInput without saving it, with the teacher's Account Token. Game setup doesn't call it: registerCurriculumPack runs the same checks and returns them as 422.",
+          "Returns `{ valid, errors, warnings }`, each item `{ path, code, message }`. Warnings (such as OPTIONAL_FIELD_MISSING) never make the pack invalid.",
+          "A missing or wrongly typed field is refused first with 400 INVALID_REQUEST_BODY (the body is checked against CurriculumPackInput), so only a well-formed pack gets a 200.",
           "Learner level and learning objective have no field: the closest is the pack `description`.",
         ],
-        deviations: [
-          "Returns `{ valid, errors, warnings }` with `{ path, code, message }` items, not the spec's `{ valid, issues }` with `{ jsonPointer, rule, message }`.",
-        ],
+        deviations: [],
       },
 
       registerCurriculumPack: {
@@ -429,7 +447,7 @@
             instructorToken: "<instructorToken>",
             participantId: null,
             participantToken: null,
-            state: { ...sampleState, currentPhase: "pretest", activeRoundNumber: null, phaseEndsAt: "2026-11-17T09:15:00.000Z", participantCount: 0 },
+            state: { ...sampleState, currentPhase: "pretest", activeRoundNumber: null, phaseEndsAt: "2026-11-17T09:15:00.000Z", participantCount: 0, participants: [] },
           },
         },
         errors: [
@@ -445,13 +463,12 @@
           "This call issues the per-session instructor Capability Token, which every in-game call uses, so the Account Token expiring never breaks a running game. Keep `instructorToken` for every teacher call (D, G, and the reads in C and H).",
           "Share `roomCode` with learners; they join with it (step B).",
           "`timerConfig` durations are whole seconds 1-86400; `null` makes that phase teacher-paced (no deadline). Omitted fields use the API defaults (15 min pretest, trial, post-test and survey; 20 min mapping; 10 min peer review), so Game setup sends all six: its chain-building and peer-review minutes × 60 (or `null` when teacher-paced), and `null` for the phases the prototype keeps teacher-paced.",
-          "`seed` is the board preview's seed, so Round 1 would be dealt exactly as previewed (see the deviation: the backend ignores it today).",
+          "`seed` is the board preview's seed. The server deals Round 1 from it on entering `round-1:chain-mapping` (unless that transition sends its own `seed`): the same pack, Pack Version and seed always give the same board. The server's shuffle and board size (the pack's `boardConfig`) differ from the browser preview, so its board won't match the preview.",
           "\"Start game\" on Game setup creates a brand-new Game Session with a new room code; \"Reset session\" and \"Start a new session\" on the teacher screen only go back to Game setup. Nothing ends the old session.",
           "Board size and shortest chain have no field here: they come from the pack's `boardConfig` (see the Game setup gaps).",
         ],
         deviations: [
           "Every session starts in `pretest`, including solo mode (the spec summary says solo auto-starts Round 1; it only auto-joins the creator).",
-          "`state` has no `activeBoard` key and no board is dealt; `seed` is ignored, so the previewed board can't be reproduced server-side.",
           "`creatorDisplayName` (Game setup's \"name shown to your class\") is only used in solo mode (as the auto-joined learner's name); in classroom mode it is dropped.",
         ],
       },
@@ -519,9 +536,9 @@
           "`path` is the tapped Keyword Cards as GridCoord `{ row, col }` in order; each cell must touch the previous one (sideways, up/down or diagonal) and no cell may repeat, else 422 CHAIN_TOPOLOGY_INVALID.",
           "409 PHASE_CLOSED_FOR_SUBMISSIONS: not in Chain-Mapping, not the active round, or more than 5 s (grace period) after `phaseEndsAt`.",
           "409 CHAIN_ALREADY_SUBMITTED: this learner already sent the same cells in this round (same or reversed order). Learners may submit several different chains.",
+          "A chain needs at least the Curriculum Pack's `boardConfig.minChainLength` cells (read from the Game Session's pinned Pack Version; 4 if the pack sets none), else 422 CHAIN_TOPOLOGY_INVALID. Under 2 cells is a 400 schema error.",
         ],
         deviations: [
-          "A chain needs at least 4 cells (fixed, not read from the Curriculum Pack); the spec says `minItems: 2` and the demo accepts 2.",
           "The returned chain has no `sessionId`, `stepRationales`, `peerVotes` or `verdict`, and adds `chainLength` and `keywordIds`.",
           "An instructor token, or a token for another Game Session, gets 403 FORBIDDEN_ROLE, which the spec doesn't declare for this route.",
         ],
@@ -531,21 +548,21 @@
         method: "GET",
         path: "/api/v1/sessions/{sessionId}",
         pathParams: { sessionId: "Game Session id (from createGameSession)" },
-        auth: ["apiKey", "instructor"],
+        auth: ["apiKey", "instructor", "participant"],
         request: null,
         response: { status: 200, body: { state: sampleState } },
-        errors: [{ status: 404, code: "SESSION_NOT_FOUND" }],
-        status: "partial",
+        errors: [
+          { status: 401, code: "UNAUTHORIZED_TOKEN" },
+          { status: 403, code: "FORBIDDEN_ROLE" },
+          { status: 404, code: "SESSION_NOT_FOUND" },
+        ],
+        status: "implemented",
         notes: [
           "Poll this while the stream (streamGameSessionEvents) is not implemented.",
-          "Either Capability Token works: the teacher's instructor token or a learner's participant token for this Game Session.",
+          "Either Capability Token works: the teacher's instructor token or a learner's participant token for this Game Session. Another session's token gets 403 FORBIDDEN_ROLE.",
+          "Round Summary and Completed have no timer, so they report `phaseEndsAt` equal to `phaseStartedAt` (no deadline to come).",
         ],
-        deviations: [
-          "Requires a Bearer token for this Game Session (401 UNAUTHORIZED_TOKEN without one, 403 FORBIDDEN_ROLE for another session's token); the spec declares no security and only 404.",
-          "`activeBoard` is in the spec but never returned: the board can't come from the server yet.",
-          "Only `participantCount` is returned, not the participants; names and per-learner data have no read endpoint.",
-          "Round Summary and Completed report `phaseEndsAt` equal to `phaseStartedAt` instead of null.",
-        ],
+        deviations: [],
       },
 
       streamGameSessionEvents: {
@@ -563,10 +580,9 @@
         notes: [
           "text/event-stream of `{ event, data }` envelopes: session.snapshot, participant.joined, phase.changed, chain.submitted, chain.adjudicated, standings.updated.",
           "The spec does not define the `data` payload of each event.",
+          "Not implemented (the spec marks it `x-implemented: false`): there is no Netlify function for this route, so screens poll getGameSessionState.",
         ],
-        deviations: [
-          "Not implemented: there is no Netlify function for this route, so screens must poll getGameSessionState.",
-        ],
+        deviations: [],
       },
 
       listRoundChains: {
@@ -712,7 +728,7 @@
         method: "GET",
         path: "/api/v1/sessions/{sessionId}/rounds/{roundNumber}/standings",
         pathParams: { sessionId: "Game Session id", roundNumber: "1 or 2" },
-        auth: ["apiKey", "instructor"],
+        auth: ["apiKey", "instructor", "participant"],
         request: null,
         response: {
           status: 200,
@@ -724,16 +740,19 @@
             ],
           },
         },
-        errors: [{ status: 404, code: "SESSION_NOT_FOUND" }],
+        errors: [
+          { status: 401, code: "UNAUTHORIZED_TOKEN" },
+          { status: 403, code: "FORBIDDEN_ROLE" },
+          { status: 404, code: "SESSION_NOT_FOUND" },
+        ],
         status: "partial",
         notes: [
           "Ranked by longest approved Concept Chain, then number of approved chains.",
           "`isFinalized` turns true once the round reaches its Round Summary (or any later phase).",
-          "Either Capability Token works (instructor or participant of this Game Session).",
+          "Either Capability Token works (instructor or participant of this Game Session); another session's token gets 403 FORBIDDEN_ROLE.",
           "Equal results get consecutive ranks (list order); there is no shared rank.",
         ],
         deviations: [
-          "Requires a Bearer token for this Game Session (401 / 403); the spec declares no security and only 404.",
           "Learners with no approved chain are left out; the screen lists every learner, so it must merge with its own roster.",
           "No `cumulativeRationaleScore` is returned, and identical paths are not deduplicated.",
           "There is no pending-review count: the \"To check\" column has no API field.",
@@ -761,17 +780,42 @@
         status: "partial",
         notes: [
           "The server never auto-advances: a phase changes only when the teacher calls this.",
-          "It only moves to the next phase in the Game Session order; there is no skipping or going back.",
+          "It only moves to the next phase in the Game Session order; there is no skipping or going back. `jump` must name that next phase as `targetPhase` (another phase gets 409 INVALID_PHASE_TRANSITION, none gets 400 INVALID_REQUEST_BODY). Ending early uses endGameSession.",
           "A write conflict is retried up to 3 times; a 409 CONCURRENT_UPDATE_CONFLICT is safe to retry.",
+          "Entering `round-1:chain-mapping` or `round-2:chain-mapping` deals that round's board (`state.activeBoard`). Its seed is this request's `seed`, else (Round 1 only) the creation seed, else one the server generates; `activeBoard.seed` reports it. The same pack, Pack Version and seed always give the same board, so a Study RCT can replay a board by sending its seed.",
         ],
         deviations: [
-          "No Keyword Card board is shuffled on Round 1 or Round 2 entry, and `seed` is ignored; `activeBoard` is never returned.",
-          "`jump` is accepted but can only target the next phase (otherwise 409 INVALID_PHASE_TRANSITION).",
           "Advancing from `completed` returns 200 with the unchanged state instead of 409.",
-          "Round Summary and Completed report `phaseEndsAt` equal to `phaseStartedAt` instead of null.",
           "Only the instructor token is accepted (a participant gets 403 FORBIDDEN_ROLE).",
           "x-api-key is checked when the server has API_KEY set, but the spec does not declare it here.",
         ],
+      },
+      extendSessionPhase: {
+        method: "POST",
+        path: "/api/v1/sessions/{sessionId}/phase/extend",
+        pathParams: { sessionId: "Game Session id (from createGameSession)" },
+        auth: ["apiKey", "instructor"],
+        request: { seconds: 60 },
+        response: {
+          status: 200,
+          body: { state: { ...sampleState, phaseEndsAt: "2026-11-17T09:21:00.000Z" } },
+        },
+        errors: [
+          { status: 400, code: "INVALID_REQUEST_BODY" },
+          { status: 401, code: "UNAUTHORIZED_TOKEN" },
+          { status: 403, code: "FORBIDDEN_ROLE" },
+          { status: 404, code: "SESSION_NOT_FOUND" },
+          { status: 409, code: "PHASE_HAS_NO_TIMER" },
+          { status: 409, code: "SESSION_ALREADY_COMPLETED" },
+          { status: 409, code: "CONCURRENT_UPDATE_CONFLICT" },
+        ],
+        status: "implemented",
+        notes: [
+          "`seconds` is a whole number from 1 to 600. The new deadline is `max(phaseEndsAt, now) + seconds`, so a Chain-Mapping phase whose time ran out reopens for submissions.",
+          "The extension lasts until the next phase transition.",
+          "An instructor-driven phase (`phaseEndsAt` null) has no timer to extend: 409 PHASE_HAS_NO_TIMER.",
+        ],
+        deviations: [],
       },
       // Operations with no screen in this prototype yet: listed in the legend's "no screen yet" section only.
       submitAssessmentAttempt: {
@@ -816,10 +860,15 @@
         auth: ["apiKey", "instructor", "participant"],
         errors: [
           { status: 401, code: "UNAUTHORIZED_TOKEN" },
+          { status: 403, code: "FORBIDDEN_ROLE" },
           { status: 404, code: "SESSION_NOT_FOUND" },
         ],
-        status: "specced-only",
-        deviations: ["No handler: nothing in src/ or netlify/functions/ serves this route yet."],
+        status: "implemented",
+        deviations: [],
+        notes: [
+          "A learner's token returns their own `participantReport`; fields whose inputs don't exist yet (e.g. the Posttest) are `null`.",
+          "An instructor token returns `{ role, cohortSummary }` only. The cohort is the learners still in the session; each mean is over the learners who have its input (`null` when none has), and `boardNeglectHeatmap[row][col]` counts the learners who never used that cell.",
+        ],
       },
     },
 
@@ -830,19 +879,15 @@
       },
       boardSize: {
         title: "Board size",
-        note: "Not enforced by the API: createGameSession has no board size field. A pack's size is its `boardConfig.rows` / `cols` (3-12 in the spec), fixed when the pack is registered (`diabe-teach` is 7×7), and the backend deals no board at all today.",
+        note: "Not enforced by the API: createGameSession has no board size field. A pack's size is its `boardConfig.rows` / `cols` (3-12 in the spec), fixed when the pack is registered (`diabe-teach` is 7×7); the server deals each round's board (`state.activeBoard`) at that size, not the one chosen here.",
       },
       minChain: {
         title: "Shortest chain allowed",
-        note: "Not enforced by the API: createGameSession has no field for it, and submitConceptChain uses a fixed 4 cells (422 CHAIN_TOPOLOGY_INVALID below that), not the pack's `boardConfig.minChainLength`. Only the demo enforces the number set here.",
+        note: "Not settable per Game Session: createGameSession has no field for it. submitConceptChain enforces the pack's `boardConfig.minChainLength` (4 if the pack sets none; 422 CHAIN_TOPOLOGY_INVALID below that), so the number set here only matches the API when the pack uses the same minimum.",
       },
       boardPreview: {
         title: "Board preview",
-        note: "Dealt in the browser from the pack, board size and preview seed. No API deals or returns a board yet: `state.activeBoard` is in the spec but never returned, and createGameSession ignores `seed`.",
-      },
-      extend: {
-        title: "Extend the phase (+1 min)",
-        note: "No API can extend a phase: `phaseEndsAt` is fixed from the session's timerConfig when the phase starts, and a timerConfig can only be set at createGameSession. The demo changes its local timer only.",
+        note: "Dealt in the browser from the pack, board size and preview seed. The API deals Round 1 from the same `seed` (`state.activeBoard`), but with its own shuffle and the pack's `boardConfig` size, so the server's board won't match this preview.",
       },
     },
 
@@ -916,7 +961,7 @@
         note: "Chain-building and peer-review minutes become createGameSession's `timerConfig.roundMappingSec` / `roundAdjudicationSec` (minutes × 60, 1-86400 s); teacher-paced sends `null` (no deadline). Both Gameplay Rounds use them.",
       },
       "A.seed": {
-        note: "Shuffle picks a new board preview seed, sent as createGameSession's `seed` so Round 1 matches the preview. Partial: the backend ignores `seed` and deals no board, so a previewed board can't be reproduced server-side yet.",
+        note: "Shuffle picks a new board preview seed, sent as createGameSession's `seed` so Round 1 matches the preview. The server deals Round 1 reproducibly from it (same pack, Pack Version and seed, same board), but with its own shuffle, so its board won't match the browser preview.",
       },
       "A.roomCode": {
         note: "Shows `roomCode` from the createGameSession response (also in every `state`).",
@@ -932,11 +977,12 @@
         note: "The countdown is `state.phaseEndsAt` minus now. `phaseEndsAt: null` means the phase is teacher-paced: no deadline, it lasts until the teacher clicks Next phase. When the Chain-Mapping time runs out, submissions are still accepted for a fixed 5 s grace period, then rejected with 409 PHASE_CLOSED_FOR_SUBMISSIONS; the phase stays current (closed) until the teacher advances.",
       },
       "C.board": {
-        note: "Meant to be `state.activeBoard` (a BoardGridView of Keyword Cards). It is in the spec but the backend never returns it and deals no board, so today the board can only be built on the client.",
+        ops: ["getGameSessionState"],
+        note: "`state.activeBoard` (a BoardGridView: `cells[row][col].card` is the Keyword Card), dealt by the server when the round's Chain-Mapping phase starts and `null` outside a round. This demo still draws its own browser-dealt board, so its cards won't match the server's.",
       },
       "C.roster": {
         ops: ["getGameSessionState", "streamGameSessionEvents", "listRoundChains"],
-        note: "Per-learner chain counts (and display names of learners who submitted) come from list-round-chains (polled). Still a gap: no endpoint lists the participants, so learners with no chain yet are unknown; `state` has only `participantCount`, and `participant.joined` is a specced-only stream event.",
+        note: "The roster is `state.participants` (every learner who joined: `participantId`, `displayName`, `joinedAt`, `leftAt`), polled with get-session-state. Per-learner chain counts come from list-round-chains (polled), matched by `participantId`. `participant.joined` is a specced-only stream event.",
       },
       "C.review": {
         ops: ["listRoundChains", "streamGameSessionEvents"],
@@ -944,7 +990,7 @@
       },
       "C.classmates": {
         ops: ["getGameSessionState", "streamGameSessionEvents"],
-        note: "No endpoint lists the participants: `state` has only `participantCount`. Each classmate's name would arrive in a `participant.joined` stream event (specced only), so today the list can't come from the server.",
+        note: "Classmates are `state.participants` (display name and join time; filter out your own `participantId`), polled with get-session-state; the learner's Capability Token sees the same list as the teacher. `participant.joined` is a specced-only stream event.",
       },
       "C.timeline": {
         ops: ["getGameSessionState"],
@@ -957,6 +1003,10 @@
       "C.myChains": {
         ops: ["listRoundChains", "streamGameSessionEvents"],
         note: "The learner's chains come from list-round-chains (filter by your `participantId`), with later peer votes (and voter names) and the Instructor Final Ruling. No stream yet (`chain.adjudicated` is specced only), so the screen polls.",
+      },
+      "D.extend": {
+        ops: ["extendSessionPhase"],
+        note: "+1 min sends `{ seconds: 60 }`; the returned `phaseEndsAt` is the new deadline.",
       },
       "E.builder": {
         note: "Builds the submitConceptChain body: tapped Keyword Cards → `path` (GridCoord), each link's reason → `stepRationales`, the story → `narrativeExplanation`.",
@@ -1059,13 +1109,22 @@
 
   const fillPath = (template, params) => template.replace(/\{(\w+)\}/g, (whole, name) => (params[name] ?? null) === null ? whole : String(params[name]));
 
+  // The demo's board ({ seed, rows, cols, cells: [{ keywordId, label }] }) as a BoardGridView; it has no domain or summary.
+  function boardView(b) {
+    if (!b) return null;
+    return { seed: b.seed, rows: b.rows, cols: b.cols, cells: b.cells.map((cells, row) => cells.map((c, col) => ({ row, col,
+      card: { id: c.keywordId, verbatimLabel: c.label, displayLabel: c.label, aliases: [], domainId: "<domainId>", summary: "<summary>" } }))) };
+  }
+
   function publicState(state) {
     const ss = state.session;
     return {
       sessionId: ss.sessionId, roomCode: ss.roomCode, packId: ss.packId, mode: ss.mode, adjudicationMode: ss.adjudicationMode,
       currentPhase: ss.currentPhase, activeRoundNumber: ss.activeRoundNumber ?? null,
       phaseStartedAt: ss.phaseStartedAt, phaseEndsAt: ss.phaseEndsAt ?? null,
-      participantCount: state.participants.length, // no activeBoard: the backend never returns it
+      participantCount: state.participants.length,
+      participants: state.participants.map((p) => ({ participantId: p.participantId, displayName: p.displayName, joinedAt: p.joinedAt ?? "<joinedAt>", leftAt: p.leftAt ?? null })),
+      activeBoard: boardView(ss.activeBoard),
     };
   }
 
@@ -1073,7 +1132,7 @@
     return {
       chainId: c.chainId, sessionId: c.sessionId, roundNumber: c.roundNumber, participantId: c.participantId,
       path: c.path, keywordIds: c.keywordIds, narrativeExplanation: c.narrativeExplanation,
-      // The browser fake keeps `{ fromCoord, toCoord, rationale }` objects; the API sends plain strings.
+      // Plain strings, as the API sends them; a demo saved before the fake switched to strings may still hold objects.
       stepRationales: (c.stepRationales ?? []).map((r) => (typeof r === "string" ? r : r?.rationale ?? "")), status: c.status, verdict: c.verdict ?? null,
       peerVotes: c.peerVotes ?? [], submittedAt: c.submittedAt,
     };
@@ -1107,8 +1166,10 @@
     const cur = publicState(state), i = PHASES.indexOf(cur.currentPhase);
     if (i < 0 || i >= PHASES.length - 1) return cur; // completed: 200 with the state unchanged (see deviations)
     const phase = PHASES[i + 1], m = /^round-(\d)/.exec(phase), sec = timerOf(state)[PHASE_TIMER[phase.split(":").pop()]];
+    // Entering a round's Chain-Mapping deals a new board; it stays through that round's Round Summary.
+    const activeBoard = !m ? null : phase.endsWith(":chain-mapping") ? "<board the server deals for this round>" : cur.activeBoard;
     return { ...cur, currentPhase: phase, activeRoundNumber: m ? Number(m[1]) : null, phaseStartedAt: "<server time>",
-      phaseEndsAt: sec ? `<phaseStartedAt + ${sec} s>` : null };
+      phaseEndsAt: sec ? `<phaseStartedAt + ${sec} s>` : null, activeBoard };
   }
 
   const ops = catalog.operations;
@@ -1122,14 +1183,14 @@
       return { request, response: { status: 201, body: {
         sessionId: "<sessionId>", roomCode: "<roomCode>", instructorToken: "<instructorToken>", participantId: null, participantToken: null,
         state: { sessionId: "<sessionId>", roomCode: "<roomCode>", packId: request.packId, mode: request.mode, adjudicationMode: request.adjudicationMode,
-          currentPhase: "pretest", activeRoundNumber: null, phaseStartedAt: "<createdAt>", phaseEndsAt: pretest ? `<createdAt + ${pretest} s>` : null, participantCount: 0 },
+          currentPhase: "pretest", activeRoundNumber: null, phaseStartedAt: "<createdAt>", phaseEndsAt: pretest ? `<createdAt + ${pretest} s>` : null, participantCount: 0, participants: [], activeBoard: null },
       } } };
     }
     const st = publicState(state), fresh = st.currentPhase === "pretest", pretest = timerOf(state).pretestSec;
     const out = { response: { status: 201, body: {
       sessionId: st.sessionId, roomCode: st.roomCode, instructorToken: "<instructorToken>", participantId: null, participantToken: null,
       state: { ...st, currentPhase: "pretest", activeRoundNumber: null, phaseStartedAt: fresh ? st.phaseStartedAt : "<createdAt>",
-        phaseEndsAt: fresh ? st.phaseEndsAt : pretest ? `<createdAt + ${pretest} s>` : null, participantCount: 0 },
+        phaseEndsAt: fresh ? st.phaseEndsAt : pretest ? `<createdAt + ${pretest} s>` : null, participantCount: 0, participants: [] },
     } } };
     const request = sessionRequest(state);
     if (request) out.request = request;

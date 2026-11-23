@@ -1,6 +1,7 @@
 import type { APIGatewayProxyEvent, APIGatewayProxyResult } from "aws-lambda";
 import type { CapabilityTokenPort, VerifiedCapability } from "../../../src/application/ports/capability-token.port.js";
 import type { ClockPort } from "../../../src/application/ports/clock.port.js";
+import type { CurriculumPackRepositoryPort } from "../../../src/application/ports/curriculum-pack-repository.port.js";
 import type { GameSessionRepositoryPort } from "../../../src/application/ports/game-session-repository.port.js";
 import type { SubmitConceptChainCommand } from "../../../src/application/ports/submit-concept-chain.port.js";
 import { readOptionalJsonObjectBody } from "../../../src/adapters/inbound/http/json-object-body.js";
@@ -11,9 +12,9 @@ import { ForbiddenRoleError, UnauthorizedTokenError } from "../../../src/domain/
 
 export interface SubmitChainHandlerDependencies {
   readonly sessionRepo: GameSessionRepositoryPort;
+  readonly packRepo: CurriculumPackRepositoryPort;
   readonly tokenVerifier: CapabilityTokenPort;
   readonly clock?: ClockPort;
-  readonly minChainLength?: number;
   readonly apiKey?: string;
   readonly requireApiKey?: boolean;
 }
@@ -24,6 +25,7 @@ export function createSubmitChainHandler(
   const prodDeps = AppRuntime.getProductionDependencies();
   const deps: SubmitChainHandlerDependencies = dependencies ?? {
     sessionRepo: prodDeps.sessionRepo!,
+    packRepo: prodDeps.packRepo,
     tokenVerifier: prodDeps.tokenVerifier!,
     apiKey: prodDeps.apiKey,
     requireApiKey: prodDeps.requireApiKey,
@@ -32,8 +34,8 @@ export function createSubmitChainHandler(
 
   const useCase = new SubmitConceptChainUseCase({
     sessionRepo: deps.sessionRepo,
+    packRepo: deps.packRepo,
     clock,
-    minChainLength: deps.minChainLength,
   });
 
   const rawHandler = async (

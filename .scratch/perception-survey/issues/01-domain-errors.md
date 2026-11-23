@@ -4,7 +4,9 @@
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** resolved
+
+Resolved 2026-11-20: done in `3e37faf` and `f52ba83` (route `POST /api/v1/sessions/{sessionId}/survey`, `netlify/functions/submit-survey.ts`; tests `tests/functions/submit-survey.test.ts`, `survey-journey.feature`).
 
 - [ ] Create `SurveyAlreadySubmittedError` class with code `SURVEY_ALREADY_SUBMITTED` (maps to 409)
 - [ ] Create `SurveyCommentsTooLongError` class with code `SURVEY_COMMENTS_TOO_LONG` (maps to 422), include actual/max word counts in metadata

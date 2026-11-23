@@ -4,7 +4,9 @@
 
 **Blocked by:** 02-survey-response-entity
 
-**Status:** ready-for-agent
+**Status:** resolved
+
+Resolved 2026-11-20: done in `3e37faf` and `f52ba83` (route `POST /api/v1/sessions/{sessionId}/survey`, `netlify/functions/submit-survey.ts`; tests `tests/functions/submit-survey.test.ts`, `survey-journey.feature`).
 
 - [ ] Add `SurveyResponseDocument` interface to `mongo-game-session-repository.types.ts`
 - [ ] Add `surveyResponse` field to `GameSessionDocument` interface

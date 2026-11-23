@@ -4,7 +4,9 @@
 
 **Blocked by:** 01
 
-**Status:** ready-for-agent
+**Status:** resolved
+
+Resolved 2026-11-20: done in PR #4 (merge `2976821`: `d4ac9da`, `2433b0f`, `df1b44f`, `b6dda6e`, `72345f9`); see the Comments below.
 
 - [x] Each element listed above has the right letter, actor badge and read/write outline
 - [x] Submit card lists 409 `PHASE_CLOSED_FOR_SUBMISSIONS` and 422 `CHAIN_TOPOLOGY_INVALID`

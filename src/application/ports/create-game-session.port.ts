@@ -5,6 +5,7 @@ import type {
   SessionTimerConfig,
 } from "../../domain/game-session/game-session.types.js";
 import type { BoardGridViewDto } from "../dtos/board-grid-view.dto.js";
+import type { SessionParticipantViewDto } from "../dtos/session-participant-view.dto.js";
 import type { CapabilityTokenSignerPort } from "./capability-token.port.js";
 import type { ClockPort } from "./clock.port.js";
 import type { CurriculumPackRepositoryPort } from "./curriculum-pack-repository.port.js";
@@ -46,7 +47,10 @@ export interface PublicSessionStateDto {
   readonly phaseStartedAt: string;
   /** `null` while the current phase is instructor-driven (no timer). */
   readonly phaseEndsAt: string | null;
+  /** Learners whose `leftAt` is `null`. */
   readonly participantCount: number;
+  /** Everyone who joined, in join order. */
+  readonly participants: readonly SessionParticipantViewDto[];
   /** The active Gameplay Round's board; `null` outside the rounds. */
   readonly activeBoard: BoardGridViewDto | null;
 }

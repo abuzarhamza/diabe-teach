@@ -4,7 +4,9 @@
 
 **Blocked by:** 02: Role-Based Curriculum Pack Handler & Middy Router
 
-**Status:** ready-for-agent
+**Status:** wontfix (superseded by discrete-domain-functions-middy 01-03, 2026-11-20)
+
+Closed 2026-11-20: superseded by `3c5f131` (one Netlify function per route with the shared middy chain `createApiHandler`; no central `@middy/http-router` or `netlify/functions/api.ts`, and `openapi-backend` is gone).
 
 - [ ] Update `src/app-runtime.ts` and `netlify/functions/api.ts` to expose the Middy router pipeline
 - [ ] Uninstall `openapi-backend` from `package.json`

@@ -101,6 +101,36 @@ describe("every wrapped route passes its own config to the wrapper", () => {
   it.each(routeFiles.filter(name => name !== "health.ts"))("%s", (name) => {
     const source = readFileSync(join(functionsDir, name), "utf8");
     expect(source).toContain("export const config: Config = {");
-    expect(source).toContain("export default wrapLambdaHandler(lambdaHandler, config);");
+    expect(source).toContain("export default wrapLambdaHandler(lambdaHandler, config, AppRuntime.invocationOptions);");
+  });
+});
+
+describe("wrapLambdaHandler afterInvocation", () => {
+  it("runs after the handler answers", async () => {
+    const calls: string[] = [];
+    const handler = wrapLambdaHandler(async () => {
+      calls.push("handler");
+      return { statusCode: 200, body: "{}" };
+    }, { path: "/api/v1/packs" }, {
+      afterInvocation: async () => {
+        calls.push("after");
+      },
+    });
+    const response = await handler(new Request("http://localhost/api/v1/packs"), netlifyContext({}));
+    expect(response.status).toBe(200);
+    expect(calls).toEqual(["handler", "after"]);
+  });
+
+  it("runs after the handler throws, and the error still propagates", async () => {
+    let after = 0;
+    const handler = wrapLambdaHandler(async () => {
+      throw new Error("boom");
+    }, { path: "/api/v1/packs" }, {
+      afterInvocation: async () => {
+        after += 1;
+      },
+    });
+    await expect(handler(new Request("http://localhost/api/v1/packs"), netlifyContext({}))).rejects.toThrow("boom");
+    expect(after).toBe(1);
   });
 });

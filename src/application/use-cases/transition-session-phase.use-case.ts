@@ -12,6 +12,7 @@ import type {
 import {
   ForbiddenRoleError,
   InvalidPhaseTransitionError,
+  MalformedRequestBodyError,
   SessionNotFoundError,
 } from "../../domain/errors/domain-errors.js";
 import { BoardDealer } from "../../domain/game-session/board-dealer.js";
@@ -50,6 +51,12 @@ implements TransitionSessionPhaseUseCasePort {
       );
     }
     BoardDealer.assertValidSeed(command.seed, "seed");
+    if (command.action === "jump" && command.targetPhase === undefined) {
+      throw new MalformedRequestBodyError(
+        "Missing 'targetPhase': a jump must name the next phase.",
+        { field: "targetPhase" },
+      );
+    }
 
     const now = this.#clock.now();
     const sessionId = SessionId.from(command.sessionId);

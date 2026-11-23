@@ -83,6 +83,48 @@ Then(
   },
 );
 
+/** A learner who left keeps their roster entry, with `leftAt` set (api-completion 04). */
+Then(
+  "the session state should list participant {string} who has left",
+  function (this: TestWorld, displayName: string) {
+    const body = this.lastResponseBody as {
+      state?: { participants?: Array<{ displayName: string; leftAt: string | null }> };
+    };
+    const entry = (body.state?.participants ?? []).find(p => p.displayName === displayName);
+    expect(entry !== undefined, `no participant named ${displayName}`).to.equal(true);
+    expect(Number.isNaN(Date.parse(entry?.leftAt ?? ""))).to.equal(false);
+  },
+);
+
+/** The roster comes from the session state (api-completion 01). */
+Then(
+  "the session state should list participant {string} who has not left",
+  function (this: TestWorld, displayName: string) {
+    const body = this.lastResponseBody as {
+      state?: {
+        participants?: Array<{
+          participantId: string;
+          displayName: string;
+          joinedAt: string;
+          leftAt: string | null;
+        }>;
+      };
+    };
+    const participants = body.state?.participants ?? [];
+    const entry = participants.find(p => p.displayName === displayName);
+    expect(entry !== undefined, `no participant named ${displayName}`).to.equal(true);
+    expect(entry?.participantId).to.equal(this.participantIds.get(displayName));
+    expect(Number.isNaN(Date.parse(entry?.joinedAt ?? ""))).to.equal(false);
+    expect(entry?.leftAt).to.equal(null);
+    expect(Object.keys(entry ?? {}).sort()).to.deep.equal([
+      "displayName",
+      "joinedAt",
+      "leftAt",
+      "participantId",
+    ]);
+  },
+);
+
 Then(
   "the response error code should be {string}",
   function (this: TestWorld, expectedCode: string) {
@@ -193,16 +235,5 @@ Then(
     const roundNumber
       = body.state?.activeRoundNumber ?? body.session?.activeRoundNumber;
     expect(roundNumber).to.equal(expectedRound);
-  },
-);
-
-Then(
-  "the chain should be finalized with score {int}",
-  function (this: TestWorld, expectedScore: number) {
-    const body = this.lastResponseBody as {
-      chain?: { qualityScore?: number; status?: string };
-    };
-    expect(body.chain?.qualityScore).to.equal(expectedScore);
-    expect(body.chain?.status).to.equal("instructor-finalized");
   },
 );

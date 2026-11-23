@@ -1,5 +1,9 @@
 # Issue 01: Install Netlify CLI
 
+**Status:** resolved
+
+Resolved 2026-11-20: done (`netlify-cli` devDependency, `netlify.toml` `[dev]` block and URL-based `tests/integration/support/http-client.ts` in `b368e85`; `dev:local`/`test:bdd` scripts, `BeforeAll` health check in `tests/integration/support/hooks.ts`; no Express in `package.json`).
+
 ## Task
 
 Install `@netlify/cli` as a dev dependency for local Netlify Functions emulation.

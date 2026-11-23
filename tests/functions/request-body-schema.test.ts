@@ -11,6 +11,7 @@ import { createRegisterPackHandler } from "../../netlify/functions/packs/registe
 import { createValidatePackHandler } from "../../netlify/functions/packs/validate-pack.js";
 import { createAdjudicateChainHandler } from "../../netlify/functions/sessions/adjudicate-chain.js";
 import { createCreateSessionHandler } from "../../netlify/functions/sessions/create-session.js";
+import { createExtendPhaseHandler } from "../../netlify/functions/sessions/extend-phase.js";
 import { createJoinSessionHandler } from "../../netlify/functions/sessions/join-session.js";
 import { createSubmitAssessmentHandler } from "../../netlify/functions/sessions/submit-assessment.js";
 import { createSubmitChainHandler } from "../../netlify/functions/sessions/submit-chain.js";
@@ -253,6 +254,23 @@ const ROUTES: readonly Route[] = [
     },
   },
   {
+    operationId: "extendSessionPhase",
+    path: `/api/v1/sessions/${SESSION_ID}/phase/extend`,
+    pathParameters: { sessionId: SESSION_ID },
+    needsToken: true,
+    validBody: () => ({ seconds: 60 }),
+    build: async () => {
+      const { tokens, authorization } = await capabilityRoute("instructor");
+      return {
+        handler: createExtendPhaseHandler({
+          sessionRepo: new InMemoryGameSessionRepository(),
+          tokenVerifier: tokens,
+        }) as unknown as Handler,
+        authorization,
+      };
+    },
+  },
+  {
     operationId: "submitConceptChain",
     path: `/api/v1/sessions/${SESSION_ID}/rounds/1/chains`,
     pathParameters: { sessionId: SESSION_ID, roundNumber: "1" },
@@ -270,6 +288,7 @@ const ROUTES: readonly Route[] = [
       const { tokens, authorization } = await capabilityRoute("participant");
       return {
         handler: createSubmitChainHandler({
+          packRepo: new InMemoryCurriculumPackRepository(),
           sessionRepo: new InMemoryGameSessionRepository(),
           tokenVerifier: tokens,
         }) as unknown as Handler,

@@ -56,9 +56,10 @@ export class SignInInstructorUseCase implements SignInInstructorUseCasePort {
       throw new AccountTemporarilyLockedError(lockEnd);
     }
     if (!(await this.#passwordHasher.verify(account.passwordHash, password))) {
-      account.recordFailedSignIn(now);
-      await this.#accountRepo.saveSignInCounters(account);
-      const newLockEnd = account.activeLockEnd(now);
+      // One atomic update in the repository, so concurrent wrong passwords
+      // each count once and together lock the account exactly once.
+      const updated = await this.#accountRepo.recordFailedSignIn(account.accountId, now);
+      const newLockEnd = updated?.activeLockEnd(now) ?? null;
       if (newLockEnd) {
         throw new AccountTemporarilyLockedError(newLockEnd);
       }

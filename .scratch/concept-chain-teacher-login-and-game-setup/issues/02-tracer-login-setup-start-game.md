@@ -4,7 +4,9 @@
 
 **Blocked by:** 01
 
-**Status:** ready-for-agent
+**Status:** resolved
+
+Resolved 2026-11-20: done in `fe90fcd` (`claudPoc/concept-chain/login.html`, `setup.html`), later wired to the real API in `93dbb3f`; see the Comments below.
 
 - [x] Teacher login page exists, uses the shared design, and says plainly it's a demo sign-in
 - [x] Signed-out visits to Game setup or the teacher screen redirect to Teacher login; sign-out works

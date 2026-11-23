@@ -64,6 +64,7 @@ function makeHandlers(clock: FakeClock) {
       clock,
     }),
     submitChain: createSubmitChainHandler({
+      packRepo: new InMemoryCurriculumPackRepository(),
       sessionRepo,
       tokenVerifier: tokenAdapter,
       clock,

@@ -15,6 +15,9 @@ interface CardIndices {
 }
 
 export class CurriculumPack {
+  /** Minimum chain length for a pack whose `boardConfig` doesn't set one. */
+  public static readonly DEFAULT_MIN_CHAIN_LENGTH = 4;
+
   public readonly id: PackId;
   public readonly title: string;
   public readonly version: string;
@@ -140,6 +143,18 @@ export class CurriculumPack {
       unarchivedAt: this.unarchivedAt,
       unarchivedBy: this.unarchivedBy,
     };
+  }
+
+  /**
+   * The fewest cells a Concept Chain in this pack may have: the pack's
+   * `boardConfig.minChainLength`, or {@link CurriculumPack.DEFAULT_MIN_CHAIN_LENGTH}
+   * when a stored pack doesn't set one.
+   */
+  public get minChainLength(): number {
+    const configured = (this.boardConfig as Partial<BoardConfig> | undefined)?.minChainLength;
+    return typeof configured === "number" && Number.isInteger(configured) && configured >= 2
+      ? configured
+      : CurriculumPack.DEFAULT_MIN_CHAIN_LENGTH;
   }
 
   public getCardById(cardId: string): KeywordCard | undefined {

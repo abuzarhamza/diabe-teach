@@ -1,6 +1,11 @@
 [build]
   command = "npm run typecheck"
 
+# Node is pinned to one major version, the same in `.nvmrc`, `package.json`
+# `engines` and here (api-completion ticket 14).
+[build.environment]
+  NODE_VERSION = "24"
+
 [functions]
   directory = "netlify/functions"
   node_bundler = "esbuild"
@@ -16,80 +21,9 @@
 [context.dev.environment]
   NODE_ENV = "development"
 
-# API Routes - direct to Netlify Functions (force = true ensures no fallback)
-[[redirects]]
-  from = "/api/v1/sessions"
-  to = "/.netlify/functions/create-session"
-  status = 200
-  force = true
-
-[[redirects]]
-  from = "/api/v1/sessions/join"
-  to = "/.netlify/functions/join-session"
-  status = 200
-  force = true
-
-[[redirects]]
-  from = "/api/v1/sessions/:sessionId"
-  to = "/.netlify/functions/get-session"
-  status = 200
-  force = true
-
-[[redirects]]
-  from = "/api/v1/sessions/:sessionId/phase"
-  to = "/.netlify/functions/transition-phase"
-  status = 200
-  force = true
-
-# No redirect for `/api/v1/sessions/:sessionId/rounds/:roundNumber/chains`:
-# its POST (submit-chain) and GET (list-round-chains) each route through their
-# own `config.path` and `method`. A forced redirect matches every method and
-# sent both to submit-chain (list-round-chains ticket 01).
-
-[[redirects]]
-  from = "/api/v1/sessions/:sessionId/assessments/:stage"
-  to = "/.netlify/functions/submit-assessment"
-  status = 200
-  force = true
-
-[[redirects]]
-  from = "/api/v1/sessions/:sessionId/survey"
-  to = "/.netlify/functions/submit-survey"
-  status = 200
-  force = true
-
-[[redirects]]
-  from = "/api/v1/sessions/:sessionId/rounds/:roundNumber/chains/:chainId/adjudicate"
-  to = "/.netlify/functions/adjudicate-chain"
-  status = 200
-  force = true
-
-[[redirects]]
-  from = "/api/v1/sessions/:sessionId/rounds/:roundNumber/standings"
-  to = "/.netlify/functions/get-standings"
-  status = 200
-  force = true
-
-# Curriculum Pack routes have no redirects: each pack function routes itself
-# through its own `config.path` and `method` (Netlify Functions v2). A forced
-# redirect from `/api/v1/packs` sent every method to the list function, so a
-# POST to the documented registration path could miss the register function
-# (teacher-login ticket 05). `/api/v1/packs/register` was never documented.
-
-[[redirects]]
-  from = "/api/v1/accounts/sign-up"
-  to = "/.netlify/functions/sign-up"
-  status = 200
-  force = true
-
-[[redirects]]
-  from = "/api/v1/accounts/sign-in"
-  to = "/.netlify/functions/sign-in"
-  status = 200
-  force = true
-
-[[redirects]]
-  from = "/api/v1/accounts/me"
-  to = "/.netlify/functions/get-current-account"
-  status = 200
-  force = true
+# No `/api/v1` redirects. Every API function routes itself through its own
+# `config.path` and `method` (Netlify Functions v2). A forced redirect matches
+# every method, so it once sent a GET to a POST-only function on a shared path
+# (teacher-login 05, list-round-chains 01). The pack and chains redirects went
+# first; the session and account ones were removed in api-completion ticket 10.
+# A test (tests/adapters/netlify-toml-redirects.test.ts) fails if one returns.

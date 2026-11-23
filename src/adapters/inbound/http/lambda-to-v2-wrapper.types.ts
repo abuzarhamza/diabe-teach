@@ -6,3 +6,12 @@
 export interface RouteConfig {
   readonly path?: string | readonly string[];
 }
+
+/**
+ * Optional hooks around one invocation, supplied by the composition root.
+ * `afterInvocation` runs once the handler has finished (answered or thrown),
+ * before the response is handed back.
+ */
+export interface WrapLambdaHandlerOptions {
+  readonly afterInvocation?: () => Promise<void>;
+}
