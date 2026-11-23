@@ -1,5 +1,6 @@
 import type { MiddlewareObj } from "@middy/core";
 import {
+  AccountTemporarilyLockedError,
   AdjudicationLockedError,
   AssessmentAlreadySubmittedError,
   AssessmentIncompleteError,
@@ -8,15 +9,24 @@ import {
   ChainTopologyInvalidError,
   ConcurrentUpdateConflictError,
   DomainError,
+  EmailAlreadyRegisteredError,
   ForbiddenRoleError,
+  InvalidAccountEmailError,
+  InvalidAccountPasswordError,
+  InvalidBoardSeedError,
+  InvalidCredentialsError,
   InvalidPhaseTransitionError,
   InvalidSurveyResponseError,
   InvalidTimerConfigError,
+  MalformedRequestBodyError,
+  NotEnoughKeywordCardsError,
   PackAlreadyArchivedError,
   PackAlreadyExistsError,
+  PackCannotFillBoardError,
   PackIsSystemPackError,
   PackNotArchivedError,
   PackNotFoundError,
+  PackValidationFailedError,
   PhaseClosedForSubmissionsError,
   RoomCodeNotFoundError,
   SessionNotFoundError,
@@ -32,10 +42,19 @@ export function domainErrorMiddleware(): MiddlewareObj<any, any> {
 
       if (error instanceof DomainError) {
         let statusCode = 500;
-        if (error instanceof UnauthorizedTokenError) {
+        if (
+          error instanceof UnauthorizedTokenError
+          || error instanceof InvalidCredentialsError
+        ) {
           statusCode = 401;
         }
-        else if (error instanceof InvalidTimerConfigError) {
+        else if (
+          error instanceof InvalidTimerConfigError
+          || error instanceof InvalidBoardSeedError
+          || error instanceof MalformedRequestBodyError
+          || error instanceof InvalidAccountEmailError
+          || error instanceof InvalidAccountPasswordError
+        ) {
           statusCode = 400;
         }
         else if (
@@ -56,6 +75,7 @@ export function domainErrorMiddleware(): MiddlewareObj<any, any> {
           || error instanceof SurveyAlreadySubmittedError
           || error instanceof ConcurrentUpdateConflictError
           || error instanceof ChainAlreadySubmittedError
+          || error instanceof EmailAlreadyRegisteredError
         ) {
           statusCode = 409;
         }
@@ -65,14 +85,20 @@ export function domainErrorMiddleware(): MiddlewareObj<any, any> {
         ) {
           statusCode = 403;
         }
+        else if (error instanceof AccountTemporarilyLockedError) {
+          statusCode = 423;
+        }
         else if (error instanceof ChainNotFoundError) {
           statusCode = 404;
         }
         else if (
           error instanceof ChainTopologyInvalidError
+          || error instanceof PackCannotFillBoardError
+          || error instanceof PackValidationFailedError
           || error instanceof AssessmentIncompleteError
           || error instanceof SurveyCommentsTooLongError
           || error instanceof InvalidSurveyResponseError
+          || error instanceof NotEnoughKeywordCardsError
         ) {
           statusCode = 422;
         }

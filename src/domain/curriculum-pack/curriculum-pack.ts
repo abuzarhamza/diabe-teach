@@ -31,6 +31,9 @@ export class CurriculumPack {
   public readonly authorName: string | null;
   public readonly createdAt: Date;
   public readonly archivedAt: Date | null;
+  public readonly archivedBy: string | null;
+  public readonly unarchivedAt: Date | null;
+  public readonly unarchivedBy: string | null;
 
   readonly #cardsById: ReadonlyMap<string, KeywordCard>;
   readonly #cardsByLookupKey: ReadonlyMap<string, KeywordCard>;
@@ -67,6 +70,11 @@ export class CurriculumPack {
     this.archivedAt = props.archivedAt
       ? new Date(props.archivedAt)
       : null;
+    this.archivedBy = props.archivedBy ?? null;
+    this.unarchivedAt = props.unarchivedAt
+      ? new Date(props.unarchivedAt)
+      : null;
+    this.unarchivedBy = props.unarchivedBy ?? null;
 
     const { byId, byLookup } = CurriculumPack.#buildCardIndices(this.cards);
     this.#cardsById = byId;
@@ -78,29 +86,40 @@ export class CurriculumPack {
     return new CurriculumPack(props);
   }
 
-  public archive(archivedAt: Date = new Date()): CurriculumPack {
+  /**
+   * Archives the pack, recording who did it and when. The last unarchive
+   * stays recorded too, so the pack's history can be explained.
+   */
+  public archive(
+    archivedAt: Date = new Date(),
+    archivedBy: string | null = null,
+  ): CurriculumPack {
     return new CurriculumPack({
-      id: this.id,
-      title: this.title,
-      version: this.version,
-      description: this.description,
-      boardConfig: this.boardConfig,
-      domains: this.domains,
-      cards: this.cards,
-      adjudicationRubric: this.adjudicationRubric,
-      assessmentInstrument: this.assessmentInstrument,
-      perceptionSurvey: this.perceptionSurvey,
-      isSystemPack: this.isSystemPack,
+      ...this.#props(),
       isArchived: true,
-      createdBy: this.createdBy,
-      authorName: this.authorName,
-      createdAt: this.createdAt,
       archivedAt,
+      archivedBy,
     });
   }
 
-  public unarchive(): CurriculumPack {
+  /**
+   * Unarchives the pack, recording who did it and when. The last archive
+   * (`archivedAt`, `archivedBy`) stays recorded.
+   */
+  public unarchive(
+    unarchivedAt: Date = new Date(),
+    unarchivedBy: string | null = null,
+  ): CurriculumPack {
     return new CurriculumPack({
+      ...this.#props(),
+      isArchived: false,
+      unarchivedAt,
+      unarchivedBy,
+    });
+  }
+
+  #props(): CurriculumPackProps {
+    return {
       id: this.id,
       title: this.title,
       version: this.version,
@@ -112,12 +131,15 @@ export class CurriculumPack {
       assessmentInstrument: this.assessmentInstrument,
       perceptionSurvey: this.perceptionSurvey,
       isSystemPack: this.isSystemPack,
-      isArchived: false,
+      isArchived: this.isArchived,
       createdBy: this.createdBy,
       authorName: this.authorName,
       createdAt: this.createdAt,
-      archivedAt: null,
-    });
+      archivedAt: this.archivedAt,
+      archivedBy: this.archivedBy,
+      unarchivedAt: this.unarchivedAt,
+      unarchivedBy: this.unarchivedBy,
+    };
   }
 
   public getCardById(cardId: string): KeywordCard | undefined {

@@ -1,7 +1,13 @@
 import type { Config } from "@netlify/functions";
-export { default, lambdaHandler, createValidatePackHandler } from "./packs/validate-pack.js";
+import { wrapLambdaHandler } from "../../src/adapters/inbound/http/lambda-to-v2-wrapper.js";
+import { lambdaHandler } from "./packs/validate-pack.js";
+
+export { createValidatePackHandler, lambdaHandler } from "./packs/validate-pack.js";
 
 export const config: Config = {
   path: "/api/v1/packs/validate",
   method: "POST",
 };
+
+// Route parameters come from matching the request URL against `config.path` (api-hardening 03).
+export default wrapLambdaHandler(lambdaHandler, config);

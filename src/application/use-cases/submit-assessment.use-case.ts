@@ -5,7 +5,6 @@ import type {
   AssessmentAttempt,
   McqAnswerChoice,
 } from "../../domain/game-session/game-session.types.js";
-import type { CurriculumPackRepositoryPort } from "../ports/curriculum-pack-repository.port.js";
 import type { GameSessionRepositoryPort } from "../ports/game-session-repository.port.js";
 import type {
   AssessmentStageSummary,
@@ -18,26 +17,26 @@ import type {
   SubmitAssessmentResult,
   SubmitAssessmentUseCasePort,
 } from "../ports/submit-assessment.port.js";
-import { PackId } from "../../domain/curriculum-pack/pack-id.js";
 import {
   AssessmentIncompleteError,
   ForbiddenRoleError,
-  PackNotFoundError,
   PhaseClosedForSubmissionsError,
   SessionNotFoundError,
 } from "../../domain/errors/domain-errors.js";
 import { SessionId } from "../../domain/game-session/session-id.js";
 import { GameSessionUpdateRetrier } from "../services/game-session-update-retrier.js";
+import { SessionPackLoader } from "../services/session-pack-loader.js";
 
 export class SubmitAssessmentUseCase implements SubmitAssessmentUseCasePort {
   readonly #sessionRepo: GameSessionRepositoryPort;
   readonly #sessionUpdates: GameSessionUpdateRetrier;
-  readonly #packRepo: CurriculumPackRepositoryPort;
+  /** Reads the session's pinned Pack Version (or the latest, for legacy sessions). */
+  readonly #packs: SessionPackLoader;
 
   public constructor(deps: SubmitAssessmentDependencies) {
     this.#sessionRepo = deps.sessionRepo;
     this.#sessionUpdates = new GameSessionUpdateRetrier(deps.sessionRepo);
-    this.#packRepo = deps.packRepo;
+    this.#packs = new SessionPackLoader(deps.packRepo);
   }
 
   public async execute(
@@ -66,12 +65,7 @@ export class SubmitAssessmentUseCase implements SubmitAssessmentUseCasePort {
     this.#validatePhaseForStage(loaded, command.stage, participantId);
 
     // Load curriculum pack for question validation
-    const packId = PackId.create(loaded.packId);
-    const pack = await this.#packRepo.findById(packId);
-
-    if (!pack) {
-      throw new PackNotFoundError(loaded.packId);
-    }
+    const pack = await this.#packs.load(loaded);
 
     // Validate all questions have answers
     const questions = pack.assessmentInstrument?.questions ?? [];

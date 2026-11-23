@@ -63,6 +63,8 @@ implements GameSessionRepositoryPort {
       sessionId: session.sessionId,
       roomCode: session.roomCode,
       packId: session.packId,
+      packVersion: session.packVersion,
+      ownerAccountId: session.ownerAccountId,
       mode: session.mode,
       adjudicationMode: session.adjudicationMode,
       timerConfig: session.timerConfig,
@@ -71,6 +73,7 @@ implements GameSessionRepositoryPort {
       participants: session.participants,
       activeRoundNumber: session.activeRoundNumber,
       createdAt: session.createdAt,
+      creationSeed: session.creationSeed,
       version,
       _chains: session.chains.map(chain => ConceptChain.create({
         chainId: chain.chainId,
@@ -87,6 +90,7 @@ implements GameSessionRepositoryPort {
       })),
       _assessments: session.assessmentAttempts,
       _surveyResponses: session.surveyResponses,
+      _roundBoards: session.roundBoards,
     });
   }
 }

@@ -2,7 +2,7 @@ import type { APIGatewayProxyResult } from "aws-lambda";
 import type { CapabilityTokenPort, CapabilityTokenSignerPort } from "../../../src/application/ports/capability-token.port.js";
 import type { CurriculumPackRepositoryPort } from "../../../src/application/ports/curriculum-pack-repository.port.js";
 import type { GameSessionRepositoryPort } from "../../../src/application/ports/game-session-repository.port.js";
-import { World, setWorldConstructor } from "@cucumber/cucumber";
+import { setWorldConstructor, World } from "@cucumber/cucumber";
 import { FakeClock } from "../../../src/adapters/outbound/fake-clock.js";
 
 export interface TestDependencies {
@@ -32,6 +32,18 @@ export class TestWorld extends World {
 
   public lastChainId: string | null = null;
 
+  /** A round's board noted from one response, to compare with later ones. */
+  public notedBoard: unknown = null;
+
+  /** The teacher's email for this scenario, unique per run. */
+  public teacherEmail: string | null = null;
+  /** The Instructor Account id returned by sign-up. */
+  public signedUpAccountId: string | null = null;
+  /** The signed-in teacher's Account Token, needed to start a classroom game. */
+  public accountToken: string | null = null;
+  /** The pack id this scenario registered, unique per run. */
+  public registeredPackId: string | null = null;
+
   public reset(): void {
     this.clock = new FakeClock();
     this.currentSessionId = null;
@@ -42,6 +54,11 @@ export class TestWorld extends World {
     this.lastResponse = null;
     this.lastResponseBody = null;
     this.lastChainId = null;
+    this.notedBoard = null;
+    this.teacherEmail = null;
+    this.signedUpAccountId = null;
+    this.accountToken = null;
+    this.registeredPackId = null;
   }
 
   public parseLastResponse(): void {

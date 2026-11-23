@@ -14,7 +14,11 @@ const gridCoordSchema = new Schema(
 const peerVoteSchema = new Schema(
   {
     voterParticipantId: { type: String, required: true },
-    decision: { type: String, enum: ["approve", "challenge"], required: true },
+    decision: {
+      type: String,
+      enum: ["approve", "challenge"],
+      required: true,
+    },
     comment: { type: String },
     votedAt: { type: Date, required: true },
   },
@@ -41,19 +45,71 @@ const conceptChainSchema = new Schema(
   {
     chainId: { type: String, required: true },
     participantId: { type: String, required: true },
-    roundNumber: { type: Number, enum: [1, 2], required: true },
-    path: { type: [gridCoordSchema], required: true },
-    keywordIds: { type: [String], required: true },
+    roundNumber: {
+      type: Number,
+      enum: [1, 2],
+      required: true,
+    },
+    path: {
+      type: [gridCoordSchema],
+      required: true,
+    },
+    keywordIds: {
+      type: [String],
+      required: true,
+    },
     narrativeExplanation: { type: String, required: true },
-    stepRationales: { type: [String], default: [] },
+    stepRationales: {
+      type: [String],
+      default: [],
+    },
     status: {
       type: String,
       enum: ["pending-review", "approved", "rejected"],
       default: "pending-review",
     },
-    peerVotes: { type: [peerVoteSchema], default: [] },
+    peerVotes: {
+      type: [peerVoteSchema],
+      default: [],
+    },
     verdict: { type: chainVerdictSchema, default: null },
     submittedAt: { type: Date, required: true },
+  },
+  { _id: false },
+);
+
+const keywordCardSnapshotSchema = new Schema(
+  {
+    id: { type: String, required: true },
+    verbatimLabel: { type: String, required: true },
+    displayLabel: { type: String, required: true },
+    aliases: {
+      type: [String],
+      default: [],
+    },
+    domainId: { type: String, required: true },
+    summary: { type: String, required: true },
+  },
+  { _id: false },
+);
+
+// One Gameplay Round's dealt board: cells[row][col] holds a card snapshot.
+const roundBoardSchema = new Schema(
+  {
+    roundNumber: {
+      type: Number,
+      enum: [1, 2],
+      required: true,
+    },
+    seed: { type: String, required: true },
+    rows: { type: Number, required: true },
+    cols: { type: Number, required: true },
+    cells: {
+      type: [
+        [keywordCardSnapshotSchema],
+      ],
+      required: true,
+    },
   },
   { _id: false },
 );
@@ -84,7 +140,11 @@ const timerConfigSchema = new Schema(
 const assessmentAttemptSchema = new Schema(
   {
     participantId: { type: String, required: true },
-    stage: { type: String, enum: ["pretest", "posttest"], required: true },
+    stage: {
+      type: String,
+      enum: ["pretest", "posttest"],
+      required: true,
+    },
     answers: { type: Schema.Types.Mixed, required: true },
     submittedAt: { type: Date, required: true },
   },
@@ -104,8 +164,19 @@ const surveyResponseSchema = new Schema(
 export const gameSessionSchema = new Schema(
   {
     _id: { type: String, required: true },
-    roomCode: { type: String, required: true, unique: true, index: true },
+    roomCode: {
+      type: String,
+      required: true,
+      unique: true,
+      index: true,
+    },
     packId: { type: String, required: true },
+    // The pinned Pack Version. Sessions stored before pinning have none and
+    // read the pack's latest version.
+    packVersion: { type: String, default: null },
+    // The Instructor Account that started the session; null for solo
+    // sessions and for sessions stored before accounts existed.
+    ownerAccountId: { type: String, default: null },
     mode: {
       type: String,
       enum: ["solo", "classroom", "study-rct"],
@@ -135,10 +206,23 @@ export const gameSessionSchema = new Schema(
       default: "pretest",
     },
     phaseStartedAt: { type: Date, required: true },
-    participants: { type: [participantSchema], default: [] },
-    activeRoundNumber: { type: Number, enum: [1, 2, null], default: null },
-    chains: { type: [conceptChainSchema], default: [] },
-    assessments: { type: [assessmentAttemptSchema], default: [] },
+    participants: {
+      type: [participantSchema],
+      default: [],
+    },
+    activeRoundNumber: {
+      type: Number,
+      enum: [1, 2, null],
+      default: null,
+    },
+    chains: {
+      type: [conceptChainSchema],
+      default: [],
+    },
+    assessments: {
+      type: [assessmentAttemptSchema],
+      default: [],
+    },
     surveyResponses: {
       type: [surveyResponseSchema],
       default: [],
@@ -146,6 +230,13 @@ export const gameSessionSchema = new Schema(
     // Legacy single survey response, kept so old documents load; written as null.
     surveyResponse: { type: surveyResponseSchema, default: null },
     createdAt: { type: Date, required: true },
+    // Round 1's board seed given at creation. Sessions stored before boards
+    // have neither field and load with no seed and no boards.
+    creationSeed: { type: String, default: null },
+    roundBoards: {
+      type: [roundBoardSchema],
+      default: [],
+    },
     // Optimistic-concurrency version. Sessions stored before it existed have
     // no value and are read as 0.
     version: { type: Number },

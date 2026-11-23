@@ -4,7 +4,7 @@
 [functions]
   directory = "netlify/functions"
   node_bundler = "esbuild"
-  external_node_modules = ["mongoose", "mongodb"]
+  external_node_modules = ["mongoose", "mongodb", "@node-rs/argon2"]
 
 [dev]
   port = 8888
@@ -41,11 +41,10 @@
   status = 200
   force = true
 
-[[redirects]]
-  from = "/api/v1/sessions/:sessionId/rounds/:roundNumber/chains"
-  to = "/.netlify/functions/submit-chain"
-  status = 200
-  force = true
+# No redirect for `/api/v1/sessions/:sessionId/rounds/:roundNumber/chains`:
+# its POST (submit-chain) and GET (list-round-chains) each route through their
+# own `config.path` and `method`. A forced redirect matches every method and
+# sent both to submit-chain (list-round-chains ticket 01).
 
 [[redirects]]
   from = "/api/v1/sessions/:sessionId/assessments/:stage"
@@ -71,38 +70,26 @@
   status = 200
   force = true
 
+# Curriculum Pack routes have no redirects: each pack function routes itself
+# through its own `config.path` and `method` (Netlify Functions v2). A forced
+# redirect from `/api/v1/packs` sent every method to the list function, so a
+# POST to the documented registration path could miss the register function
+# (teacher-login ticket 05). `/api/v1/packs/register` was never documented.
+
 [[redirects]]
-  from = "/api/v1/packs"
-  to = "/.netlify/functions/list-packs"
+  from = "/api/v1/accounts/sign-up"
+  to = "/.netlify/functions/sign-up"
   status = 200
   force = true
 
 [[redirects]]
-  from = "/api/v1/packs/register"
-  to = "/.netlify/functions/register-pack"
+  from = "/api/v1/accounts/sign-in"
+  to = "/.netlify/functions/sign-in"
   status = 200
   force = true
 
 [[redirects]]
-  from = "/api/v1/packs/validate"
-  to = "/.netlify/functions/validate-pack"
-  status = 200
-  force = true
-
-[[redirects]]
-  from = "/api/v1/packs/:packId"
-  to = "/.netlify/functions/get-pack-by-id"
-  status = 200
-  force = true
-
-[[redirects]]
-  from = "/api/v1/packs/:packId/archive"
-  to = "/.netlify/functions/archive-pack"
-  status = 200
-  force = true
-
-[[redirects]]
-  from = "/api/v1/packs/:packId/unarchive"
-  to = "/.netlify/functions/unarchive-pack"
+  from = "/api/v1/accounts/me"
+  to = "/.netlify/functions/get-current-account"
   status = 200
   force = true

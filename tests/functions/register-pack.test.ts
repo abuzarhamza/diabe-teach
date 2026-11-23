@@ -3,6 +3,18 @@ import { describe, expect, it } from "vitest";
 import { createRegisterPackHandler } from "../../netlify/functions/packs/register-pack.js";
 import { FakeCapabilityTokenAdapter } from "../../src/adapters/outbound/fake-capability-token-adapter.js";
 import { InMemoryCurriculumPackRepository } from "../../src/adapters/outbound/in-memory-curriculum-pack-repository.js";
+import { SignedInTeachers } from "./support/signed-in-teacher.js";
+
+function createCards(count: number): Array<Record<string, unknown>> {
+  return Array.from({ length: count }, (_, index) => ({
+    id: `card-${index + 1}`,
+    verbatimLabel: `Card ${index + 1}`,
+    displayLabel: `Card ${index + 1}`,
+    aliases: [],
+    domainId: "domain-1",
+    summary: `Card number ${index + 1}`,
+  }));
+}
 
 function createMinimalValidPack(): Record<string, unknown> {
   return {
@@ -19,16 +31,8 @@ function createMinimalValidPack(): Record<string, unknown> {
     domains: [
       { id: "domain-1", label: "Domain 1", description: "First domain" },
     ],
-    cards: [
-      {
-        id: "card-1",
-        verbatimLabel: "Card 1",
-        displayLabel: "Card 1",
-        aliases: [],
-        domainId: "domain-1",
-        summary: "First card",
-      },
-    ],
+    // A 3×3 board needs at least 9 Keyword Cards.
+    cards: createCards(9),
     adjudicationRubric: {
       evaluatorPersona: "Test Evaluator",
       subjectDomain: "Testing",
@@ -42,25 +46,25 @@ function createMinimalValidPack(): Record<string, unknown> {
 }
 
 interface TestContext {
-  tokenAdapter: FakeCapabilityTokenAdapter;
+  teachers: SignedInTeachers;
   packRepo: InMemoryCurriculumPackRepository;
   deps: {
     packRepo: InMemoryCurriculumPackRepository;
-    tokenVerifier: FakeCapabilityTokenAdapter;
+    accountTokenVerifier: SignedInTeachers["verifier"];
     apiKey: string;
     requireApiKey: boolean;
   };
 }
 
 function createTestContext(): TestContext {
-  const tokenAdapter = new FakeCapabilityTokenAdapter();
+  const teachers = new SignedInTeachers();
   const packRepo = new InMemoryCurriculumPackRepository([]);
   return {
-    tokenAdapter,
+    teachers,
     packRepo,
     deps: {
       packRepo,
-      tokenVerifier: tokenAdapter,
+      accountTokenVerifier: teachers.verifier,
       apiKey: "test-api-key",
       requireApiKey: true,
     },
@@ -96,10 +100,7 @@ describe("pOST /api/v1/packs", () => {
     const ctx = createTestContext();
     const handler = createRegisterPackHandler(ctx.deps);
     const pack = createMinimalValidPack();
-    const token = await ctx.tokenAdapter.signToken({
-      sessionId: "instructor-session",
-      role: "instructor",
-    });
+    const token = await ctx.teachers.tokenFor();
 
     const result = (await handler(
       createEvent(pack, token),
@@ -116,10 +117,7 @@ describe("pOST /api/v1/packs", () => {
     const ctx = createTestContext();
     const handler = createRegisterPackHandler(ctx.deps);
     const pack = createMinimalValidPack();
-    const token = await ctx.tokenAdapter.signToken({
-      sessionId: "instructor-session",
-      role: "instructor",
-    });
+    const token = await ctx.teachers.tokenFor();
 
     await handler(createEvent(pack, token), {} as never);
 
@@ -130,18 +128,34 @@ describe("pOST /api/v1/packs", () => {
 
     expect(result.statusCode).toBe(409);
     const body = JSON.parse(result.body);
-    expect(body.error.code).toBe("PACK_ALREADY_EXISTS");
+    expect(body).not.toHaveProperty("error");
+    expect(body.code).toBe("PACK_ALREADY_EXISTS");
+    expect(body.message).toBe("Curriculum Pack 'test-pack' version '1.0.0' already exists.");
   });
 
-  it("returns 422 for invalid pack structure", async () => {
+  it("returns 400 naming the first missing required field (request schema, api-hardening 06)", async () => {
     const ctx = createTestContext();
     const handler = createRegisterPackHandler(ctx.deps);
-    const token = await ctx.tokenAdapter.signToken({
-      sessionId: "instructor-session",
-      role: "instructor",
-    });
+    const token = await ctx.teachers.tokenFor();
+
+    const result = (await handler(
+      createEvent({ id: "Invalid ID!", title: "" }, token),
+      {} as never,
+    )) as APIGatewayProxyResult;
+
+    expect(result.statusCode).toBe(400);
+    const body = JSON.parse(result.body);
+    expect(body.code).toBe("INVALID_REQUEST_BODY");
+    expect(body.details).toEqual({ field: "version", reason: "is required" });
+  });
+
+  it("returns 422 for a well-shaped pack that breaks the pack rules", async () => {
+    const ctx = createTestContext();
+    const handler = createRegisterPackHandler(ctx.deps);
+    const token = await ctx.teachers.tokenFor();
 
     const invalidPack = {
+      ...createMinimalValidPack(),
       id: "Invalid ID!",
       title: "",
     };
@@ -153,16 +167,19 @@ describe("pOST /api/v1/packs", () => {
 
     expect(result.statusCode).toBe(422);
     const body = JSON.parse(result.body);
-    expect(body.error.code).toBe("PACK_VALIDATION_FAILED");
-    expect(body.error.errors.length).toBeGreaterThan(0);
+    expect(body).not.toHaveProperty("error");
+    expect(body.code).toBe("PACK_VALIDATION_FAILED");
+    expect(typeof body.message).toBe("string");
+    expect(body.details.errors.length).toBeGreaterThan(0);
+    expect(Array.isArray(body.details.warnings)).toBe(true);
   });
 
-  it("returns 403 for non-instructor role", async () => {
+  it("returns 401 for an instructor Capability Token instead of an Account Token", async () => {
     const ctx = createTestContext();
     const handler = createRegisterPackHandler(ctx.deps);
-    const token = await ctx.tokenAdapter.signToken({
-      sessionId: "participant-session",
-      role: "participant",
+    const token = await new FakeCapabilityTokenAdapter().signToken({
+      sessionId: "instructor-session",
+      role: "instructor",
     });
 
     const result = (await handler(
@@ -170,16 +187,13 @@ describe("pOST /api/v1/packs", () => {
       {} as never,
     )) as APIGatewayProxyResult;
 
-    expect(result.statusCode).toBe(403);
+    expect(result.statusCode).toBe(401);
   });
 
   it("allows registering same packId with different version", async () => {
     const ctx = createTestContext();
     const handler = createRegisterPackHandler(ctx.deps);
-    const token = await ctx.tokenAdapter.signToken({
-      sessionId: "instructor-session",
-      role: "instructor",
-    });
+    const token = await ctx.teachers.tokenFor();
 
     const pack1 = createMinimalValidPack();
     pack1.version = "1.0.0";
@@ -196,5 +210,52 @@ describe("pOST /api/v1/packs", () => {
     expect(result.statusCode).toBe(201);
     const body = JSON.parse(result.body);
     expect(body.version).toBe("2.0.0");
+  });
+
+  describe("pack capacity: the cards must fill the board", () => {
+    async function register(ctx: TestContext, pack: Record<string, unknown>) {
+      const handler = createRegisterPackHandler(ctx.deps);
+      const token = await ctx.teachers.tokenFor();
+      return (await handler(
+        createEvent(pack, token),
+        {} as never,
+      )) as APIGatewayProxyResult;
+    }
+
+    it("refuses a pack with fewer cards than rows × cols and stores nothing", async () => {
+      const ctx = createTestContext();
+      const pack = createMinimalValidPack();
+      pack.cards = createCards(8);
+
+      const result = await register(ctx, pack);
+
+      expect(result.statusCode).toBe(422);
+      const body = JSON.parse(result.body);
+      expect(body).not.toHaveProperty("error");
+      expect(body.code).toBe("PACK_VALIDATION_FAILED");
+      expect(
+        body.details.errors.some((e: { code: string; path: string }) =>
+          e.code === "INSUFFICIENT_CARDS" && e.path === "cards"),
+      ).toBe(true);
+      expect(await ctx.packRepo.existsByIdAndVersion("test-pack", "1.0.0")).toBe(false);
+    });
+
+    it("registers a pack with exactly rows × cols cards", async () => {
+      const ctx = createTestContext();
+
+      const result = await register(ctx, createMinimalValidPack());
+
+      expect(result.statusCode).toBe(201);
+    });
+
+    it("registers a pack with more cards than rows × cols", async () => {
+      const ctx = createTestContext();
+      const pack = createMinimalValidPack();
+      pack.cards = createCards(12);
+
+      const result = await register(ctx, pack);
+
+      expect(result.statusCode).toBe(201);
+    });
   });
 });

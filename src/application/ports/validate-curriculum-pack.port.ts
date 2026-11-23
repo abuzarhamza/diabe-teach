@@ -15,7 +15,7 @@ export interface ValidationWarning {
 export interface ValidateCurriculumPackInput {
   readonly pack: Omit<
     CurriculumPackProps,
-    "id" | "isSystemPack" | "isArchived" | "createdBy" | "authorName" | "createdAt" | "archivedAt"
+    "id" | "isSystemPack" | "isArchived" | "createdBy" | "authorName" | "createdAt" | "archivedAt" | "archivedBy" | "unarchivedAt" | "unarchivedBy"
   > & { readonly id: string };
 }
 

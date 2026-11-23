@@ -1,6 +1,5 @@
 import type { APIGatewayProxyEvent } from "aws-lambda";
 import { describe, expect, it } from "vitest";
-import { createCreateSessionHandler } from "../../netlify/functions/sessions/create-session.js";
 import { createGetSessionHandler } from "../../netlify/functions/sessions/get-session.js";
 import { createJoinSessionHandler } from "../../netlify/functions/sessions/join-session.js";
 import { createSubmitChainHandler } from "../../netlify/functions/sessions/submit-chain.js";
@@ -10,6 +9,7 @@ import { FakeClock } from "../../src/adapters/outbound/fake-clock.js";
 import { InMemoryCurriculumPackRepository } from "../../src/adapters/outbound/in-memory-curriculum-pack-repository.js";
 import { InMemoryGameSessionRepository } from "../../src/adapters/outbound/in-memory-game-session-repository.js";
 import { DIABE_TEACH_PACK } from "../../src/domain/curriculum-pack/diabe-teach-pack.js";
+import { createSignedInCreateSessionHandler } from "./support/signed-in-teacher.js";
 
 function makeEvent(
   method: string,
@@ -49,7 +49,7 @@ function makeHandlers(clock: FakeClock) {
   const tokenAdapter = new FakeCapabilityTokenAdapter();
 
   return {
-    create: createCreateSessionHandler({
+    create: createSignedInCreateSessionHandler({
       packRepo,
       sessionRepo,
       tokenSigner: tokenAdapter,
@@ -59,6 +59,7 @@ function makeHandlers(clock: FakeClock) {
     get: createGetSessionHandler({ sessionRepo, tokenVerifier: tokenAdapter }),
     transition: createTransitionPhaseHandler({
       sessionRepo,
+      packRepo,
       tokenVerifier: tokenAdapter,
       clock,
     }),
@@ -452,7 +453,11 @@ describe("instructor-driven (untimed) phases", () => {
 
     expect(created.statusCode).toBe(400);
     expect(created.body.code).toBe("INVALID_REQUEST_BODY");
-    expect(created.body.details).toEqual({ field: "roundMappingSec", value });
+    // The request schema catches it first and names the JSON path (api-hardening 06).
+    expect(created.body.details).toEqual({
+      field: "timerConfig.roundMappingSec",
+      reason: expect.any(String),
+    });
   });
 
   it("rejects an unknown timer field at create time with INVALID_REQUEST_BODY", async () => {
@@ -470,7 +475,7 @@ describe("instructor-driven (untimed) phases", () => {
 
     expect(created.statusCode).toBe(400);
     expect(created.body.code).toBe("INVALID_REQUEST_BODY");
-    expect(created.body.details).toEqual({ field: "roundMapingSec", value: null });
+    expect(created.body.details).toEqual({ field: "timerConfig.roundMapingSec", reason: "is not allowed" });
   });
 
   it.each([

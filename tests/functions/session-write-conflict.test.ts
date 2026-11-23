@@ -154,7 +154,11 @@ describe("session writes that lose a concurrent-update race", () => {
     const { session, sessionId, store, tokenAdapter, aliceToken, instructorToken } = await setUpChainMappingSession();
     const sessionRepo = new RaceBeforeFirstSaveSessionRepository(store);
     const submitChain = createSubmitChainHandler({ sessionRepo, tokenVerifier: tokenAdapter });
-    const transitionPhase = createTransitionPhaseHandler({ sessionRepo, tokenVerifier: tokenAdapter });
+    const transitionPhase = createTransitionPhaseHandler({
+      sessionRepo,
+      packRepo: new InMemoryCurriculumPackRepository(),
+      tokenVerifier: tokenAdapter,
+    });
     sessionRepo.raceWith(async () => {
       const transitioned = await transitionPhase(makeAdvancePhaseEvent(sessionId, instructorToken), {} as never);
       expect(transitioned.statusCode).toBe(200);
@@ -334,7 +338,7 @@ async function setUpSession<TRepo extends CountingSessionRepository>(
     bobToken: await tokenAdapter.signToken({ role: "participant", sessionId, participantId: bob.participantId }),
     instructorToken: await tokenAdapter.signToken({ role: "instructor", sessionId }),
     join: createJoinSessionHandler({ ...handlerDeps, tokenSigner: tokenAdapter }),
-    transitionPhase: createTransitionPhaseHandler(handlerDeps),
+    transitionPhase: createTransitionPhaseHandler({ ...handlerDeps, packRepo }),
     adjudicateChain: createAdjudicateChainHandler(handlerDeps),
     submitAssessment: createSubmitAssessmentHandler({ ...handlerDeps, packRepo }),
     submitSurvey: createSubmitSurveyHandler({ ...handlerDeps, packRepo }),

@@ -18,6 +18,20 @@ export interface CurriculumPackSummaryDto {
   readonly hasPerceptionSurvey: boolean;
 }
 
+/**
+ * A pack as the pack list shows it: the summary of its latest Pack Version,
+ * plus who released that version and whether the pack is archived.
+ */
+export interface CurriculumPackListItemDto extends CurriculumPackSummaryDto {
+  /**
+   * The releasing account's email before the @, or null when the version's
+   * `createdBy` is not an Instructor Account (packs registered before
+   * accounts, and System Packs). Never the full email.
+   */
+  readonly authorHandle: string | null;
+  readonly isArchived: boolean;
+}
+
 export interface PublicAssessmentQuestionDto {
   readonly id: string;
   readonly bloomLevel: 2 | 3;

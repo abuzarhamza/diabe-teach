@@ -28,6 +28,13 @@ describe("appRuntime and Seeder Integration with .env.dev.yaml (Ticket 02)", () 
     expect(loaded.apiKey).toBe("override-api-key");
   });
 
+  it("drops the API key only when DEV_DISABLE_API_KEY=true under netlify dev (npm run dev:prototype)", () => {
+    const base = { API_KEY: "override-api-key" };
+    expect(AppRuntime.loadEnvConfig({ ...base, DEV_DISABLE_API_KEY: "true", NETLIFY_DEV: "true" }).apiKey).toBeUndefined();
+    expect(AppRuntime.loadEnvConfig({ ...base, DEV_DISABLE_API_KEY: "true" }).apiKey).toBe("override-api-key");
+    expect(AppRuntime.loadEnvConfig({ ...base, NETLIFY_DEV: "true" }).apiKey).toBe("override-api-key");
+  });
+
   it("curriculumPackSeeder resolves config via AppRuntime when no explicit options are provided", () => {
     // Test that CurriculumPackSeeder resolveOptions returns the loaded .env.dev.yaml config
     const resolved = CurriculumPackSeeder.resolveOptions();

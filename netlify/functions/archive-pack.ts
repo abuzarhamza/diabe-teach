@@ -1,7 +1,13 @@
 import type { Config } from "@netlify/functions";
-export { default, lambdaHandler, createArchivePackHandler } from "./packs/archive-pack.js";
+import { wrapLambdaHandler } from "../../src/adapters/inbound/http/lambda-to-v2-wrapper.js";
+import { lambdaHandler } from "./packs/archive-pack.js";
+
+export { createArchivePackHandler, lambdaHandler } from "./packs/archive-pack.js";
 
 export const config: Config = {
   path: "/api/v1/packs/:packId/archive",
   method: "POST",
 };
+
+// Route parameters come from matching the request URL against `config.path` (api-hardening 03).
+export default wrapLambdaHandler(lambdaHandler, config);

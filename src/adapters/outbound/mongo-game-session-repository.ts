@@ -1,6 +1,8 @@
 import type { Connection, Model } from "mongoose";
 import type { GameSessionRepositoryPort } from "../../application/ports/game-session-repository.port.js";
+import type { AssessmentAttempt, LikertRating, McqAnswerChoice, SurveyResponse } from "../../domain/game-session/game-session.types.js";
 import type { RoomCode } from "../../domain/game-session/room-code.js";
+import type { RoundBoard } from "../../domain/game-session/round-board.types.js";
 import type { SessionId } from "../../domain/game-session/session-id.js";
 import type {
   AssessmentAttemptDocument,
@@ -10,18 +12,18 @@ import type {
   MongoGameSessionConnectionConfig,
   MongoGameSessionRepositoryOptions,
   ParticipantDocument,
+  RoundBoardDocument,
   SurveyResponseDocument,
 } from "./mongo-game-session-repository.types.js";
-import type { AssessmentAttempt, LikertRating, McqAnswerChoice, SurveyResponse } from "../../domain/game-session/game-session.types.js";
 import { ConcurrentUpdateConflictError } from "../../domain/errors/domain-errors.js";
 import { ConceptChain } from "../../domain/game-session/concept-chain.js";
 import { GameSession } from "../../domain/game-session/game-session.js";
+import { DEFAULT_MONGODB_DB_NAME } from "./curriculum-pack.schema.js";
 import {
   GAME_SESSION_MODEL_NAME,
   GAME_SESSIONS_COLLECTION,
   gameSessionSchema,
 } from "./game-session.schema.js";
-import { DEFAULT_MONGODB_DB_NAME } from "./curriculum-pack.schema.js";
 import { MongoConnectionManager } from "./mongo-client-singleton.js";
 
 export {
@@ -43,13 +45,13 @@ export class MongoGameSessionRepository implements GameSessionRepositoryPort {
   public static getModel(connection: Connection): Model<GameSessionDocument> {
     return (
       (connection.models[GAME_SESSION_MODEL_NAME] as
-        | Model<GameSessionDocument>
-        | undefined) ??
-      connection.model<GameSessionDocument>(
-        GAME_SESSION_MODEL_NAME,
-        gameSessionSchema,
-        GAME_SESSIONS_COLLECTION,
-      )
+      | Model<GameSessionDocument>
+      | undefined)
+    ?? connection.model<GameSessionDocument>(
+      GAME_SESSION_MODEL_NAME,
+      gameSessionSchema,
+      GAME_SESSIONS_COLLECTION,
+    )
     );
   }
 
@@ -69,7 +71,7 @@ export class MongoGameSessionRepository implements GameSessionRepositoryPort {
         );
         const model = MongoGameSessionRepository.getModel(connection);
         return {
-          findOne: async (filter) =>
+          findOne: async filter =>
             model.findOne(filter).lean<GameSessionDocument | null>().exec(),
           find: async (filter = {}) =>
             model.find(filter).lean<GameSessionDocument[]>().exec(),
@@ -94,13 +96,17 @@ export class MongoGameSessionRepository implements GameSessionRepositoryPort {
   public async findById(sessionId: SessionId): Promise<GameSession | null> {
     const collection = await this.#getCollection();
     const doc = await collection.findOne({ _id: sessionId.value });
-    return doc ? MongoGameSessionRepository.#toDomain(doc) : null;
+    return doc
+      ? MongoGameSessionRepository.#toDomain(doc)
+      : null;
   }
 
   public async findByRoomCode(roomCode: RoomCode): Promise<GameSession | null> {
     const collection = await this.#getCollection();
     const doc = await collection.findOne({ roomCode: roomCode.value });
-    return doc ? MongoGameSessionRepository.#toDomain(doc) : null;
+    return doc
+      ? MongoGameSessionRepository.#toDomain(doc)
+      : null;
   }
 
   /**
@@ -131,7 +137,7 @@ export class MongoGameSessionRepository implements GameSessionRepositoryPort {
 
   static #toDomain(doc: GameSessionDocument): GameSession {
     // Restore chains for rehydration
-    const chains = doc.chains.map((chainDoc) =>
+    const chains = doc.chains.map(chainDoc =>
       ConceptChain.create({
         chainId: chainDoc.chainId,
         participantId: chainDoc.participantId,
@@ -176,6 +182,8 @@ export class MongoGameSessionRepository implements GameSessionRepositoryPort {
       sessionId: doc._id,
       roomCode: doc.roomCode,
       packId: doc.packId,
+      packVersion: doc.packVersion ?? null,
+      ownerAccountId: doc.ownerAccountId ?? null,
       mode: doc.mode,
       adjudicationMode: doc.adjudicationMode,
       timerConfig: doc.timerConfig,
@@ -188,11 +196,31 @@ export class MongoGameSessionRepository implements GameSessionRepositoryPort {
       })),
       activeRoundNumber: doc.activeRoundNumber,
       createdAt: doc.createdAt,
+      creationSeed: doc.creationSeed ?? null,
       version: doc.version ?? 0,
       _chains: chains,
       _assessments: assessments,
       _surveyResponses: surveyResponses,
+      _roundBoards: (doc.roundBoards ?? []).map(MongoGameSessionRepository.#copyRoundBoard),
     });
+  }
+
+  /** Copies a round board card by card; serves both loading and saving. */
+  static #copyRoundBoard(board: RoundBoard): RoundBoardDocument {
+    return {
+      roundNumber: board.roundNumber,
+      seed: board.seed,
+      rows: board.rows,
+      cols: board.cols,
+      cells: board.cells.map(row => row.map(card => ({
+        id: card.id,
+        verbatimLabel: card.verbatimLabel,
+        displayLabel: card.displayLabel,
+        aliases: [...card.aliases],
+        domainId: card.domainId,
+        summary: card.summary,
+      }))),
+    };
   }
 
   static #toDocument(session: GameSession): GameSessionDocument {
@@ -200,18 +228,20 @@ export class MongoGameSessionRepository implements GameSessionRepositoryPort {
       _id: session.sessionId.value,
       roomCode: session.roomCode.value,
       packId: session.packId,
+      packVersion: session.packVersion,
+      ownerAccountId: session.ownerAccountId,
       mode: session.mode,
       adjudicationMode: session.adjudicationMode,
       timerConfig: session.timerConfig,
       currentPhase: session.currentPhase,
       phaseStartedAt: session.phaseStartedAt,
-      participants: session.participants.map((p) => ({
+      participants: session.participants.map(p => ({
         participantId: p.participantId,
         displayName: p.displayName,
         joinedAt: p.joinedAt,
       })),
       activeRoundNumber: session.activeRoundNumber,
-      chains: session.chains.map((c) =>
+      chains: session.chains.map(c =>
         MongoGameSessionRepository.#chainToDocument(c),
       ),
       assessments: MongoGameSessionRepository.#assessmentsToDocument(session.assessmentAttempts),
@@ -221,6 +251,8 @@ export class MongoGameSessionRepository implements GameSessionRepositoryPort {
       // Clears the legacy single-response field so it cannot diverge from the list.
       surveyResponse: null,
       createdAt: session.createdAt,
+      creationSeed: session.creationSeed,
+      roundBoards: session.roundBoards.map(MongoGameSessionRepository.#copyRoundBoard),
     };
   }
 

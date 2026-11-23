@@ -190,6 +190,44 @@ export class PackNotArchivedError extends DomainError {
   }
 }
 
+/**
+ * The Curriculum Pack failed the pack validator on registration. `details`
+ * carries the validator's `errors` and `warnings` lists.
+ */
+export class PackValidationFailedError extends DomainError {
+  public readonly code = "PACK_VALIDATION_FAILED" as const;
+
+  public constructor(errors: readonly unknown[], warnings: readonly unknown[]) {
+    super(
+      `The Curriculum Pack failed validation with ${errors.length} error(s).`,
+      { errors, warnings },
+    );
+  }
+}
+
+/**
+ * The Curriculum Pack has fewer Keyword Cards than its `rows × cols` board,
+ * so a Game Session could not deal a full board. Guards packs stored before
+ * the pack validator enforced this.
+ */
+export class PackCannotFillBoardError extends DomainError {
+  public readonly code = "PACK_VALIDATION_FAILED" as const;
+
+  public constructor(packId: string, cardCount: number, rows: number, cols: number) {
+    const requiredCardCount = rows * cols;
+    super(
+      `Curriculum Pack '${packId}' has ${cardCount} Keyword Cards but its ${rows}×${cols} board needs at least ${requiredCardCount}, so a Game Session cannot deal a full board.`,
+      {
+        packId,
+        cardCount,
+        rows,
+        cols,
+        requiredCardCount,
+      },
+    );
+  }
+}
+
 export class AssessmentAlreadySubmittedError extends DomainError {
   public readonly code = "ASSESSMENT_ALREADY_SUBMITTED" as const;
 
@@ -256,6 +294,37 @@ export class InvalidTimerConfigError extends DomainError {
   }
 }
 
+export class InvalidBoardSeedError extends DomainError {
+  public readonly code = "INVALID_REQUEST_BODY" as const;
+
+  public constructor(field: string, value: unknown) {
+    super(
+      `Invalid '${field}': a board seed must be a non-empty string.`,
+      { field, value },
+    );
+  }
+}
+
+/**
+ * A round's board cannot be dealt because the Curriculum Pack has fewer
+ * Keyword Cards than the board has cells.
+ */
+export class NotEnoughKeywordCardsError extends DomainError {
+  public readonly code = "PACK_VALIDATION_FAILED" as const;
+
+  public constructor(cardCount: number, rows: number, cols: number) {
+    super(
+      `Cannot deal a ${rows}×${cols} board: the Curriculum Pack has only ${cardCount} Keyword Cards, and ${rows * cols} are needed.`,
+      {
+        cardCount,
+        rows,
+        cols,
+        requiredCardCount: rows * cols,
+      },
+    );
+  }
+}
+
 /**
  * A Game Session save found the stored session at a different version than
  * the one that was loaded (or no stored session at all), so another write got
@@ -268,6 +337,79 @@ export class ConcurrentUpdateConflictError extends DomainError {
     super(
       `Game Session '${sessionId}' was changed by another request. Reload it and try again.`,
       { sessionId, expectedVersion },
+    );
+  }
+}
+
+/**
+ * A request body that could not be read as a JSON object, or that is missing
+ * a required field.
+ */
+export class MalformedRequestBodyError extends DomainError {
+  public readonly code = "INVALID_REQUEST_BODY" as const;
+
+  public constructor(message = "The request body must be a JSON object.", details?: Readonly<Record<string, unknown>>) {
+    super(message, details);
+  }
+}
+
+/** An Instructor Account email that is missing or not shaped like an email. */
+export class InvalidAccountEmailError extends DomainError {
+  public readonly code = "INVALID_REQUEST_BODY" as const;
+
+  public constructor() {
+    super("A valid email address is required.", { field: "email" });
+  }
+}
+
+/** An Instructor Account password that is missing, too short or too long. */
+export class InvalidAccountPasswordError extends DomainError {
+  public readonly code = "INVALID_REQUEST_BODY" as const;
+
+  public constructor(minLength: number, maxLength: number) {
+    super(
+      `A password of at least ${minLength} characters (and at most ${maxLength}) is required.`,
+      { field: "password", minLength, maxLength },
+    );
+  }
+}
+
+/** Sign-up with an email that already belongs to an Instructor Account. */
+export class EmailAlreadyRegisteredError extends DomainError {
+  public readonly code = "EMAIL_ALREADY_REGISTERED" as const;
+
+  public constructor() {
+    super("An Instructor Account with this email already exists.");
+  }
+}
+
+/**
+ * Sign-in with an unknown email or a wrong password. Both get this same
+ * error, with no details, so the response never reveals which emails have
+ * accounts.
+ */
+export class InvalidCredentialsError extends DomainError {
+  public readonly code = "INVALID_CREDENTIALS" as const;
+
+  public constructor() {
+    super("Email or password is incorrect.");
+  }
+}
+
+/**
+ * Sign-in to an Instructor Account that is locked after too many wrong
+ * passwords in a row. Refused even with the right password until the lock
+ * ends; distinct from INVALID_CREDENTIALS so the teacher knows to wait.
+ */
+export class AccountTemporarilyLockedError extends DomainError {
+  public readonly code = "ACCOUNT_TEMPORARILY_LOCKED" as const;
+
+  public constructor(lockedUntil: Date) {
+    super(
+      "Too many wrong passwords. Sign-in is temporarily locked; try again later.",
+      {
+        lockedUntil: lockedUntil.toISOString(),
+      },
     );
   }
 }

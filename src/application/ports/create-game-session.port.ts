@@ -4,6 +4,7 @@ import type {
   SessionMode,
   SessionTimerConfig,
 } from "../../domain/game-session/game-session.types.js";
+import type { BoardGridViewDto } from "../dtos/board-grid-view.dto.js";
 import type { CapabilityTokenSignerPort } from "./capability-token.port.js";
 import type { ClockPort } from "./clock.port.js";
 import type { CurriculumPackRepositoryPort } from "./curriculum-pack-repository.port.js";
@@ -21,14 +22,23 @@ export interface CreateGameSessionCommand {
   readonly mode: SessionMode;
   readonly adjudicationMode: AdjudicationMode;
   readonly timerConfig?: Partial<SessionTimerConfig>;
+  /** Seeds Round 1's board (unless the transition into Round 1 sends its own). */
   readonly seed?: string;
   readonly creatorDisplayName?: string;
+  /**
+   * The Instructor Account whose Account Token came with the request, or
+   * null without one. Every mode except solo requires it and stores it as
+   * the session's owner; solo sessions ignore it and stay anonymous.
+   */
+  readonly ownerAccountId?: string | null;
 }
 
 export interface PublicSessionStateDto {
   readonly sessionId: string;
   readonly roomCode: string;
   readonly packId: string;
+  /** The pinned Pack Version; `null` for sessions stored before pinning. */
+  readonly packVersion: string | null;
   readonly mode: SessionMode;
   readonly adjudicationMode: AdjudicationMode;
   readonly currentPhase: PhaseIdentifier;
@@ -37,6 +47,8 @@ export interface PublicSessionStateDto {
   /** `null` while the current phase is instructor-driven (no timer). */
   readonly phaseEndsAt: string | null;
   readonly participantCount: number;
+  /** The active Gameplay Round's board; `null` outside the rounds. */
+  readonly activeBoard: BoardGridViewDto | null;
 }
 
 export interface CreateGameSessionResult {

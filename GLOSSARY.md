@@ -64,6 +64,14 @@ _Avoid_: Admin override, moderator lock, teacher grade
 A stateless, session-scoped bearer token encoding a caller's verified role (`instructor` or `participant`) and session identity without requiring a persistent user account.
 _Avoid_: JWT session cookie, API key, user login token
 
+**Instructor Account**:
+A teacher's persistent identity, made of a unique email (trimmed and lower-cased) and a password kept only as a hash. It has no display name; the name learners see is chosen per Game Session.
+_Avoid_: User, profile, login, teacher record
+
+**Account Token**:
+A bearer token, issued on sign-up or sign-in, that proves which Instructor Account is calling. It is not tied to any Game Session and lasts 12 hours. It is never interchangeable with a Capability Token: each is refused where the other is required.
+_Avoid_: Session token, login cookie, Capability Token
+
 ### Assessment & Metacognition
 
 **Assessment Attempt**:

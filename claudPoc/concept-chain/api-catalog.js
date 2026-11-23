@@ -3,10 +3,12 @@
 // and evaluated by tests/claudpoc-api-catalog-drift.test.ts against docs/api/openapi.yaml.
 //
 // Contracts are hand-written from docs/api/openapi.yaml with $refs resolved.
-// Statuses and deviations were checked against src/ and netlify/functions/ on 2026-11-17.
+// Statuses and deviations were checked against src/ and netlify/functions/ on 2026-11-17; the account and pack
+// library operations (teacher-login tickets 01-07) were re-checked over HTTP against `npm run dev:prototype` on 2026-11-19.
 // When a backend gap closes, update `status` and `deviations` here.
 //
 // Shape (see .scratch/concept-chain-screens-api-overlay/spec.md):
+//   screens[]        = { id, label, file, actor }  (the prototype's pages in flow order; steps' `screens` name these ids)
 //   steps[letter]    = { title, actor: "teacher"|"learner"|"both", ops: opId[], screens: string[] }
 //   operations[opId] = { method, path, pathParams, auth, request, response: { status, body },
 //                        errors: [{ status, code }], status, deviations, notes?, sample?(session, ctx),
@@ -14,10 +16,12 @@
 //   (a step or target may name a `variant`; its fields replace the operation's, and its notes are appended)
 //   gaps[key]        = { title, note, ops?: opId[] }   (UI elements with no API; ops may name "missing" operations)
 //   targets[key]     = { step?, gap?, ops?, note?, variant? }  (optional finer keys used as data-api="G.reject")
+//   nav[key]         = { title, step, note }  (data-api="nav.<key>": a control that only navigates; it points at the
+//                                               step that happens on the page it opens, and makes no API call)
 //   noScreen[]       = { title, actor, ops: opId[] }  (operations no screen uses yet; legend only)
 // An element whose operations include a `missing` one is drawn in the bad (red) color.
 //
-// Pages mark elements with data-api="<letter>" | "<letter>.<detail>" | "gap.<key>"
+// Pages mark elements with data-api="<letter>" | "<letter>.<detail>" | "gap.<key>" | "nav.<key>"
 // and data-api-io="write" (sends a request, dashed) | "read" (shows API data, solid).
 /* eslint-disable */
 (function (root) {
@@ -43,11 +47,42 @@
     path: [{ row: 0, col: 0 }, { row: 0, col: 1 }, { row: 1, col: 1 }, { row: 2, col: 1 }],
     keywordIds: ["insulin", "glut4", "glucose-uptake", "hyperglycaemia"],
     narrativeExplanation: "Insulin moves GLUT4 to the membrane, so glucose uptake rises; without it, blood glucose stays high.",
-    stepRationales: [{ fromCoord: { row: 0, col: 0 }, toCoord: { row: 0, col: 1 }, rationale: "Insulin signalling translocates GLUT4." }],
+    stepRationales: ["Insulin signalling translocates GLUT4."],
     status: "pending-review",
     verdict: null,
     peerVotes: [{ voterParticipantId: "<otherParticipantId>", decision: "approve", comment: null, votedAt: "2026-11-17T09:22:00.000Z" }],
     submittedAt: "2026-11-17T09:12:00.000Z",
+  };
+
+  // Curriculum Pack shapes (CurriculumPackSummary, PublicCurriculumPack, CurriculumPackInput), trimmed to 3 cards.
+  const sampleBoardConfig = { rows: 7, cols: 7, minChainLength: 4, adjacencyRule: "chebyshev-8" };
+  const samplePackSummary = {
+    id: "diabe-teach", title: "Diabe-teach: Undergraduate Diabetes Mellitus Clinical Reasoning", version: "1.0.0", subjectDomain: "Diabetes mellitus",
+    boardConfig: sampleBoardConfig, cardCount: 49, domainCount: 7, hasAssessmentInstrument: true, hasPerceptionSurvey: true,
+  };
+  const sampleCards = [
+    { id: "insulin", verbatimLabel: "Insulin", displayLabel: "Insulin", aliases: [], domainId: "anatomy-pathophysiology", summary: "Hormone from pancreatic beta cells that lowers blood glucose." },
+    { id: "metformin", verbatimLabel: "Metformin", displayLabel: "Metformin", aliases: ["Biguanide"], domainId: "therapeutics-multidisciplinary", summary: "First-line oral biguanide for type 2 diabetes." },
+    { id: "hba1c", verbatimLabel: "HbA1c", displayLabel: "HbA1c", aliases: ["Glycated hemoglobin", "Hemoglobin A1c", "A1c"], domainId: "diagnostics-monitoring", summary: "Glycated hemoglobin: mean blood glucose over 8-12 weeks." },
+  ];
+  const sampleRubric = {
+    evaluatorPersona: "Endocrinology tutor", subjectDomain: "Diabetes mellitus",
+    chainContinuityCriteria: ["Each link names a mechanism, cause or consequence"], calibrationExamples: [],
+  };
+  const samplePublicPack = {
+    id: "diabe-teach", title: samplePackSummary.title, version: "1.0.0",
+    description: "49-keyword associative concept-chaining board game for undergraduate diabetes mellitus.",
+    boardConfig: sampleBoardConfig,
+    domains: [{ id: "anatomy-pathophysiology", label: "Anatomy & Pathophysiology", description: "Pancreatic islets, hormones and glucose homeostasis." }],
+    cards: sampleCards, adjudicationRubric: sampleRubric, assessmentInstrument: null, perceptionSurvey: null,
+  };
+  const samplePackInput = {
+    id: "my-endocrine-review", title: "Endocrine review", version: "1.0.0", description: "Year 2 undergraduate · Explain how insulin resistance leads to complications",
+    boardConfig: sampleBoardConfig,
+    domains: [{ id: "<domainId>", label: "<Semantic Domain (not collected)>", description: "<not collected>" }],
+    cards: sampleCards.map((c) => ({ ...c, domainId: "<domainId>", summary: "<not collected>" })),
+    adjudicationRubric: { evaluatorPersona: "<not collected>", subjectDomain: "Endocrine review", chainContinuityCriteria: ["<not collected>"], calibrationExamples: [] },
+    assessmentInstrument: null, perceptionSurvey: null,
   };
 
   const rulingNotes = [
@@ -90,7 +125,8 @@
     },
 
     authLabels: {
-      apiKey: "x-api-key header (only when the server has API_KEY set)",
+      apiKey: "x-api-key header (only when the server has API_KEY set; `npm run dev:prototype` turns it off, so the pages never hold the key)",
+      account: "Authorization: Bearer <Account Token> (from sign-up or sign-in; 12 hours)",
       instructor: "Authorization: Bearer <instructor Capability Token>",
       participant: "Authorization: Bearer <participant Capability Token>",
     },
@@ -102,12 +138,36 @@
       missing: "Missing",
     },
 
+    // The prototype's pages in flow order (the legend lists them and marks the current one).
+    screens: [
+      { id: "login", label: "Teacher login", file: "login.html", actor: "teacher" },
+      { id: "setup", label: "Game setup", file: "setup.html", actor: "teacher" },
+      { id: "teacher", label: "Teacher screen", file: "teacher.html", actor: "teacher" },
+      { id: "learner", label: "Learner screen", file: "participant.html", actor: "learner" },
+      { id: "lobby", label: "Lobby", file: "lobby.html", actor: "learner" },
+    ],
+
     steps: {
+      // L comes first: the teacher signs in (or creates an account) on Teacher login. The Account Token it returns is
+      // kept in localStorage under its own key and sent on the pack library's write calls.
+      L: {
+        title: "Teacher sign-in",
+        actor: "teacher",
+        ops: ["signInInstructor", "signUpInstructor", "getCurrentInstructorAccount"],
+        screens: ["login", "setup"],
+      },
+      // P comes before A: the teacher picks or makes a Curriculum Pack on Game setup, then starts the game.
+      P: {
+        title: "Choose a Curriculum Pack",
+        actor: "teacher",
+        ops: ["listCurriculumPacks", "getCurriculumPackById", "registerCurriculumPack", "archiveCurriculumPack", "unarchiveCurriculumPack"],
+        screens: ["setup"],
+      },
       A: {
-        title: "Create session",
+        title: "Start game",
         actor: "teacher",
         ops: ["createGameSession"],
-        screens: ["teacher"],
+        screens: ["setup", "teacher"],
       },
       B: {
         title: "Join session",
@@ -156,16 +216,210 @@
     },
 
     operations: {
+      signUpInstructor: {
+        method: "POST",
+        path: "/api/v1/accounts/sign-up",
+        pathParams: {},
+        auth: ["apiKey"],
+        request: { email: "rahman.s@aku.edu", password: "<at least 10 characters>" },
+        response: { status: 201, body: { accountId: "<accountId>", email: "rahman.s@aku.edu", accountToken: "<accountToken>", expiresAt: "<issued + 12 h>" } },
+        errors: [
+          { status: 400, code: "INVALID_REQUEST_BODY" },
+          { status: 401, code: "UNAUTHORIZED_TOKEN" },
+          { status: 409, code: "EMAIL_ALREADY_REGISTERED" },
+        ],
+        status: "implemented",
+        notes: [
+          "\"Create account\" on Teacher login. Signs the new account in: keep `accountToken` (the prototype stores it in localStorage under `cc-account-token-v1`; Sign out removes it).",
+          "The email is trimmed and lower-cased. A password under 10 characters gets 400 INVALID_REQUEST_BODY with `details.field: \"password\"` (\"password too short\"); an email that already has an account gets 409 EMAIL_ALREADY_REGISTERED (\"already registered\").",
+        ],
+        deviations: [],
+      },
+
+      signInInstructor: {
+        method: "POST",
+        path: "/api/v1/accounts/sign-in",
+        pathParams: {},
+        auth: ["apiKey"],
+        request: { email: "rahman.s@aku.edu", password: "<password>" },
+        response: { status: 200, body: { accountId: "<accountId>", email: "rahman.s@aku.edu", accountToken: "<accountToken>", expiresAt: "<issued + 12 h>" } },
+        errors: [
+          { status: 400, code: "INVALID_REQUEST_BODY" },
+          { status: 401, code: "INVALID_CREDENTIALS" },
+          { status: 423, code: "ACCOUNT_TEMPORARILY_LOCKED" },
+        ],
+        status: "implemented",
+        notes: [
+          "\"Sign in\" on Teacher login. An unknown email and a wrong password get the same 401 INVALID_CREDENTIALS (\"wrong email or password\").",
+          "Five wrong passwords in a row lock the account for 15 minutes: 423 ACCOUNT_TEMPORARILY_LOCKED with `details.lockedUntil` (\"temporarily locked\"), even with the right password.",
+          "There is no server-side sign-out: the token works until `expiresAt`. Game setup and the teacher screen send the teacher back to Teacher login when it is missing or expired.",
+        ],
+        deviations: [],
+      },
+
+      getCurrentInstructorAccount: {
+        method: "GET",
+        path: "/api/v1/accounts/me",
+        pathParams: {},
+        auth: ["apiKey", "account"],
+        request: null,
+        response: { status: 200, body: { accountId: "<accountId>", email: "rahman.s@aku.edu", createdAt: "<createdAt>" } },
+        errors: [
+          { status: 401, code: "UNAUTHORIZED_TOKEN" },
+        ],
+        status: "implemented",
+        notes: [
+          "Game setup calls it on load to check the stored Account Token and show the signed-in email. A rejected token (401) sends the teacher back to Teacher login with a message.",
+        ],
+        deviations: [],
+      },
+
+      listCurriculumPacks: {
+        method: "GET",
+        path: "/api/v1/packs",
+        pathParams: {},
+        auth: [],
+        request: null,
+        response: { status: 200, body: { packs: [{ ...samplePackSummary, authorHandle: null, isArchived: false }] } },
+        errors: [],
+        status: "implemented",
+        notes: [
+          "No token is needed. Game setup lists the shared library with it: each pack shows \"by <authorHandle> · v<version>\" (\"by unknown\" when `authorHandle` is null: System Packs and packs released before accounts).",
+          "\"Show archived\" adds `?includeArchived=true`: archived packs come back with `isArchived: true`, listed with Unarchive and not playable.",
+          "A list item has no `description` and no keywords: the keyword count is `cardCount`; the keywords need getCurriculumPackById.",
+        ],
+        deviations: [
+          "Only `diabe-teach` ships with the backend; the earlier prototype's other built-in topics are gone from Game setup.",
+          "There is no `isSystemPack` flag, so Game setup offers Archive and Edit on System Packs too and shows the server's refusal.",
+        ],
+      },
+
+      getCurriculumPackById: {
+        method: "GET",
+        path: "/api/v1/packs/{packId}",
+        pathParams: { packId: "Curriculum Pack id (from listCurriculumPacks)" },
+        auth: ["apiKey"],
+        request: null,
+        response: { status: 200, body: { pack: samplePublicPack } },
+        errors: [
+          { status: 401, code: "UNAUTHORIZED_TOKEN" },
+          { status: 404, code: "PACK_NOT_FOUND" },
+        ],
+        status: "implemented",
+        notes: [
+          "Game setup calls it when a pack is chosen (board preview, \"See all words\", the game's keywords) and for \"Edit → save as new version\". It sends no Authorization header: a bearer token here is read as an instructor Capability Token, so an Account Token gets 401.",
+          "No Capability Token is needed. With the instructor token (Authorization: Bearer) the assessment questions also carry `correctIndex` and `explanation`; an invalid token gets 401.",
+          "The keyword list is `pack.cards[].displayLabel`; the board size and shortest chain are `pack.boardConfig`.",
+          "The live sample shows only the first 3 Keyword Cards of the pack.",
+        ],
+        deviations: [
+          "A pack id that isn't a slug (letters, digits, dashes) gets 404 PACK_NOT_FOUND rather than 400.",
+          "Without the instructor token the assessment questions have no `correctIndex`, so \"Edit → save as new version\" of a pack with an assessment can't send it back unchanged and the release may be refused.",
+        ],
+      },
+
+      validateCurriculumPack: {
+        method: "POST",
+        path: "/api/v1/packs/validate",
+        pathParams: {},
+        auth: ["apiKey", "account"],
+        request: samplePackInput,
+        response: {
+          status: 200,
+          body: { valid: false, issues: [{ jsonPointer: "/adjudicationRubric/chainContinuityCriteria", rule: "minItems", message: "At least one chain continuity criterion is required." }] },
+        },
+        errors: [
+          { status: 400, code: "INVALID_REQUEST_BODY" },
+          { status: 401, code: "UNAUTHORIZED_TOKEN" },
+        ],
+        status: "partial",
+        notes: [
+          "Checks a draft CurriculumPackInput without saving it, with the teacher's Account Token. Game setup doesn't call it: registerCurriculumPack runs the same checks and returns them as 422.",
+          "Learner level and learning objective have no field: the closest is the pack `description`.",
+        ],
+        deviations: [
+          "Returns `{ valid, errors, warnings }` with `{ path, code, message }` items, not the spec's `{ valid, issues }` with `{ jsonPointer, rule, message }`.",
+        ],
+      },
+
+      registerCurriculumPack: {
+        method: "POST",
+        path: "/api/v1/packs",
+        pathParams: {},
+        auth: ["apiKey", "account"],
+        request: samplePackInput,
+        response: { status: 201, body: { pack: { ...samplePackSummary, id: "my-endocrine-review", title: "Endocrine review", subjectDomain: "Endocrinology", cardCount: 49 } } },
+        errors: [
+          { status: 400, code: "INVALID_REQUEST_BODY" },
+          { status: 401, code: "UNAUTHORIZED_TOKEN" },
+          { status: 403, code: "PACK_IS_SYSTEM_PACK" },
+          { status: 409, code: "PACK_ALREADY_EXISTS" },
+          { status: 422, code: "PACK_VALIDATION_FAILED" },
+        ],
+        status: "implemented",
+        notes: [
+          "Needs the teacher's Account Token; no Game Session is needed. Each Pack Version records the releasing account, shown as the author handle in the list.",
+          "\"Save pack\" on Game setup registers a new pack (v1.0.0) built from its keyword list: one Semantic Domain, one Keyword Card per keyword, a one-line rubric, no assessment or survey.",
+          "\"Edit → save as new version\" registers the same `id` with the next `version` (1.0.0 → 1.1.0), keeping the pack's domains, rubric and the cards of keywords it still has. A new version always starts unarchived.",
+          "409 PACK_ALREADY_EXISTS: that `id` and `version` is already registered (by anyone). 403: System Packs refuse new versions.",
+        ],
+        deviations: [
+          "Returns 201 `{ packId, version, warnings }`, not `{ pack: CurriculumPackSummary }`.",
+        ],
+      },
+
+      archiveCurriculumPack: {
+        method: "POST",
+        path: "/api/v1/packs/{packId}/archive",
+        pathParams: { packId: "Curriculum Pack id (from listCurriculumPacks)" },
+        auth: ["apiKey", "account"],
+        request: null,
+        response: { status: 200, body: { packId: "my-endocrine-review", isArchived: true, archivedAt: "<archivedAt>", archivedBy: "<accountId>" } },
+        errors: [
+          { status: 401, code: "UNAUTHORIZED_TOKEN" },
+          { status: 403, code: "PACK_IS_SYSTEM_PACK" },
+          { status: 404, code: "PACK_NOT_FOUND" },
+          { status: 409, code: "PACK_ALREADY_ARCHIVED" },
+        ],
+        status: "implemented",
+        notes: [
+          "\"Archive\" on Game setup (it replaces Delete: nothing is ever deleted). Any signed-in teacher may archive any pack except a System Pack; the pack leaves the list until \"Show archived\" is on.",
+          "Game Sessions already using the pack keep working.",
+        ],
+        deviations: [],
+      },
+
+      unarchiveCurriculumPack: {
+        method: "POST",
+        path: "/api/v1/packs/{packId}/unarchive",
+        pathParams: { packId: "Curriculum Pack id (from listCurriculumPacks with includeArchived=true)" },
+        auth: ["apiKey", "account"],
+        request: null,
+        response: { status: 200, body: { packId: "my-endocrine-review", isArchived: false, unarchivedAt: "<unarchivedAt>", unarchivedBy: "<accountId>" } },
+        errors: [
+          { status: 401, code: "UNAUTHORIZED_TOKEN" },
+          { status: 404, code: "PACK_NOT_FOUND" },
+          { status: 409, code: "PACK_NOT_ARCHIVED" },
+        ],
+        status: "implemented",
+        notes: [
+          "\"Unarchive\" next to an archived pack while \"Show archived\" is on. Records the acting account; the last archive stays on record.",
+        ],
+        deviations: [],
+      },
+
       createGameSession: {
         method: "POST",
         path: "/api/v1/sessions",
         pathParams: {},
-        auth: ["apiKey"],
+        auth: ["apiKey", "account"],
         request: {
           packId: "diabe-teach",
           mode: "classroom",
           adjudicationMode: "peer-instructor",
-          timerConfig: { roundMappingSec: 300, roundAdjudicationSec: 240 },
+          creatorDisplayName: "Ms Rahman",
+          timerConfig: { pretestSec: null, trialOrientationSec: null, roundMappingSec: 300, roundAdjudicationSec: 240, posttestSec: null, feedbackSurveySec: null },
+          seed: "k3v9q2",
         },
         response: {
           status: 201,
@@ -180,20 +434,25 @@
         },
         errors: [
           { status: 400, code: "INVALID_REQUEST_BODY" },
+          { status: 401, code: "UNAUTHORIZED_TOKEN" },
           { status: 404, code: "PACK_NOT_FOUND" },
+          { status: 422, code: "PACK_VALIDATION_FAILED" },
         ],
         status: "partial",
         notes: [
-          "No Capability Token is needed: this call issues the instructor token. Keep `instructorToken` for every teacher call (D, G, and the reads in C and H).",
+          "Not called by the prototype: \"Start game\" and every in-game screen stay faked in the browser (decision of 2026-11-19), playing the chosen pack's real keywords.",
+          "A classroom start needs the teacher's Account Token (401 UNAUTHORIZED_TOKEN without one); a solo start needs none. The session records the account as its owner and pins the Pack Version it started with.",
+          "This call issues the per-session instructor Capability Token, which every in-game call uses, so the Account Token expiring never breaks a running game. Keep `instructorToken` for every teacher call (D, G, and the reads in C and H).",
           "Share `roomCode` with learners; they join with it (step B).",
-          "`timerConfig` durations are whole seconds 1-86400; `null` makes that phase teacher-paced (no deadline). Omitted fields use the defaults (20 min mapping, 10 min peer review).",
-          "\"Reset session\" and \"Start a new session\" both create a brand-new Game Session with a new room code; nothing ends the old one.",
+          "`timerConfig` durations are whole seconds 1-86400; `null` makes that phase teacher-paced (no deadline). Omitted fields use the API defaults (15 min pretest, trial, post-test and survey; 20 min mapping; 10 min peer review), so Game setup sends all six: its chain-building and peer-review minutes × 60 (or `null` when teacher-paced), and `null` for the phases the prototype keeps teacher-paced.",
+          "`seed` is the board preview's seed, so Round 1 would be dealt exactly as previewed (see the deviation: the backend ignores it today).",
+          "\"Start game\" on Game setup creates a brand-new Game Session with a new room code; \"Reset session\" and \"Start a new session\" on the teacher screen only go back to Game setup. Nothing ends the old session.",
+          "Board size and shortest chain have no field here: they come from the pack's `boardConfig` (see the Game setup gaps).",
         ],
         deviations: [
           "Every session starts in `pretest`, including solo mode (the spec summary says solo auto-starts Round 1; it only auto-joins the creator).",
-          "`state` has no `activeBoard` key and no board is dealt; `seed` is ignored.",
-          "`mode` and `adjudicationMode` are not validated; only `timerConfig` is (400 INVALID_REQUEST_BODY).",
-          "Malformed JSON is not mapped to 400 INVALID_REQUEST_BODY.",
+          "`state` has no `activeBoard` key and no board is dealt; `seed` is ignored, so the previewed board can't be reproduced server-side.",
+          "`creatorDisplayName` (Game setup's \"name shown to your class\") is only used in solo mode (as the auto-joined learner's name); in classroom mode it is dropped.",
         ],
       },
 
@@ -213,6 +472,7 @@
           },
         },
         errors: [
+          { status: 400, code: "INVALID_REQUEST_BODY" },
           { status: 404, code: "ROOM_CODE_NOT_FOUND" },
           { status: 409, code: "CONCURRENT_UPDATE_CONFLICT" },
         ],
@@ -226,7 +486,6 @@
         deviations: [
           "Joining is accepted in any phase, including `completed`.",
           "A missing `displayName` becomes \"Anonymous\"; joining twice creates two participants.",
-          "A missing `roomCode` or malformed JSON is not mapped to 400 INVALID_REQUEST_BODY (unmapped server error).",
         ],
       },
 
@@ -239,13 +498,14 @@
           path: [{ row: 0, col: 0 }, { row: 0, col: 1 }, { row: 1, col: 1 }, { row: 2, col: 1 }],
           narrativeExplanation: sampleChain.narrativeExplanation,
           stepRationales: [
-            { fromCoord: { row: 0, col: 0 }, toCoord: { row: 0, col: 1 }, rationale: "Insulin signalling translocates GLUT4." },
-            { fromCoord: { row: 0, col: 1 }, toCoord: { row: 1, col: 1 }, rationale: "GLUT4 at the membrane lets glucose in." },
-            { fromCoord: { row: 1, col: 1 }, toCoord: { row: 2, col: 1 }, rationale: "Without that uptake, blood glucose stays high." },
+            "Insulin signalling translocates GLUT4.",
+            "GLUT4 at the membrane lets glucose in.",
+            "Without that uptake, blood glucose stays high.",
           ],
         },
         response: { status: 201, body: { chain: { ...sampleChain, peerVotes: [] } } },
         errors: [
+          { status: 400, code: "INVALID_REQUEST_BODY" },
           { status: 401, code: "UNAUTHORIZED_TOKEN" },
           { status: 404, code: "SESSION_NOT_FOUND" },
           { status: 409, code: "PHASE_CLOSED_FOR_SUBMISSIONS" },
@@ -262,11 +522,8 @@
         ],
         deviations: [
           "A chain needs at least 4 cells (fixed, not read from the Curriculum Pack); the spec says `minItems: 2` and the demo accepts 2.",
-          "`stepRationales` is stored as plain strings, not the spec's StepRationale objects; `keywordIds` is read from the body although the spec doesn't define it, and isn't derived from a board (no board is dealt).",
-          "An empty `narrativeExplanation` is accepted (spec `minLength: 1`).",
           "The returned chain has no `sessionId`, `stepRationales`, `peerVotes` or `verdict`, and adds `chainLength` and `keywordIds`.",
           "An instructor token, or a token for another Game Session, gets 403 FORBIDDEN_ROLE, which the spec doesn't declare for this route.",
-          "Malformed JSON is not mapped to 400 INVALID_REQUEST_BODY.",
         ],
       },
 
@@ -316,17 +573,35 @@
         method: "GET",
         path: "/api/v1/sessions/{sessionId}/rounds/{roundNumber}/chains",
         pathParams: { sessionId: "Game Session id", roundNumber: "1 or 2" },
-        auth: ["apiKey", "instructor"],
+        auth: ["apiKey", "instructor", "participant"],
         request: null,
-        response: { status: 200, body: { roundNumber: 1, chains: [sampleChain] } },
-        errors: [],
-        status: "missing",
+        response: {
+          status: 200,
+          body: {
+            roundNumber: 1,
+            chains: [{
+              ...sampleChain,
+              participantDisplayName: "Amira",
+              peerVotes: sampleChain.peerVotes.map((v) => ({ ...v, voterDisplayName: "Ben" })),
+            }],
+          },
+        },
+        errors: [
+          { status: 400, code: "INVALID_REQUEST_BODY" },
+          { status: 401, code: "UNAUTHORIZED_TOKEN" },
+          { status: 403, code: "FORBIDDEN_ROLE" },
+          { status: 404, code: "SESSION_NOT_FOUND" },
+        ],
+        status: "implemented",
         notes: [
-          "Proposed endpoint: the same path with GET, returning every SubmittedChain of the Gameplay Round (with peer votes and verdict).",
+          "Each chain is a SubmittedChain (path, keywords, narrative, step rationales, status, peer votes, verdict) plus the learner's `participantDisplayName` and each peer vote's `voterDisplayName` (\"Unknown\" if the participant can't be found). No email or Account id.",
+          "Sorted by `submittedAt`, then `chainId`. A round with no chains, or one not started yet, returns 200 with `chains: []`.",
+          "Instructor Capability Token: every chain of the round, in any phase. Participant Capability Token: only their own chains while that round is in chain-mapping (or before it); every chain of the round from its peer-adjudication on (round summary, later rounds, posttest, survey, completed).",
+          "`roundNumber` other than 1 or 2 → 400. A token for another Game Session → 403; no, bad or expired token, or an Account Token → 401 (ADR-0007).",
+          "No stream: screens poll this route alongside `state` to stay fresh.",
+          "The prototype screens don't call it yet: their chain lists still come from the browser fake.",
         ],
-        deviations: [
-          "Neither the spec nor the backend has a way to list a round's Concept Chains. The teacher's review list (and per-learner chain counts) can only be built from the specced-only chain.submitted / chain.adjudicated stream events.",
-        ],
+        deviations: [],
       },
 
       adjudicateConceptChain: {
@@ -354,6 +629,7 @@
           },
         },
         errors: [
+          { status: 400, code: "INVALID_REQUEST_BODY" },
           { status: 401, code: "UNAUTHORIZED_TOKEN" },
           { status: 403, code: "FORBIDDEN_ROLE" },
           { status: 404, code: "SESSION_NOT_FOUND" },
@@ -425,11 +701,9 @@
           },
         },
         deviations: [
-          "`feedback` is not enforced: an empty or missing feedback is accepted. `qualityScore` is not range-checked.",
           "The verdict comes back as `{ isApproved, isLocked, feedback, qualityScore, decidedBy: \"instructor\", decidedAt }`, not the spec's AdjudicationVerdict (no `adjudicatorType`, `overallFeedback`, `transitionEvaluations`).",
           "The returned chain has no `sessionId` or `stepRationales`, and adds `chainLength`.",
           "A ruling is accepted in any phase, and the path's `roundNumber` is not checked against the chain's round.",
-          "A missing `action` defaults to `peer-approve`; an unknown action changes nothing and still returns 200.",
           "`ai-evaluate` is a placeholder that always approves with `qualityScore: 75`.",
         ],
       },
@@ -477,6 +751,7 @@
           body: { state: sampleState },
         },
         errors: [
+          { status: 400, code: "INVALID_REQUEST_BODY" },
           { status: 401, code: "UNAUTHORIZED_TOKEN" },
           { status: 403, code: "FORBIDDEN_ROLE" },
           { status: 404, code: "SESSION_NOT_FOUND" },
@@ -493,11 +768,9 @@
           "No Keyword Card board is shuffled on Round 1 or Round 2 entry, and `seed` is ignored; `activeBoard` is never returned.",
           "`jump` is accepted but can only target the next phase (otherwise 409 INVALID_PHASE_TRANSITION).",
           "Advancing from `completed` returns 200 with the unchanged state instead of 409.",
-          "A missing `action` defaults to `advance` although the spec makes it required.",
           "Round Summary and Completed report `phaseEndsAt` equal to `phaseStartedAt` instead of null.",
           "Only the instructor token is accepted (a participant gets 403 FORBIDDEN_ROLE).",
           "x-api-key is checked when the server has API_KEY set, but the spec does not declare it here.",
-          "Malformed JSON is not mapped to 400 INVALID_REQUEST_BODY.",
         ],
       },
       // Operations with no screen in this prototype yet: listed in the legend's "no screen yet" section only.
@@ -507,6 +780,7 @@
         pathParams: { stage: ["pretest", "posttest"] },
         auth: ["apiKey", "participant"],
         errors: [
+          { status: 400, code: "INVALID_REQUEST_BODY" },
           { status: 401, code: "UNAUTHORIZED_TOKEN" },
           { status: 404, code: "SESSION_NOT_FOUND" },
           { status: 409, code: "ASSESSMENT_ALREADY_SUBMITTED" },
@@ -523,6 +797,7 @@
         path: "/api/v1/sessions/{sessionId}/survey",
         auth: ["apiKey", "participant"],
         errors: [
+          { status: 400, code: "INVALID_REQUEST_BODY" },
           { status: 401, code: "UNAUTHORIZED_TOKEN" },
           { status: 404, code: "SESSION_NOT_FOUND" },
           { status: 409, code: "SURVEY_ALREADY_SUBMITTED" },
@@ -549,6 +824,22 @@
     },
 
     gaps: {
+      packMeta: {
+        title: "Learner level and learning objective",
+        note: "No API field for either, on a Curriculum Pack or a Game Session. The closest is the pack's `description` (the demo stores \"level · objective\" there).",
+      },
+      boardSize: {
+        title: "Board size",
+        note: "Not enforced by the API: createGameSession has no board size field. A pack's size is its `boardConfig.rows` / `cols` (3-12 in the spec), fixed when the pack is registered (`diabe-teach` is 7×7), and the backend deals no board at all today.",
+      },
+      minChain: {
+        title: "Shortest chain allowed",
+        note: "Not enforced by the API: createGameSession has no field for it, and submitConceptChain uses a fixed 4 cells (422 CHAIN_TOPOLOGY_INVALID below that), not the pack's `boardConfig.minChainLength`. Only the demo enforces the number set here.",
+      },
+      boardPreview: {
+        title: "Board preview",
+        note: "Dealt in the browser from the pack, board size and preview seed. No API deals or returns a board yet: `state.activeBoard` is in the spec but never returned, and createGameSession ignores `seed`.",
+      },
       extend: {
         title: "Extend the phase (+1 min)",
         note: "No API can extend a phase: `phaseEndsAt` is fixed from the session's timerConfig when the phase starts, and a timerConfig can only be set at createGameSession. The demo changes its local timer only.",
@@ -563,8 +854,70 @@
       { title: "Session analytics", actor: "both", ops: ["getSessionAnalytics"] },
     ],
 
+    // Controls that only navigate (data-api="nav.<key>"): they make no API call themselves.
+    nav: {
+      setup: {
+        title: "Opens Game setup",
+        step: "A",
+        note: "Navigation only, no API call. The new game is created by step A (createGameSession) when the teacher presses \"Start game\" on Game setup. Nothing ends the old Game Session.",
+      },
+    },
+
     // Finer keys for data-api="<letter>.<detail>". Keys not listed here fall back to the step letter.
     targets: {
+      "L.signIn": {
+        ops: ["signInInstructor"],
+        note: "Sign in sends `{ email, password }` and keeps the returned Account Token in this browser. Errors shown: wrong email or password (401), temporarily locked (423).",
+      },
+      "L.signUp": {
+        ops: ["signUpInstructor"],
+        note: "Create account sends `{ email, password }` and signs the new account in. Errors shown: password too short (400), already registered (409).",
+      },
+      "L.me": {
+        ops: ["getCurrentInstructorAccount"],
+        note: "\"Signed in as <email>\": the email returned at sign-in, checked against getCurrentInstructorAccount on Game setup. Sign out removes the Account Token from this browser (there is no server-side sign-out).",
+      },
+      "P.list": {
+        ops: ["listCurriculumPacks"],
+        note: "The pack list is listCurriculumPacks: name = `title`, keyword count = `cardCount`, and \"by <authorHandle> · v<version>\" under each name.",
+      },
+      "P.byline": {
+        ops: ["listCurriculumPacks"],
+        note: "\"by <authorHandle> · v<version>\" from the list item; \"by unknown\" when `authorHandle` is null.",
+      },
+      "P.showArchived": {
+        ops: ["listCurriculumPacks"],
+        note: "\"Show archived\" lists with `?includeArchived=true`; archived packs show Unarchive and can't be played.",
+      },
+      "P.archive": {
+        ops: ["archiveCurriculumPack"],
+        note: "Archive (two clicks) sends the Account Token. Nothing is deleted; the pack can be unarchived.",
+      },
+      "P.unarchive": {
+        ops: ["unarchiveCurriculumPack"],
+        note: "Unarchive sends the Account Token and lists the pack again.",
+      },
+      "P.version": {
+        ops: ["getCurriculumPackById", "registerCurriculumPack"],
+        note: "Edit loads the pack (getCurriculumPackById) into the editor; \"Save as new version\" registers the same id with the next version and the Account Token.",
+      },
+      "P.keywords": {
+        ops: ["getCurriculumPackById"],
+        note: "The chosen pack's keywords are `pack.cards[].displayLabel` from getCurriculumPackById.",
+      },
+      "P.create": {
+        ops: ["registerCurriculumPack", "validateCurriculumPack"],
+        note: "Save pack registers a new pack (v1.0.0) with the Account Token: the keyword list becomes Keyword Cards in one Semantic Domain, with a one-line rubric. registerCurriculumPack validates it too (422 lists what is wrong), so validateCurriculumPack is not called.",
+      },
+      "A.creatorDisplayName": {
+        note: "\"Name shown to your class\" is a per-game choice, sent as createGameSession's `creatorDisplayName` (accounts have no display name). The prototype keeps it in the browser game.",
+      },
+      "A.timerConfig": {
+        note: "Chain-building and peer-review minutes become createGameSession's `timerConfig.roundMappingSec` / `roundAdjudicationSec` (minutes × 60, 1-86400 s); teacher-paced sends `null` (no deadline). Both Gameplay Rounds use them.",
+      },
+      "A.seed": {
+        note: "Shuffle picks a new board preview seed, sent as createGameSession's `seed` so Round 1 matches the preview. Partial: the backend ignores `seed` and deals no board, so a previewed board can't be reproduced server-side yet.",
+      },
       "A.roomCode": {
         note: "Shows `roomCode` from the createGameSession response (also in every `state`).",
       },
@@ -583,11 +936,11 @@
       },
       "C.roster": {
         ops: ["getGameSessionState", "streamGameSessionEvents", "listRoundChains"],
-        note: "No endpoint lists the participants: `state` has only `participantCount`, and names would arrive via the specced-only `participant.joined` stream event. The per-learner chain counts need the missing list-round-chains endpoint.",
+        note: "Per-learner chain counts (and display names of learners who submitted) come from list-round-chains (polled). Still a gap: no endpoint lists the participants, so learners with no chain yet are unknown; `state` has only `participantCount`, and `participant.joined` is a specced-only stream event.",
       },
       "C.review": {
         ops: ["listRoundChains", "streamGameSessionEvents"],
-        note: "Needs a missing endpoint: nothing lists a Gameplay Round's Concept Chains. Proposed: GET /api/v1/sessions/{sessionId}/rounds/{roundNumber}/chains, then keep it fresh from `chain.submitted` / `chain.adjudicated` stream events.",
+        note: "The review list comes from list-round-chains with the instructor Capability Token: every chain of the round, with the learner's and voters' display names, peer votes and verdict. No stream yet (`chain.submitted` / `chain.adjudicated` are specced only), so the screen polls.",
       },
       "C.classmates": {
         ops: ["getGameSessionState", "streamGameSessionEvents"],
@@ -599,11 +952,11 @@
       },
       "C.classChains": {
         ops: ["listRoundChains", "streamGameSessionEvents"],
-        note: "Classmates' Concept Chains to review need a missing endpoint: nothing lists a Gameplay Round's chains. Proposed: GET /api/v1/sessions/{sessionId}/rounds/{roundNumber}/chains, kept fresh from `chain.submitted` / `chain.adjudicated` stream events.",
+        note: "Classmates' Concept Chains come from list-round-chains with the learner's Capability Token. During that round's chain-mapping it returns only the learner's own chains; from peer-adjudication on, every chain of the round (filter out your own). No stream yet, so the screen polls.",
       },
       "C.myChains": {
         ops: ["listRoundChains", "streamGameSessionEvents"],
-        note: "Each chain the learner submitted comes back in the step E response, but later peer votes and the Instructor Final Ruling on it can only arrive from the missing list-round-chains endpoint or `chain.adjudicated` stream events.",
+        note: "The learner's chains come from list-round-chains (filter by your `participantId`), with later peer votes (and voter names) and the Instructor Final Ruling. No stream yet (`chain.adjudicated` is specced only), so the screen polls.",
       },
       "E.builder": {
         note: "Builds the submitConceptChain body: tapped Keyword Cards → `path` (GridCoord), each link's reason → `stepRationales`, the story → `narrativeExplanation`.",
@@ -620,7 +973,8 @@
 
     globalNotes: [
       "Paths use the /api/v1 base path.",
-      "When the server has API_KEY set, every route checks the x-api-key header.",
+      "When the server has API_KEY set, every route checks the x-api-key header. The prototype runs against `npm run dev:prototype`, which turns that check off, so no page holds the key.",
+      "Real API: Teacher login (sign-up, sign-in), the signed-in check, and Game setup's pack library (list, keywords, save, new version, archive, unarchive). Faked in the browser: Start game and everything in a running game.",
     ],
   };
 
@@ -628,7 +982,8 @@
   // operations[op].sample(state, ctx) builds request/response JSON from the demo session, in API shapes.
   // Pure and deterministic: no DOM, no clock, no randomness. A pinned card re-renders on every redraw and
   // its copy buttons copy exactly what this returns.
-  //   state = CC.get():  { session: PublicSessionState (+ activeBoard), participants: [], chains: SubmittedChain-like[] }
+  //   state = the stored demo session (CC.peek()), or null when none exists yet (login, a first visit to Game setup):
+  //           { session: PublicSessionState (+ activeBoard), settings?: CreateSessionRequest-like, participants: [], chains: [] }
   //   ctx (built by api-overlay.js, plain data only):
   //     variant        the step/target variant (e.g. "peer-challenge", "instructor-reject")
   //     chainId        the Concept Chain under the cursor (from the nearest [data-api-chain]), or null
@@ -636,11 +991,71 @@
   //     draft          learner's chain being built: { path: GridCoord[], links: string[], story: string }
   //     voteNotes      { [chainId]: comment draft }  (learner)
   //     rulings        { [chainId]: { feedback, score } }  (teacher's ruling drafts)
+  //     setup          Game setup's form: { packId, creatorDisplayName, mappingMinutes, mappingPaced,
+  //                    adjudicationMinutes, adjudicationPaced, seed, boardSize, minChainLength }
+  //     packs          Game setup's pack list: [{ packId, name, group, description, keywordCount, maxBoardSize }]
+  //     pack           the chosen pack: { packId, name, description, keywords: string[] }
+  //     newPack        the create-pack editor while open: { name, level, objective, keywords: string[] }
   // Returns { path?, request?, response? }; anything left out falls back to the fixed example.
   // Values the demo can't know (tokens, ids and times the server assigns) stay as <placeholders>.
   const PHASES = ["pretest", "trial-orientation", "round-1:chain-mapping", "round-1:peer-adjudication", "round-1:round-summary",
     "round-2:chain-mapping", "round-2:peer-adjudication", "round-2:round-summary", "posttest", "feedback-survey", "completed"];
-  const TIMER_SEC = { "chain-mapping": 300, "peer-adjudication": 240 }; // the createGameSession sample's timerConfig
+  // The prototype's timerConfig defaults (CC.DEFAULT_TIMER_CONFIG): used for sessions stored without settings.
+  const DEMO_TIMER = { pretestSec: null, trialOrientationSec: null, roundMappingSec: 300, roundAdjudicationSec: 240, posttestSec: null, feedbackSurveySec: null };
+  const PHASE_TIMER = { pretest: "pretestSec", "trial-orientation": "trialOrientationSec", "chain-mapping": "roundMappingSec",
+    "peer-adjudication": "roundAdjudicationSec", posttest: "posttestSec", "feedback-survey": "feedbackSurveySec" };
+  const timerOf = (state) => ({ ...DEMO_TIMER, ...(state?.settings?.timerConfig ?? {}) });
+  const MAX_MIN = 1440; // 86400 s
+
+  // Game setup minutes → timerConfig seconds: teacher-paced → null; not a whole 1-1440 → a placeholder.
+  function minutesToSec(minutes, paced) {
+    if (paced) return null;
+    const n = Number(minutes);
+    return String(minutes ?? "").trim() !== "" && Number.isInteger(n) && n >= 1 && n <= MAX_MIN ? n * 60 : "<whole minutes 1-1440 × 60>";
+  }
+
+  // The createGameSession body Game setup's "Start game" would send.
+  function setupRequest(f) {
+    const request = {
+      packId: f.packId ?? "<packId>", mode: "classroom", adjudicationMode: "peer-instructor",
+      creatorDisplayName: f.creatorDisplayName ?? "<teacher name>",
+      timerConfig: { ...DEMO_TIMER, roundMappingSec: minutesToSec(f.mappingMinutes, f.mappingPaced), roundAdjudicationSec: minutesToSec(f.adjudicationMinutes, f.adjudicationPaced) },
+    };
+    if (f.seed) request.seed = String(f.seed);
+    return request;
+  }
+
+  // The createGameSession body that created a stored session (its settings), or null for old sessions.
+  function sessionRequest(state) {
+    const set = state?.settings; if (!set) return null;
+    const request = { packId: set.packId, mode: set.mode, adjudicationMode: set.adjudicationMode };
+    if (set.creatorDisplayName) request.creatorDisplayName = set.creatorDisplayName;
+    request.timerConfig = timerOf(state);
+    if (set.seed) request.seed = set.seed;
+    return request;
+  }
+
+  // Curriculum Pack shapes from the demo's plain keyword packs. Values the demo doesn't have stay <placeholders>.
+  const slug = (text) => String(text ?? "").toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  const boardConfigOf = (size, minChain) => ({ rows: size ?? 7, cols: size ?? 7, minChainLength: minChain ?? 4, adjacencyRule: "chebyshev-8" });
+  const cardsOf = (keywords) => (keywords ?? []).slice(0, 3).map((k) => ({ id: slug(k) || "<cardId>", verbatimLabel: k, displayLabel: k, aliases: [], domainId: "<domainId>", summary: "<summary>" }));
+  function packSummary(p) {
+    return { id: p.packId, title: p.name, version: p.version ?? "1.0.0", subjectDomain: p.group ?? "<subjectDomain>", boardConfig: boardConfigOf(p.maxBoardSize, 4),
+      cardCount: p.keywordCount ?? p.keywords?.length ?? 0, domainCount: "<domainCount>", hasAssessmentInstrument: false, hasPerceptionSurvey: false,
+      authorHandle: p.authorHandle ?? null, isArchived: !!p.isArchived };
+  }
+  function newPackInput(np, setup) {
+    const size = Number(setup?.boardSize) || 7, minChain = Number(setup?.minChainLength) || 4;
+    return {
+      id: np.packId ?? (slug(np.name) || "<pack-id>"), title: String(np.name ?? "").trim() || "<pack name>", version: np.version ?? "1.0.0",
+      description: [np.level, np.objective].map((x) => String(x ?? "").trim()).filter(Boolean).join(" · ") || "<description>",
+      boardConfig: boardConfigOf(size, minChain),
+      domains: [{ id: "<domainId>", label: "<Semantic Domain (not collected)>", description: "<not collected>" }],
+      cards: cardsOf(np.keywords).map((c) => ({ ...c, summary: "<not collected>" })),
+      adjudicationRubric: { evaluatorPersona: "<not collected>", subjectDomain: String(np.name ?? "").trim() || "<subjectDomain>", chainContinuityCriteria: ["<not collected>"], calibrationExamples: [] },
+      assessmentInstrument: null, perceptionSurvey: null,
+    };
+  }
 
   const fillPath = (template, params) => template.replace(/\{(\w+)\}/g, (whole, name) => (params[name] ?? null) === null ? whole : String(params[name]));
 
@@ -658,7 +1073,8 @@
     return {
       chainId: c.chainId, sessionId: c.sessionId, roundNumber: c.roundNumber, participantId: c.participantId,
       path: c.path, keywordIds: c.keywordIds, narrativeExplanation: c.narrativeExplanation,
-      stepRationales: c.stepRationales ?? [], status: c.status, verdict: c.verdict ?? null,
+      // The browser fake keeps `{ fromCoord, toCoord, rationale }` objects; the API sends plain strings.
+      stepRationales: (c.stepRationales ?? []).map((r) => (typeof r === "string" ? r : r?.rationale ?? "")), status: c.status, verdict: c.verdict ?? null,
       peerVotes: c.peerVotes ?? [], submittedAt: c.submittedAt,
     };
   }
@@ -673,7 +1089,7 @@
     return {
       path,
       narrativeExplanation: (draft.story ?? "").trim(),
-      stepRationales: path.slice(1).map((c, i) => ({ fromCoord: path[i], toCoord: c, rationale: (draft.links?.[i] ?? "").trim() })),
+      stepRationales: path.slice(1).map((_c, i) => (draft.links?.[i] ?? "").trim()),
     };
   }
 
@@ -690,7 +1106,7 @@
   function nextState(state) {
     const cur = publicState(state), i = PHASES.indexOf(cur.currentPhase);
     if (i < 0 || i >= PHASES.length - 1) return cur; // completed: 200 with the state unchanged (see deviations)
-    const phase = PHASES[i + 1], m = /^round-(\d)/.exec(phase), sec = TIMER_SEC[phase.split(":")[1]];
+    const phase = PHASES[i + 1], m = /^round-(\d)/.exec(phase), sec = timerOf(state)[PHASE_TIMER[phase.split(":").pop()]];
     return { ...cur, currentPhase: phase, activeRoundNumber: m ? Number(m[1]) : null, phaseStartedAt: "<server time>",
       phaseEndsAt: sec ? `<phaseStartedAt + ${sec} s>` : null };
   }
@@ -698,14 +1114,64 @@
   const ops = catalog.operations;
   const sid = (state) => ({ sessionId: state.session.sessionId });
 
-  ops.createGameSession.sample = (state) => {
-    const st = publicState(state), fresh = st.currentPhase === "pretest";
+  // Game setup (ctx.setup): the request "Start game" would send, built from the form. Teacher screen: the
+  // request that created the stored session (its settings) and that session as the response.
+  ops.createGameSession.sample = (state, ctx = {}) => {
+    if (ctx.setup) {
+      const request = setupRequest(ctx.setup), pretest = request.timerConfig.pretestSec;
+      return { request, response: { status: 201, body: {
+        sessionId: "<sessionId>", roomCode: "<roomCode>", instructorToken: "<instructorToken>", participantId: null, participantToken: null,
+        state: { sessionId: "<sessionId>", roomCode: "<roomCode>", packId: request.packId, mode: request.mode, adjudicationMode: request.adjudicationMode,
+          currentPhase: "pretest", activeRoundNumber: null, phaseStartedAt: "<createdAt>", phaseEndsAt: pretest ? `<createdAt + ${pretest} s>` : null, participantCount: 0 },
+      } } };
+    }
+    const st = publicState(state), fresh = st.currentPhase === "pretest", pretest = timerOf(state).pretestSec;
+    const out = { response: { status: 201, body: {
+      sessionId: st.sessionId, roomCode: st.roomCode, instructorToken: "<instructorToken>", participantId: null, participantToken: null,
+      state: { ...st, currentPhase: "pretest", activeRoundNumber: null, phaseStartedAt: fresh ? st.phaseStartedAt : "<createdAt>",
+        phaseEndsAt: fresh ? st.phaseEndsAt : pretest ? `<createdAt + ${pretest} s>` : null, participantCount: 0 },
+    } } };
+    const request = sessionRequest(state);
+    if (request) out.request = request;
+    return out;
+  };
+
+  ops.listCurriculumPacks.sample = (state, ctx = {}) => (ctx.packs?.length
+    ? { response: { status: 200, body: { packs: ctx.packs.map(packSummary) } } } : {});
+
+  ops.getCurriculumPackById.sample = (state, ctx = {}) => {
+    const p = ctx.pack; if (!p) return {};
     return {
-      response: { status: 201, body: {
-        sessionId: st.sessionId, roomCode: st.roomCode, instructorToken: "<instructorToken>", participantId: null, participantToken: null,
-        state: { ...st, currentPhase: "pretest", activeRoundNumber: null, phaseStartedAt: fresh ? st.phaseStartedAt : "<createdAt>", phaseEndsAt: fresh ? st.phaseEndsAt : null, participantCount: 0 },
-      } },
+      path: fillPath(ops.getCurriculumPackById.path, { packId: p.packId }),
+      response: { status: 200, body: { pack: {
+        id: p.packId, title: p.name, version: p.version ?? "1.0.0", description: p.description || "<description>", boardConfig: boardConfigOf(p.maxBoardSize, 4),
+        domains: [{ id: "<domainId>", label: "<Semantic Domain>", description: "<description>" }],
+        cards: cardsOf(p.keywords), adjudicationRubric: { ...sampleRubric, evaluatorPersona: "<evaluatorPersona>", subjectDomain: p.group ?? p.name },
+        assessmentInstrument: null, perceptionSurvey: null,
+      } } },
     };
+  };
+
+  ops.validateCurriculumPack.sample = (state, ctx = {}) => (ctx.newPack ? { request: newPackInput(ctx.newPack, ctx.setup) } : {});
+
+  ops.registerCurriculumPack.sample = (state, ctx = {}) => {
+    if (!ctx.newPack) return {};
+    const request = newPackInput(ctx.newPack, ctx.setup);
+    return { request, response: { status: 201, body: { pack: {
+      id: request.id, title: request.title, version: request.version, subjectDomain: request.adjudicationRubric.subjectDomain, boardConfig: request.boardConfig,
+      cardCount: (ctx.newPack.keywords ?? []).length, domainCount: request.domains.length, hasAssessmentInstrument: false, hasPerceptionSurvey: false,
+    } } } };
+  };
+
+  ops.archiveCurriculumPack.sample = (state, ctx = {}) => (ctx.pack
+    ? { path: fillPath(ops.archiveCurriculumPack.path, { packId: ctx.pack.packId }),
+        response: { status: 200, body: { packId: ctx.pack.packId, isArchived: true, archivedAt: "<archivedAt>", archivedBy: "<accountId>" } } }
+    : {});
+
+  ops.unarchiveCurriculumPack.sample = (state, ctx = {}) => {
+    const p = (ctx.packs ?? []).find((x) => x.isArchived); if (!p) return {};
+    return { path: fillPath(ops.unarchiveCurriculumPack.path, { packId: p.packId }),
+      response: { status: 200, body: { packId: p.packId, isArchived: false, unarchivedAt: "<unarchivedAt>", unarchivedBy: "<accountId>" } } };
   };
 
   ops.joinGameSession.sample = (state, ctx = {}) => {
@@ -749,12 +1215,22 @@
     return out;
   };
 
-  ops.listRoundChains.sample = (state) => {
+  // ctx.participantId set = a learner's view: own chains only up to that round's chain-mapping, then every chain.
+  ops.listRoundChains.sample = (state, ctx = {}) => {
     const round = roundOf(state, null);
     if (round === null) return { path: fillPath(ops.listRoundChains.path, sid(state)) };
+    const nameOf = (id) => state.participants.find((p) => p.participantId === id)?.displayName ?? "Unknown";
+    const ownOnly = !!ctx.participantId && PHASES.indexOf(state.session.currentPhase) <= PHASES.indexOf(`round-${round}:chain-mapping`);
+    const chains = state.chains
+      .filter((c) => c.roundNumber === round && (!ownOnly || c.participantId === ctx.participantId))
+      .sort((a, b) => String(a.submittedAt).localeCompare(String(b.submittedAt)) || String(a.chainId).localeCompare(String(b.chainId)))
+      .map((c) => {
+        const base = publicChain(c);
+        return { ...base, participantDisplayName: nameOf(c.participantId), peerVotes: base.peerVotes.map((v) => ({ ...v, voterDisplayName: nameOf(v.voterParticipantId) })) };
+      });
     return {
       path: fillPath(ops.listRoundChains.path, { ...sid(state), roundNumber: round }),
-      response: { status: 200, body: { roundNumber: round, chains: state.chains.filter((c) => c.roundNumber === round).map(publicChain) } },
+      response: { status: 200, body: { roundNumber: round, chains } },
     };
   };
 

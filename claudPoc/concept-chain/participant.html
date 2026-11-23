@@ -172,7 +172,7 @@ function builderPanel(s) {
     steps += `<span class="kw">${i + 1}. ${label(c)}</span>`;
     if (i < path.length - 1) steps += `<div class="link"><label class="visually-hidden" for="link-${i}">Why ${label(c)} leads to ${label(path[i + 1])}</label><input type="text" id="link-${i}" data-link="${i}" value="${CC.esc(draft.links[i] ?? "")}" placeholder="How does ${label(c)} lead to ${label(path[i + 1])}?" ${open ? "" : "disabled"}></div>`;
   });
-  const ready = path.length >= 2 && draft.story.trim();
+  const min = CC.settingsOf(s).minChainLength, ready = path.length >= min && draft.story.trim();
   return `<div class="panel" data-api="E.builder" data-api-io="write"><div class="row between"><h2>Build a chain</h2><span class="eyebrow">${path.length} keywords</span></div>
     ${!open ? `<p class="toast err">Time's up. Wait for your teacher to start peer review.</p>` : ""}
     <div class="builder">${steps || `<p class="empty">Tap any keyword on the board to start.</p>`}</div>
@@ -183,7 +183,7 @@ function builderPanel(s) {
       <button class="btn sm" id="undo" ${open && path.length ? "" : "disabled"}>Undo</button>
       <button class="btn sm" id="clear" ${open && path.length ? "" : "disabled"}>Clear</button>
     </div>
-    ${open && !ready ? `<p class="note">${path.length < 2 ? "Pick at least two touching keywords." : "Add the story to submit."}</p>` : ""}</div>`;
+    ${open && !ready ? `<p class="note">${path.length < min ? `Pick at least ${min === 2 ? "two" : min} touching keywords.` : "Add the story to submit."}</p>` : ""}</div>`;
 }
 
 function myCard(s, c) {
@@ -244,7 +244,7 @@ function submit() {
 
 $("side").addEventListener("input", (e) => {
   const t = e.target;
-  if (t.id === "story") { draft.story = t.value; const btn = $("submit"); if (btn) btn.disabled = !(draft.path.length >= 2 && draft.story.trim() && CC.submissionsOpen(CC.get())); }
+  if (t.id === "story") { draft.story = t.value; const s = CC.get(), btn = $("submit"); if (btn) btn.disabled = !(draft.path.length >= CC.settingsOf(s).minChainLength && draft.story.trim() && CC.submissionsOpen(s)); }
   else if (t.dataset.link) draft.links[+t.dataset.link] = t.value;
   else if (t.dataset.note) voteNotes[t.dataset.note] = t.value;
 });
