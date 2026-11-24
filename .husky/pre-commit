@@ -1,1 +1,7 @@
 npx lint-staged --verbose
+
+# Type check the whole project after lint-staged (tsc cannot check single
+# files, so this is not a lint-staged task). It checks the working tree, not
+# only the staged content. Blocks the commit on any type error.
+npm run --silent typecheck
+npm run --silent typecheck:web
