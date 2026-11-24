@@ -80,7 +80,7 @@ tests/
 │   └── outbound-fault-injection.test.ts       #    [Ticket 06] Transient Mongo errors, credential stripping on crash, 25-learner stampede
 │
 ├── benchmarks/                                # 9. PERFORMANCE MICRO-BENCHMARKS (vitest bench)
-│   └── domain-and-analytics.bench.ts          #    [Ticket 07] 7x7 BoardDealer, 50-learner Neglect Heatmap, Argon2id hashing latency
+│   └── domain-and-analytics.bench.ts          #    [Ticket 07] 7x7 BoardDealer, 20 Chebyshev-8 chains, 30-learner Neglect Heatmap & Diversity Index
 │
 ├── web/                                       # 10. FRONTEND ARCHITECTURE & LINT GUARD TESTS
 │   └── web-architecture-guards.test.ts        #     Verifies standalone web/eslint.config.js no-useEffect ban & 3-layer DDD rules
