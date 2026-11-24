@@ -1,4 +1,3 @@
-import type { GridCoord } from "../../domain/game-session/concept-chain.js";
 import type { ClockPort } from "../ports/clock.port.js";
 import type { GameSessionRepositoryPort } from "../ports/game-session-repository.port.js";
 import type { LoggerPort } from "../ports/logger.port.js";
@@ -10,10 +9,10 @@ import type {
   SubmittedChainDto,
 } from "../ports/submit-concept-chain.port.js";
 import {
-  ChainTopologyInvalidError,
   ForbiddenRoleError,
   SessionNotFoundError,
 } from "../../domain/errors/domain-errors.js";
+import { ChainTopology } from "../../domain/game-session/chain-topology.js";
 import { ConceptChain } from "../../domain/game-session/concept-chain.js";
 import { SessionId } from "../../domain/game-session/session-id.js";
 import { GameSessionUpdateRetrier } from "../services/game-session-update-retrier.js";
@@ -67,7 +66,7 @@ implements SubmitConceptChainUseCasePort {
     const chain = await this.#sessionUpdates.run(
       sessionId,
       (session) => {
-        this.#validateChainTopology(command.path, minChainLength);
+        ChainTopology.assertValid(command.path, minChainLength);
 
         built ??= ConceptChain.create({
           participantId,
@@ -105,36 +104,5 @@ implements SubmitConceptChainUseCasePort {
     };
 
     return { chain: chainDto };
-  }
-
-  #validateChainTopology(path: readonly GridCoord[], minChainLength: number): void {
-    if (path.length < minChainLength) {
-      throw new ChainTopologyInvalidError(
-        `Chain must have at least ${minChainLength} cells`,
-      );
-    }
-
-    for (let i = 1; i < path.length; i++) {
-      const prev = path[i - 1]!;
-      const curr = path[i]!;
-
-      const rowDiff = Math.abs(curr.row - prev.row);
-      const colDiff = Math.abs(curr.col - prev.col);
-
-      if (rowDiff > 1 || colDiff > 1 || (rowDiff === 0 && colDiff === 0)) {
-        throw new ChainTopologyInvalidError(
-          `Cells at positions ${i - 1} and ${i} are not adjacent`,
-        );
-      }
-    }
-
-    const seen = new Set<string>();
-    for (const coord of path) {
-      const key = `${coord.row},${coord.col}`;
-      if (seen.has(key)) {
-        throw new ChainTopologyInvalidError("Chain contains duplicate cells");
-      }
-      seen.add(key);
-    }
   }
 }

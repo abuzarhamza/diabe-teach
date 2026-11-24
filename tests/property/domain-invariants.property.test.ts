@@ -10,6 +10,7 @@ import { LearnerAnalyticsService } from "../../src/application/services/learner-
 import { DIABE_TEACH_PACK } from "../../src/domain/curriculum-pack/diabe-teach-pack.js";
 import { ChainAlreadySubmittedError } from "../../src/domain/errors/domain-errors.js";
 import { BoardDealer } from "../../src/domain/game-session/board-dealer.js";
+import { ChainTopology } from "../../src/domain/game-session/chain-topology.js";
 import { ConceptChain } from "../../src/domain/game-session/concept-chain.js";
 import { GameSession } from "../../src/domain/game-session/game-session.js";
 
@@ -115,13 +116,7 @@ describe("property-Based Tests: Domain & Analytics Mathematical Invariants", () 
           // Verify Chebyshev-8 adjacency holds in both forward and reverse directions
           const reversedPath = [...path].reverse();
           for (const candidate of [path, reversedPath]) {
-            for (let i = 1; i < candidate.length; i++) {
-              const prev = candidate[i - 1]!;
-              const curr = candidate[i]!;
-              const dRow = Math.abs(curr.row - prev.row);
-              const dCol = Math.abs(curr.col - prev.col);
-              expect(Math.max(dRow, dCol)).toBe(1);
-            }
+            expect(() => ChainTopology.assertValid(candidate, length)).not.toThrow();
           }
 
           // Verify GameSession accepts the chain once and rejects both identical and reversed paths

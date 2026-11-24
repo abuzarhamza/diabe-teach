@@ -6,6 +6,7 @@ import { SeedrandomSeededRandom } from "../../src/adapters/outbound/seedrandom-s
 import { CohortAnalyticsService } from "../../src/application/services/cohort-analytics-service.js";
 import { DIABE_TEACH_PACK } from "../../src/domain/curriculum-pack/diabe-teach-pack.js";
 import { BoardDealer } from "../../src/domain/game-session/board-dealer.js";
+import { ChainTopology } from "../../src/domain/game-session/chain-topology.js";
 import { ConceptChain } from "../../src/domain/game-session/concept-chain.js";
 import { GameSession } from "../../src/domain/game-session/game-session.js";
 
@@ -55,25 +56,6 @@ function snakePaths(count: number, length: number): GridCoord[][] {
   });
 }
 
-/** The submit-chain use case's topology rule: minimum length, Chebyshev-8 steps, no repeated cell. */
-function assertChebyshev8(path: readonly GridCoord[]): void {
-  if (path.length < MIN_CHAIN_LENGTH) {
-    throw new Error("chain too short");
-  }
-  const seen = new Set<string>();
-  path.forEach((cell, i) => {
-    const prev = path[i - 1];
-    if (prev && Math.max(Math.abs(cell.row - prev.row), Math.abs(cell.col - prev.col)) !== 1) {
-      throw new Error(`cells ${i - 1} and ${i} are not adjacent`);
-    }
-    const key = `${cell.row},${cell.col}`;
-    if (seen.has(key)) {
-      throw new Error("duplicate cell");
-    }
-    seen.add(key);
-  });
-}
-
 function sessionInChainMapping(learnerCount: number): { session: GameSession; learnerIds: string[] } {
   const session = GameSession.create({
     packId: DIABE_TEACH_PACK.id.value,
@@ -100,7 +82,7 @@ describe("gameSession + ConceptChain", () => {
   bench("validate and record 20 Chebyshev-8 Concept Chains on a 7×7 board", () => {
     const { session, learnerIds } = sessionInChainMapping(5);
     CHAIN_PATHS.forEach((path, idx) => {
-      assertChebyshev8(path);
+      ChainTopology.assertValid(path, MIN_CHAIN_LENGTH);
       session.addChain(
         ConceptChain.create({
           participantId: learnerIds[idx % learnerIds.length]!,
