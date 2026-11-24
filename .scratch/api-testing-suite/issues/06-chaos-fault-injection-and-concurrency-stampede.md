@@ -16,9 +16,17 @@
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] `tests/chaos/README.md` and `tests/chaos/outbound-fault-injection.test.ts` exist and pass in Vitest
-- [ ] Verifies credentialed MongoDB errors are sanitized in logs and hidden from HTTP 500 responses
-- [ ] Verifies 1-conflict and 2-conflict retry recovery vs. 3-conflict exhaustion (`409 CONCURRENT_UPDATE_CONFLICT`)
-- [ ] Verifies a 25-learner concurrent join, chain-submit, and assessment stampede preserves 100% of writes with zero lost updates
+- [x] `tests/chaos/README.md` and `tests/chaos/outbound-fault-injection.test.ts` exist and pass in Vitest
+- [x] Verifies credentialed MongoDB errors are sanitized in logs and hidden from HTTP 500 responses
+- [x] Verifies 1-conflict and 2-conflict retry recovery vs. 3-conflict exhaustion (`409 CONCURRENT_UPDATE_CONFLICT`)
+- [x] Verifies a 25-learner concurrent join, chain-submit, and assessment stampede preserves 100% of writes with zero lost updates
+
+## Resolution
+
+`tests/chaos/outbound-fault-injection.test.ts` (3 tests) drives the real route handlers through `wrapLambdaHandler` with a `FaultInjectingGameSessionRepository` decorator over `InMemoryGameSessionRepository`.
+
+- **Credentialed MongoDB drop:** HTTP body is exactly `{ code: "INTERNAL_ERROR", message: "An unexpected error occurred." }` (no URI, host, error name or stack). Every `error` log line carries the `requestId`. Deviation from the spec text: `MongoCredentialStripper` removes the whole `user:pass@` userinfo with no placeholder, so the logged URI is `mongodb+srv://cluster0.example.mongodb.net/diabe_teach`, not `mongodb+srv://<redacted>@...`. The test checks what the code actually does.
+- **Write-conflict bursts:** 1 and 2 conflicts recover (`200`) with three `debug` lines that say `"session write conflict; retrying"` (attempts 2, 2, 3). 3 conflicts return `409 CONCURRENT_UPDATE_CONFLICT`, and the stored snapshot is unchanged except for the simulated competing writer's version bumps.
+- **25-learner stampede:** 25 joins at once overrun the server's 3-attempt `GameSessionUpdateRetrier`, so some learners get a clean `409`. Each simulated client sends the request again on `409` (`sendUntilCommitted`). The test proves a 409 commits nothing and every acknowledged write is stored exactly once: 25 participants, 25 Pretest attempts and 25 Round 1 chains, all from distinct learners, with `version` = 77 (25 + 25 + 2 phase transitions + 25). Finding: if a real classroom's clients do not retry on 409, a join burst will turn learners away.
