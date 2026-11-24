@@ -37,6 +37,7 @@ Welcome to the **Diabe-Teach Knowledge Base & Research Wiki**. This repository i
 | [20](20-standard-rfc7519-jwt-and-openapi-security-handlers.md) | [Standard RFC 7519 JWT & OpenAPI Security Handlers](20-standard-rfc7519-jwt-and-openapi-security-handlers.md) | Migration from legacy 2-part tokens to standard 3-part RFC 7519 JWTs and centralized `openapi-backend` security pipeline. |
 | [21](21-npm-first-and-yaml-parser-evaluation.md) | [Dependency Selection Standard & YAML Parser Evaluation](21-npm-first-and-yaml-parser-evaluation.md) | Research evaluation of `yaml` vs `js-yaml` and repository rule enforcing popular npm modules first. |
 | [22](22-middy-middleware-reuse-evaluation.md) | [Middy Middleware Reuse Evaluation & Standard Packages](22-middy-middleware-reuse-evaluation.md) | Evaluation of official `@middy/*` packages for CORS, security headers, body parsing, and event-loop control. |
+| [23](23-api-testing-taxonomy-and-folder-structure.md) | [API Testing Taxonomy & `tests/` Folder Structure](23-api-testing-taxonomy-and-folder-structure.md) | Mapping of Cindy Sridharan's 40-item testing taxonomy to the `tests/` folder structure (`domain/`, `adapters/`, `functions/`, `contracts/`, `property/`, `fuzz/`, `security/`, `chaos/`, `benchmarks/`, `web/`, `integration/`) and `docs/api/bruno/`. |
 
 ---
 

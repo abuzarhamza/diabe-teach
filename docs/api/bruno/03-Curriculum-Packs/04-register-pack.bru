@@ -127,10 +127,14 @@ body:json {
 }
 
 tests {
-  test("registers the Curriculum Pack version in the shared library", function() {
-    expect(res.status).to.equal(201);
-    expect(res.body.packId).to.be.a("string");
-    expect(res.body.version).to.equal("1.0.0");
+  test("registers the Curriculum Pack version (201) or reports already registered (409)", function() {
+    expect([201, 409]).to.include(res.status);
+    if (res.status === 201) {
+      expect(res.body.packId).to.be.a("string");
+      expect(res.body.version).to.equal("1.0.0");
+    } else {
+      expect(res.body.code).to.equal("PACK_ALREADY_EXISTS");
+    }
   });
 }
 

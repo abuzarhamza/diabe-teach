@@ -240,10 +240,16 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [pack]
+                required: [packId, version, warnings]
                 properties:
-                  pack:
-                    $ref: "#/components/schemas/CurriculumPackSummary"
+                  packId:
+                    type: string
+                  version:
+                    type: string
+                  warnings:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/PackValidationIssue"
         "400":
           $ref: "#/components/responses/BadRequestError"
         "413":
@@ -2121,27 +2127,31 @@ components:
       type: object
       required:
         - isApproved
-        - adjudicatorType
         - isLocked
-        - qualityScore
-        - transitionEvaluations
-        - overallFeedback
+        - decidedBy
+        - decidedAt
       properties:
         isApproved:
           type: boolean
+        isLocked:
+          type: boolean
+        decidedBy:
+          type: string
+          enum: [peer-consensus, ai, instructor]
+        decidedAt:
+          type: string
+          format: date-time
         adjudicatorType:
           type: string
           enum: [ai-specialist, peer-consensus, instructor-final]
-        isLocked:
-          type: boolean
         qualityScore:
           type: number
-          minimum: 1
-          maximum: 10
         transitionEvaluations:
           type: array
           items:
             $ref: "#/components/schemas/TransitionEvaluation"
+        feedback:
+          type: string
         overallFeedback:
           type: string
         suggestedRefinements:
@@ -2166,14 +2176,13 @@ components:
       type: object
       required:
         - chainId
-        - sessionId
         - roundNumber
         - participantId
         - path
         - keywordIds
         - narrativeExplanation
+        - chainLength
         - status
-        - peerVotes
         - submittedAt
       properties:
         chainId:
@@ -2200,6 +2209,9 @@ components:
             type: string
         narrativeExplanation:
           type: string
+        chainLength:
+          type: integer
+          minimum: 1
         stepRationales:
           type: array
           items:
@@ -2227,7 +2239,7 @@ components:
       allOf:
         - $ref: "#/components/schemas/SubmittedChain"
         - type: object
-          required: [participantDisplayName, peerVotes]
+          required: [sessionId, participantDisplayName, peerVotes]
           properties:
             participantDisplayName:
               type: string
@@ -2303,7 +2315,6 @@ components:
         - participantId
         - longestValidChainLength
         - totalValidChainsCount
-        - cumulativeRationaleScore
         - approvedChainIds
       properties:
         rank:

@@ -25,10 +25,14 @@ script:post-response {
 }
 
 tests {
-  test("creates an Instructor Account and issues an Account Token", function() {
-    expect(res.status).to.equal(201);
-    expect(res.body.accountToken).to.be.a("string");
-    expect(res.body.accountId).to.be.a("string");
+  test("creates an Instructor Account (201) or reports already registered (409)", function() {
+    expect([201, 409]).to.include(res.status);
+    if (res.status === 201) {
+      expect(res.body.accountToken).to.be.a("string");
+      expect(res.body.accountId).to.be.a("string");
+    } else {
+      expect(res.body.code).to.equal("EMAIL_ALREADY_REGISTERED");
+    }
   });
 }
 

@@ -31,6 +31,31 @@ body:json {
   }
 }
 
+script:pre-request {
+  const baseUrl = bru.getEnvVar("baseUrl");
+  const apiKey = bru.getEnvVar("apiKey");
+  const sessionId = bru.getEnvVar("sessionId");
+  const instructorToken = bru.getEnvVar("instructorToken");
+  if (sessionId && instructorToken) {
+    for (let i = 0; i < 11; i++) {
+      const stateRes = await bru.sendRequest({
+        url: `${baseUrl}/api/v1/sessions/${sessionId}`,
+        method: "GET",
+        headers: { "x-api-key": apiKey, Authorization: `Bearer ${instructorToken}` }
+      });
+      if (stateRes.data && stateRes.data.phase === "feedback-survey") {
+        break;
+      }
+      await bru.sendRequest({
+        url: `${baseUrl}/api/v1/sessions/${sessionId}/phase`,
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-api-key": apiKey, Authorization: `Bearer ${instructorToken}` },
+        data: { action: "advance" }
+      });
+    }
+  }
+}
+
 tests {
   test("records the learner's perception survey responses", function() {
     expect(res.status).to.equal(201);

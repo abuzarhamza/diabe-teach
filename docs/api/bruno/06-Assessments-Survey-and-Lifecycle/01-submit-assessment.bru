@@ -31,11 +31,51 @@ body:json {
   }
 }
 
+script:pre-request {
+  const baseUrl = bru.getEnvVar("baseUrl");
+  const apiKey = bru.getEnvVar("apiKey");
+  const sessionId = bru.getEnvVar("sessionId");
+  const instructorToken = bru.getEnvVar("instructorToken");
+  const stage = bru.getEnvVar("assessmentStage") || "pretest";
+  if (sessionId && instructorToken) {
+    const stateRes = await bru.sendRequest({
+      url: `${baseUrl}/api/v1/sessions/${sessionId}`,
+      method: "GET",
+      headers: { "x-api-key": apiKey, Authorization: `Bearer ${instructorToken}` }
+    });
+    if (stateRes.data && stateRes.data.phase !== stage) {
+      const accountToken = bru.getEnvVar("accountToken");
+      const packId = bru.getEnvVar("packId") || "diabe-teach";
+      const createRes = await bru.sendRequest({
+        url: `${baseUrl}/api/v1/sessions`,
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-api-key": apiKey, Authorization: `Bearer ${accountToken}` },
+        data: { packId, mode: "classroom", adjudicationMode: "peer-instructor" }
+      });
+      if (createRes.status === 201 && createRes.data) {
+        bru.setEnvVar("sessionId", createRes.data.sessionId);
+        bru.setEnvVar("roomCode", createRes.data.roomCode);
+        bru.setEnvVar("instructorToken", createRes.data.instructorToken);
+        const joinRes = await bru.sendRequest({
+          url: `${baseUrl}/api/v1/sessions/join`,
+          method: "POST",
+          headers: { "Content-Type": "application/json", "x-api-key": apiKey },
+          data: { roomCode: createRes.data.roomCode, displayName: "Alice" }
+        });
+        if (joinRes.status === 200 && joinRes.data) {
+          bru.setEnvVar("participantId", joinRes.data.participantId);
+          bru.setEnvVar("participantToken", joinRes.data.participantToken);
+        }
+      }
+    }
+  }
+}
+
 tests {
   test("records the learner's Assessment Attempt and scores Uncertainty Calibration", function() {
     expect(res.status).to.equal(201);
-    expect(res.body.attempt.stage).to.be.a("string");
-    expect(res.body.attempt.totalQuestions).to.equal(10);
+    expect(res.body.stage).to.be.a("string");
+    expect(res.body.recordedCount).to.equal(10);
   });
 }
 
