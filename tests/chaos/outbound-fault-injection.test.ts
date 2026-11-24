@@ -15,12 +15,15 @@ import { createTransitionPhaseHandler } from "../../netlify/functions/sessions/t
 import { wrapLambdaHandler } from "../../src/adapters/inbound/http/lambda-to-v2-wrapper.js";
 import { CryptoBoardSeedGenerator } from "../../src/adapters/outbound/crypto-board-seed-generator.js";
 import { FakeClock } from "../../src/adapters/outbound/fake-clock.js";
+import { FakeWriteConflictBackoff } from "../../src/adapters/outbound/fake-write-conflict-backoff.js";
 import { HmacAccountTokenAdapter } from "../../src/adapters/outbound/hmac-account-token-adapter.js";
 import { HmacCapabilityTokenAdapter } from "../../src/adapters/outbound/hmac-capability-token-adapter.js";
 import { InMemoryCurriculumPackRepository } from "../../src/adapters/outbound/in-memory-curriculum-pack-repository.js";
 import { InMemoryGameSessionRepository } from "../../src/adapters/outbound/in-memory-game-session-repository.js";
 import { PinoLogger } from "../../src/adapters/outbound/pino-logger.js";
 import { SeedrandomSeededRandom } from "../../src/adapters/outbound/seedrandom-seeded-random.js";
+import { TimerWriteConflictBackoff } from "../../src/adapters/outbound/timer-write-conflict-backoff.js";
+import { GameSessionUpdateRetrier } from "../../src/application/services/game-session-update-retrier.js";
 import { DIABE_TEACH_PACK } from "../../src/domain/curriculum-pack/diabe-teach-pack.js";
 import { ConcurrentUpdateConflictError } from "../../src/domain/errors/domain-errors.js";
 import { SessionId as SessionIdVo } from "../../src/domain/game-session/session-id.js";
@@ -101,33 +104,6 @@ class FaultInjectingGameSessionRepository implements GameSessionRepositoryPort {
   }
 }
 
-/** How many times one simulated learner client re-sends after a 409 before the test gives up. */
-const MAX_CLIENT_SENDS = 40;
-
-interface CommittedResponse {
-  readonly res: Response;
-  /** 409 CONCURRENT_UPDATE_CONFLICT responses this client saw before its write committed. */
-  readonly conflicts: number;
-}
-
-/**
- * A learner's client: sends the request and, on a clean 409 CONCURRENT_UPDATE_CONFLICT (the server's
- * 3-attempt retrier lost every race), sends a fresh copy again. Any other status is returned as-is.
- */
-async function sendUntilCommitted(send: () => Promise<Response>): Promise<CommittedResponse> {
-  let conflicts = 0;
-  for (let sendCount = 1; sendCount <= MAX_CLIENT_SENDS; sendCount++) {
-    const res = await send();
-    if (res.status !== 409) {
-      return { res, conflicts };
-    }
-    const body = (await res.json()) as { code: string };
-    expect(body.code).toBe("CONCURRENT_UPDATE_CONFLICT");
-    conflicts++;
-  }
-  throw new Error(`client still conflicting after ${MAX_CLIENT_SENDS} sends`);
-}
-
 describe("chaos / Fault-Injection & Concurrency Stampede Suite", () => {
   const clock = new FakeClock(new Date("2026-04-01T10:00:00.000Z"));
   const capabilityTokens = HmacCapabilityTokenAdapter.fromSecret(randomBytes(32).toString("hex"))!;
@@ -206,15 +182,17 @@ describe("chaos / Fault-Injection & Concurrency Stampede Suite", () => {
     }
   });
 
-  it("recovers transparently from 1 and 2 consecutive optimistic-concurrency conflicts and fails closed with 409 on 3 conflicts", async () => {
+  it(`recovers transparently from 1 and 2 consecutive optimistic-concurrency conflicts and fails closed with 409 after ${GameSessionUpdateRetrier.MAX_ATTEMPTS} conflicts`, async () => {
     const sink = new InMemoryLogSink();
     const logger = PinoLogger.create({ level: "debug", destination: sink });
     const packRepo = new InMemoryCurriculumPackRepository([DIABE_TEACH_PACK]);
     const faultySessionRepo = new FaultInjectingGameSessionRepository();
+    const backoff = new FakeWriteConflictBackoff(0.5);
 
     const deps = {
       packRepo,
       sessionRepo: faultySessionRepo,
+      writeConflictBackoff: backoff,
       tokenSigner: capabilityTokens,
       tokenVerifier: capabilityTokens,
       accountTokenVerifier: accountTokens,
@@ -291,11 +269,15 @@ describe("chaos / Fault-Injection & Concurrency Stampede Suite", () => {
       expect(line.sessionId).toBe(sessionId);
     }
     expect(retryLogs.map(l => l.attempt)).toEqual([2, 2, 3]);
+    // Each retry waited a jittered backoff first (half of each ceiling with the fake's 0.5 jitter).
+    expect(retryLogs.map(l => l.delayMs)).toEqual([10, 10, 20]);
+    expect(backoff.sleeps).toEqual([10, 10, 20]);
 
     const beforeExhaustion = (await faultySessionRepo.findById(SessionIdVo.from(sessionId)))!.toSnapshot();
 
-    // 3. 3 consecutive conflicts -> exhausts MAX_ATTEMPTS (3) and fails closed with 409 CONCURRENT_UPDATE_CONFLICT
-    faultySessionRepo.injectWriteConflicts(3);
+    // 3. MAX_ATTEMPTS consecutive conflicts -> exhausts the retrier and fails closed with 409 CONCURRENT_UPDATE_CONFLICT
+    const { MAX_ATTEMPTS } = GameSessionUpdateRetrier;
+    faultySessionRepo.injectWriteConflicts(MAX_ATTEMPTS);
     const join3Res = await joinSessionRoute(
       new Request("http://localhost:8888/api/v1/sessions/join", {
         method: "POST",
@@ -309,25 +291,30 @@ describe("chaos / Fault-Injection & Concurrency Stampede Suite", () => {
     expect(conflictBody.code).toBe("CONCURRENT_UPDATE_CONFLICT");
 
     // Stored session has only the 2 committed learners and was not corrupted by the failed 3rd join:
-    // apart from the 3 version bumps made by the simulated competing writer, the snapshot is unchanged.
+    // apart from the MAX_ATTEMPTS version bumps made by the simulated competing writer, the snapshot is unchanged.
     const stored = await faultySessionRepo.findById(SessionIdVo.from(sessionId));
     expect(stored?.participants.map(p => p.displayName)).toEqual([
       "Retry Learner 1",
       "Retry Learner 2",
     ]);
     const afterExhaustion = stored!.toSnapshot();
-    expect(afterExhaustion.version).toBe(beforeExhaustion.version + 3);
+    expect(afterExhaustion.version).toBe(beforeExhaustion.version + MAX_ATTEMPTS);
     expect({ ...afterExhaustion, version: 0 }).toEqual({ ...beforeExhaustion, version: 0 });
   });
 
-  it("handles a 25-learner concurrent classroom stampede (joins, Pretest assessments, and Round 1 chain submissions) with zero lost updates", async () => {
+  it("handles a 25-learner concurrent classroom stampede (joins, Pretest assessments, and Round 1 chain submissions) with zero 409s and zero lost updates, without the client resending", async () => {
     const LEARNER_COUNT = 25;
     const packRepo = new InMemoryCurriculumPackRepository([DIABE_TEACH_PACK]);
     const sessionRepo = new InMemoryGameSessionRepository();
+    const sink = new InMemoryLogSink();
+    const logger = PinoLogger.create({ level: "debug", destination: sink });
+    // The production backoff policy with real timers; seeded jitter so the delays repeat run to run.
+    const backoffRandom = seededRandom.forSeed("stampede-backoff");
 
     const deps = {
       packRepo,
       sessionRepo,
+      writeConflictBackoff: new TimerWriteConflictBackoff(backoffRandom),
       tokenSigner: capabilityTokens,
       tokenVerifier: capabilityTokens,
       accountTokenVerifier: accountTokens,
@@ -339,22 +326,27 @@ describe("chaos / Fault-Injection & Concurrency Stampede Suite", () => {
     const createSessionRoute = wrapLambdaHandler(
       createCreateSessionHandler(deps) as unknown as LambdaHandler,
       { path: "/api/v1/sessions" },
+      { logger },
     );
     const joinSessionRoute = wrapLambdaHandler(
       createJoinSessionHandler(deps) as unknown as LambdaHandler,
       { path: "/api/v1/sessions/join" },
+      { logger },
     );
     const transitionPhaseRoute = wrapLambdaHandler(
       createTransitionPhaseHandler(deps) as unknown as LambdaHandler,
       { path: "/api/v1/sessions/:sessionId/phase" },
+      { logger },
     );
     const submitAssessmentRoute = wrapLambdaHandler(
       createSubmitAssessmentHandler(deps) as unknown as LambdaHandler,
       { path: "/api/v1/sessions/:sessionId/assessments/:stage" },
+      { logger },
     );
     const submitChainRoute = wrapLambdaHandler(
       createSubmitChainHandler(deps) as unknown as LambdaHandler,
       { path: "/api/v1/sessions/:sessionId/rounds/:roundNumber/chains" },
+      { logger },
     );
 
     const accountToken = (
@@ -388,7 +380,7 @@ describe("chaos / Fault-Injection & Concurrency Stampede Suite", () => {
     // Wave 1: 25 learners join concurrently via Promise.all
     const joinResults = await Promise.all(
       Array.from({ length: LEARNER_COUNT }, (_, idx) =>
-        sendUntilCommitted(() => joinSessionRoute(
+        joinSessionRoute(
           new Request("http://localhost:8888/api/v1/sessions/join", {
             method: "POST",
             headers: { "content-type": "application/json" },
@@ -398,19 +390,19 @@ describe("chaos / Fault-Injection & Concurrency Stampede Suite", () => {
             }),
           }),
           { params: {}, requestId: `req-stampede-join-${idx + 1}`, ip: "127.0.0.1" } as unknown as Context,
-        ))),
+        )),
     );
-    // The stampede really contends: 25 simultaneous joins overrun the server's 3-attempt retrier.
-    expect(joinResults.reduce((sum, r) => sum + r.conflicts, 0)).toBeGreaterThan(0);
+    // The stampede really contends, and the server's jittered retries absorb it: no learner sees a 409.
+    expect(sink.lines().filter(l => l.msg === "session write conflict; retrying").length).toBeGreaterThan(0);
+    expect(joinResults.map(res => res.status)).toEqual(Array.from({ length: LEARNER_COUNT }).fill(200));
 
-    // A 409 commits nothing: the stored participants are exactly the 25 acknowledged joins.
+    // Every join committed exactly once: the stored participants are exactly the 25 acknowledged joins.
     const afterJoins = await sessionRepo.findById(SessionIdVo.from(sessionId));
     expect(afterJoins!.participantCount).toBe(LEARNER_COUNT);
     expect(afterJoins!.version).toBe(LEARNER_COUNT);
 
     const learners: Array<{ participantId: string; participantToken: string }> = [];
-    for (const { res } of joinResults) {
-      expect(res.status).toBe(200);
+    for (const res of joinResults) {
       const body = (await res.json()) as { participantId: string; participantToken: string };
       learners.push(body);
     }
@@ -426,7 +418,7 @@ describe("chaos / Fault-Injection & Concurrency Stampede Suite", () => {
 
     const pretestResults = await Promise.all(
       learners.map((learner, idx) =>
-        sendUntilCommitted(() => submitAssessmentRoute(
+        submitAssessmentRoute(
           new Request(`http://localhost:8888/api/v1/sessions/${sessionId}/assessments/pretest`, {
             method: "POST",
             headers: {
@@ -436,11 +428,9 @@ describe("chaos / Fault-Injection & Concurrency Stampede Suite", () => {
             body: JSON.stringify({ answers: validPretestAnswers }),
           }),
           { params: {}, requestId: `req-stampede-pretest-${idx + 1}`, ip: "127.0.0.1" } as unknown as Context,
-        ))),
+        )),
     );
-    for (const { res } of pretestResults) {
-      expect(res.status).toBe(201);
-    }
+    expect(pretestResults.map(res => res.status)).toEqual(Array.from({ length: LEARNER_COUNT }).fill(201));
     const afterPretests = await sessionRepo.findById(SessionIdVo.from(sessionId));
     expect(afterPretests!.assessmentAttempts.length).toBe(LEARNER_COUNT);
     expect(afterPretests!.version).toBe(LEARNER_COUNT * 2);
@@ -467,7 +457,7 @@ describe("chaos / Fault-Injection & Concurrency Stampede Suite", () => {
     const chainResults = await Promise.all(
       learners.map((learner, idx) => {
         const row = idx % 7;
-        return sendUntilCommitted(() => submitChainRoute(
+        return submitChainRoute(
           new Request(`http://localhost:8888/api/v1/sessions/${sessionId}/rounds/1/chains`, {
             method: "POST",
             headers: {
@@ -485,13 +475,10 @@ describe("chaos / Fault-Injection & Concurrency Stampede Suite", () => {
             }),
           }),
           { params: {}, requestId: `req-stampede-chain-${idx + 1}`, ip: "127.0.0.1" } as unknown as Context,
-        ));
+        );
       }),
     );
-
-    for (const { res } of chainResults) {
-      expect(res.status).toBe(201);
-    }
+    expect(chainResults.map(res => res.status)).toEqual(Array.from({ length: LEARNER_COUNT }).fill(201));
 
     // Final invariant verification on the stored aggregate
     const finalSession = await sessionRepo.findById(SessionIdVo.from(sessionId));
@@ -506,7 +493,7 @@ describe("chaos / Fault-Injection & Concurrency Stampede Suite", () => {
     expect(new Set(finalSession!.assessmentAttempts.map(a => a.participantId))).toEqual(
       new Set(learners.map(l => l.participantId)),
     );
-    // Every committed write bumps the version exactly once and no 409 commits anything:
+    // Every committed write bumps the version exactly once:
     // 25 joins + 25 pretests + 2 phase transitions + 25 chains = 77 atomic updates
     expect(finalSession!.version).toBe(25 + 25 + 2 + 25);
   });

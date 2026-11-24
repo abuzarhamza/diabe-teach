@@ -29,7 +29,7 @@ implements SubmitConceptChainUseCasePort {
 
   public constructor(deps: SubmitConceptChainDependencies) {
     this.#sessionRepo = deps.sessionRepo;
-    this.#sessionUpdates = new GameSessionUpdateRetrier(deps.sessionRepo);
+    this.#sessionUpdates = new GameSessionUpdateRetrier(deps.sessionRepo, deps.writeConflictBackoff);
     this.#packs = new SessionPackLoader(deps.packRepo);
     this.#clock = deps.clock;
   }

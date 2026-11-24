@@ -18,7 +18,7 @@ export class EndGameSessionUseCase implements EndGameSessionUseCasePort {
   readonly #clock: ClockPort;
 
   public constructor(deps: EndGameSessionDependencies) {
-    this.#sessionUpdates = new GameSessionUpdateRetrier(deps.sessionRepo);
+    this.#sessionUpdates = new GameSessionUpdateRetrier(deps.sessionRepo, deps.writeConflictBackoff);
     this.#clock = deps.clock;
   }
 

@@ -6,6 +6,7 @@ import type { PublicSessionStateDto } from "./create-game-session.port.js";
 import type { CurriculumPackRepositoryPort } from "./curriculum-pack-repository.port.js";
 import type { GameSessionRepositoryPort } from "./game-session-repository.port.js";
 import type { LoggerPort } from "./logger.port.js";
+import type { WriteConflictBackoffPort } from "./write-conflict-backoff.port.js";
 
 export interface TransitionSessionPhaseDependencies {
   readonly sessionRepo: GameSessionRepositoryPort;
@@ -13,6 +14,8 @@ export interface TransitionSessionPhaseDependencies {
   readonly clock: ClockPort;
   readonly seededRandom: SeededRandomPort;
   readonly seedGenerator: BoardSeedGeneratorPort;
+  /** Waits between write-conflict retries; without one the retrier retries at once. */
+  readonly writeConflictBackoff?: WriteConflictBackoffPort;
 }
 
 export interface TransitionSessionPhaseCommand {

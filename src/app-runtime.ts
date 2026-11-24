@@ -22,6 +22,7 @@ import { MongoInstructorAccountRepository } from "./adapters/outbound/mongo-inst
 import { PinoLogger } from "./adapters/outbound/pino-logger.js";
 import { SeedrandomSeededRandom } from "./adapters/outbound/seedrandom-seeded-random.js";
 import { SystemClock } from "./adapters/outbound/system-clock.js";
+import { TimerWriteConflictBackoff } from "./adapters/outbound/timer-write-conflict-backoff.js";
 
 export interface LoadEnvConfigOptions {
   readonly yamlFilePath?: string | false;
@@ -197,6 +198,7 @@ export class AppRuntime {
       tokenSigner: tokenAdapter,
       tokenVerifier: tokenAdapter,
       clock: new SystemClock(),
+      writeConflictBackoff: new TimerWriteConflictBackoff(),
       seededRandom: new SeedrandomSeededRandom(),
       seedGenerator: new CryptoBoardSeedGenerator(),
       accountRepo: MongoInstructorAccountRepository.fromConfig(config, logger),

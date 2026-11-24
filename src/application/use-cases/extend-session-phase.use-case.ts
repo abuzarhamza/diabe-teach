@@ -18,7 +18,7 @@ export class ExtendSessionPhaseUseCase implements ExtendSessionPhaseUseCasePort 
   readonly #clock: ClockPort;
 
   public constructor(deps: ExtendSessionPhaseDependencies) {
-    this.#sessionUpdates = new GameSessionUpdateRetrier(deps.sessionRepo);
+    this.#sessionUpdates = new GameSessionUpdateRetrier(deps.sessionRepo, deps.writeConflictBackoff);
     this.#clock = deps.clock;
   }
 

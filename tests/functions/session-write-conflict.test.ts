@@ -10,8 +10,10 @@ import { createSubmitChainHandler } from "../../netlify/functions/sessions/submi
 import { createSubmitSurveyHandler } from "../../netlify/functions/sessions/submit-survey.js";
 import { createTransitionPhaseHandler } from "../../netlify/functions/sessions/transition-phase.js";
 import { FakeCapabilityTokenAdapter } from "../../src/adapters/outbound/fake-capability-token-adapter.js";
+import { FakeWriteConflictBackoff } from "../../src/adapters/outbound/fake-write-conflict-backoff.js";
 import { InMemoryCurriculumPackRepository } from "../../src/adapters/outbound/in-memory-curriculum-pack-repository.js";
 import { InMemoryGameSessionRepository } from "../../src/adapters/outbound/in-memory-game-session-repository.js";
+import { GameSessionUpdateRetrier } from "../../src/application/services/game-session-update-retrier.js";
 import { ConcurrentUpdateConflictError } from "../../src/domain/errors/domain-errors.js";
 import { ConceptChain } from "../../src/domain/game-session/concept-chain.js";
 import { GameSession } from "../../src/domain/game-session/game-session.js";
@@ -238,7 +240,7 @@ describe("session writes that lose a concurrent-update race", () => {
     expect(sessionRepo.saveAttempts).toBe(0);
   });
 
-  it("returns 409 CONCURRENT_UPDATE_CONFLICT after exactly 3 save attempts, and records nothing", async () => {
+  it(`returns 409 CONCURRENT_UPDATE_CONFLICT after exactly ${GameSessionUpdateRetrier.MAX_ATTEMPTS} save attempts, and records nothing`, async () => {
     const { session, sessionId, store, tokenAdapter, aliceToken } = await setUpChainMappingSession();
     const sessionRepo = new AlwaysConflictingSessionRepository(store);
     const handler = createSubmitChainHandler({
@@ -251,7 +253,7 @@ describe("session writes that lose a concurrent-update race", () => {
 
     expect(response.statusCode).toBe(409);
     expect(JSON.parse(response.body)).toMatchObject({ code: "CONCURRENT_UPDATE_CONFLICT" });
-    expect(sessionRepo.saveAttempts).toBe(3);
+    expect(sessionRepo.saveAttempts).toBe(GameSessionUpdateRetrier.MAX_ATTEMPTS);
     expect((await store.findById(session.sessionId))?.chains).toEqual([]);
   });
 });
@@ -501,15 +503,74 @@ describe("every other session write that keeps losing the race", () => {
       toFeedbackSurvey,
       ctx => ctx.submitSurvey(makeSurveyEvent(ctx.sessionId, ctx.aliceToken), {} as never),
     ],
-  ])("returns 409 CONCURRENT_UPDATE_CONFLICT for a %s after exactly 3 save attempts, and changes nothing", async (_name, prepare, send) => {
+  ])(`returns 409 CONCURRENT_UPDATE_CONFLICT for a %s after exactly ${GameSessionUpdateRetrier.MAX_ATTEMPTS} save attempts, and changes nothing`, async (_name, prepare, send) => {
     const ctx = await setUpSession(store => new AlwaysConflictingSessionRepository(store), prepare);
 
     const response = await send(ctx);
 
     expect(response.statusCode).toBe(409);
     expect(JSON.parse(response.body)).toMatchObject({ code: "CONCURRENT_UPDATE_CONFLICT" });
-    expect(ctx.sessionRepo.saveAttempts).toBe(3);
+    expect(ctx.sessionRepo.saveAttempts).toBe(GameSessionUpdateRetrier.MAX_ATTEMPTS);
     const stored = await ctx.store.findById(ctx.session.sessionId);
     expect(stored?.version).toBe(0);
+  });
+});
+
+describe("write-conflict backoff (exponential, full jitter, capped)", () => {
+  it("waits a jittered, doubling, capped delay before each retry and none after the last attempt", async () => {
+    const { session, sessionId, store, tokenAdapter, aliceToken } = await setUpChainMappingSession();
+    const sessionRepo = new AlwaysConflictingSessionRepository(store);
+    const backoff = new FakeWriteConflictBackoff(0.5);
+    const handler = createSubmitChainHandler({
+      packRepo: new InMemoryCurriculumPackRepository(),
+      sessionRepo,
+      tokenVerifier: tokenAdapter,
+      writeConflictBackoff: backoff,
+    });
+
+    const response = await handler(makeChainEvent(sessionId, aliceToken), {} as never);
+
+    expect(response.statusCode).toBe(409);
+    expect(sessionRepo.saveAttempts).toBe(GameSessionUpdateRetrier.MAX_ATTEMPTS);
+    // Half of each ceiling: 20, 40, 80, 160, 320, then capped at 500.
+    expect(backoff.sleeps).toEqual([
+      10,
+      20,
+      40,
+      80,
+      160,
+      250,
+      250,
+      250,
+      250,
+    ]);
+    expect((await store.findById(session.sessionId))?.chains).toEqual([]);
+  });
+
+  it("does not wait when the save succeeds first time", async () => {
+    const { sessionId, store, tokenAdapter, aliceToken } = await setUpChainMappingSession();
+    const backoff = new FakeWriteConflictBackoff();
+    const handler = createSubmitChainHandler({
+      packRepo: new InMemoryCurriculumPackRepository(),
+      sessionRepo: new CountingSessionRepository(store),
+      tokenVerifier: tokenAdapter,
+      writeConflictBackoff: backoff,
+    });
+
+    expect((await handler(makeChainEvent(sessionId, aliceToken), {} as never)).statusCode).toBe(201);
+    expect(backoff.sleeps).toEqual([]);
+  });
+
+  it("keeps every delay in [0, min(cap, base * 2^(attempt - 1))) and the total worst case under 2.7 s", () => {
+    const { BASE_DELAY_MS, MAX_DELAY_MS, MAX_ATTEMPTS } = GameSessionUpdateRetrier;
+    let worstTotal = 0;
+    for (let attempt = 1; attempt < MAX_ATTEMPTS; attempt++) {
+      const ceiling = Math.min(MAX_DELAY_MS, BASE_DELAY_MS * 2 ** (attempt - 1));
+      expect(GameSessionUpdateRetrier.delayAfterConflictMs(attempt, 0)).toBe(0);
+      const worst = GameSessionUpdateRetrier.delayAfterConflictMs(attempt, 0.999999);
+      expect(worst).toBeLessThan(ceiling);
+      worstTotal += worst;
+    }
+    expect(worstTotal).toBeLessThan(2700);
   });
 });

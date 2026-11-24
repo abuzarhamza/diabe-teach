@@ -2,6 +2,7 @@ import type { APIGatewayProxyEvent, APIGatewayProxyResult } from "aws-lambda";
 import type { AdjudicateConceptChainCommand } from "../../../src/application/ports/adjudicate-concept-chain.port.js";
 import type { CapabilityTokenPort, VerifiedCapability } from "../../../src/application/ports/capability-token.port.js";
 import type { GameSessionRepositoryPort } from "../../../src/application/ports/game-session-repository.port.js";
+import type { WriteConflictBackoffPort } from "../../../src/application/ports/write-conflict-backoff.port.js";
 import { readOptionalJsonObjectBody } from "../../../src/adapters/inbound/http/json-object-body.js";
 import { createApiHandler } from "../../../src/adapters/inbound/http/middy/api-handler.js";
 import { requestLoggerOf } from "../../../src/adapters/inbound/http/request-logger.js";
@@ -14,21 +15,24 @@ export interface AdjudicateChainHandlerDependencies {
   readonly tokenVerifier: CapabilityTokenPort;
   readonly apiKey?: string;
   readonly requireApiKey?: boolean;
+  readonly writeConflictBackoff?: WriteConflictBackoffPort;
 }
 
 export function createAdjudicateChainHandler(
   dependencies?: AdjudicateChainHandlerDependencies,
 ) {
   const prodDeps = AppRuntime.getProductionDependencies();
-  const deps = dependencies ?? {
+  const deps: AdjudicateChainHandlerDependencies = dependencies ?? {
     sessionRepo: prodDeps.sessionRepo!,
     tokenVerifier: prodDeps.tokenVerifier!,
     apiKey: prodDeps.apiKey,
     requireApiKey: prodDeps.requireApiKey,
+    writeConflictBackoff: prodDeps.writeConflictBackoff,
   };
 
   const useCase = new AdjudicateConceptChainUseCase({
     sessionRepo: deps.sessionRepo,
+    writeConflictBackoff: deps.writeConflictBackoff,
   });
 
   const rawHandler = async (

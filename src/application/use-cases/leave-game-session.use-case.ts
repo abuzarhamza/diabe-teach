@@ -18,7 +18,7 @@ export class LeaveGameSessionUseCase implements LeaveGameSessionUseCasePort {
   readonly #clock: ClockPort;
 
   public constructor(deps: LeaveGameSessionDependencies) {
-    this.#sessionUpdates = new GameSessionUpdateRetrier(deps.sessionRepo);
+    this.#sessionUpdates = new GameSessionUpdateRetrier(deps.sessionRepo, deps.writeConflictBackoff);
     this.#clock = deps.clock;
   }
 

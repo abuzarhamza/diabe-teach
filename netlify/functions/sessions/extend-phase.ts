@@ -3,6 +3,7 @@ import type { CapabilityTokenPort, VerifiedCapability } from "../../../src/appli
 import type { ClockPort } from "../../../src/application/ports/clock.port.js";
 import type { ExtendSessionPhaseCommand } from "../../../src/application/ports/extend-session-phase.port.js";
 import type { GameSessionRepositoryPort } from "../../../src/application/ports/game-session-repository.port.js";
+import type { WriteConflictBackoffPort } from "../../../src/application/ports/write-conflict-backoff.port.js";
 import { readOptionalJsonObjectBody } from "../../../src/adapters/inbound/http/json-object-body.js";
 import { createApiHandler } from "../../../src/adapters/inbound/http/middy/api-handler.js";
 import { requestLoggerOf } from "../../../src/adapters/inbound/http/request-logger.js";
@@ -16,6 +17,7 @@ export interface ExtendPhaseHandlerDependencies {
   readonly clock?: ClockPort;
   readonly apiKey?: string;
   readonly requireApiKey?: boolean;
+  readonly writeConflictBackoff?: WriteConflictBackoffPort;
 }
 
 export function createExtendPhaseHandler(
@@ -27,10 +29,12 @@ export function createExtendPhaseHandler(
     tokenVerifier: prodDeps.tokenVerifier!,
     apiKey: prodDeps.apiKey,
     requireApiKey: prodDeps.requireApiKey,
+    writeConflictBackoff: prodDeps.writeConflictBackoff,
   };
 
   const useCase = new ExtendSessionPhaseUseCase({
     sessionRepo: deps.sessionRepo,
+    writeConflictBackoff: deps.writeConflictBackoff,
     clock: deps.clock ?? prodDeps.clock!,
   });
 

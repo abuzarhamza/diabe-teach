@@ -3,10 +3,13 @@ import type { VerifiedCapability } from "../ports/capability-token.port.js";
 import type { CurriculumPackRepositoryPort } from "../ports/curriculum-pack-repository.port.js";
 import type { GameSessionRepositoryPort } from "../ports/game-session-repository.port.js";
 import type { LoggerPort } from "../ports/logger.port.js";
+import type { WriteConflictBackoffPort } from "../ports/write-conflict-backoff.port.js";
 
 export interface SubmitPerceptionSurveyDependencies {
   readonly sessionRepo: GameSessionRepositoryPort;
   readonly packRepo: CurriculumPackRepositoryPort;
+  /** Waits between write-conflict retries; without one the retrier retries at once. */
+  readonly writeConflictBackoff?: WriteConflictBackoffPort;
 }
 
 export interface SubmitPerceptionSurveyCommand {

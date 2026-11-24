@@ -22,7 +22,7 @@ implements AdjudicateConceptChainUseCasePort {
   readonly #sessionUpdates: GameSessionUpdateRetrier;
 
   public constructor(deps: AdjudicateConceptChainDependencies) {
-    this.#sessionUpdates = new GameSessionUpdateRetrier(deps.sessionRepo);
+    this.#sessionUpdates = new GameSessionUpdateRetrier(deps.sessionRepo, deps.writeConflictBackoff);
   }
 
   public async execute(

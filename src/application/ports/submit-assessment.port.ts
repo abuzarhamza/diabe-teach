@@ -4,12 +4,15 @@ import type { VerifiedCapability } from "./capability-token.port.js";
 import type { CurriculumPackRepositoryPort } from "./curriculum-pack-repository.port.js";
 import type { GameSessionRepositoryPort } from "./game-session-repository.port.js";
 import type { LoggerPort } from "./logger.port.js";
+import type { WriteConflictBackoffPort } from "./write-conflict-backoff.port.js";
 
 export type { AssessmentStageSummary, LearnerMetacognitiveReport } from "../dtos/session-analytics.dto.js";
 
 export interface SubmitAssessmentDependencies {
   readonly sessionRepo: GameSessionRepositoryPort;
   readonly packRepo: CurriculumPackRepositoryPort;
+  /** Waits between write-conflict retries; without one the retrier retries at once. */
+  readonly writeConflictBackoff?: WriteConflictBackoffPort;
 }
 
 export interface SubmitAssessmentCommand {

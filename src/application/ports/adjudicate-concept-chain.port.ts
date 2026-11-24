@@ -2,9 +2,12 @@ import type { ChainVerdict, GridCoord, PeerVote } from "../../domain/game-sessio
 import type { VerifiedCapability } from "./capability-token.port.js";
 import type { GameSessionRepositoryPort } from "./game-session-repository.port.js";
 import type { LoggerPort } from "./logger.port.js";
+import type { WriteConflictBackoffPort } from "./write-conflict-backoff.port.js";
 
 export interface AdjudicateConceptChainDependencies {
   readonly sessionRepo: GameSessionRepositoryPort;
+  /** Waits between write-conflict retries; without one the retrier retries at once. */
+  readonly writeConflictBackoff?: WriteConflictBackoffPort;
 }
 
 export type AdjudicateAction

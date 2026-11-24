@@ -5,6 +5,7 @@ import type { ClockPort } from "../../../src/application/ports/clock.port.js";
 import type { CurriculumPackRepositoryPort } from "../../../src/application/ports/curriculum-pack-repository.port.js";
 import type { GameSessionRepositoryPort } from "../../../src/application/ports/game-session-repository.port.js";
 import type { TransitionSessionPhaseCommand } from "../../../src/application/ports/transition-session-phase.port.js";
+import type { WriteConflictBackoffPort } from "../../../src/application/ports/write-conflict-backoff.port.js";
 import { readOptionalJsonObjectBody } from "../../../src/adapters/inbound/http/json-object-body.js";
 import { createApiHandler } from "../../../src/adapters/inbound/http/middy/api-handler.js";
 import { requestLoggerOf } from "../../../src/adapters/inbound/http/request-logger.js";
@@ -22,6 +23,7 @@ export interface TransitionPhaseHandlerDependencies {
   readonly seedGenerator?: BoardSeedGeneratorPort;
   readonly apiKey?: string;
   readonly requireApiKey?: boolean;
+  readonly writeConflictBackoff?: WriteConflictBackoffPort;
 }
 
 export function createTransitionPhaseHandler(
@@ -34,11 +36,13 @@ export function createTransitionPhaseHandler(
     tokenVerifier: prodDeps.tokenVerifier!,
     apiKey: prodDeps.apiKey,
     requireApiKey: prodDeps.requireApiKey,
+    writeConflictBackoff: prodDeps.writeConflictBackoff,
   };
   const clock = deps.clock ?? prodDeps.clock!;
 
   const useCase = new TransitionSessionPhaseUseCase({
     sessionRepo: deps.sessionRepo,
+    writeConflictBackoff: deps.writeConflictBackoff,
     packRepo: deps.packRepo,
     clock,
     seededRandom: deps.seededRandom ?? prodDeps.seededRandom!,

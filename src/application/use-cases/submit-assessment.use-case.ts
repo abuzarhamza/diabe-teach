@@ -37,7 +37,7 @@ export class SubmitAssessmentUseCase implements SubmitAssessmentUseCasePort {
 
   public constructor(deps: SubmitAssessmentDependencies) {
     this.#sessionRepo = deps.sessionRepo;
-    this.#sessionUpdates = new GameSessionUpdateRetrier(deps.sessionRepo);
+    this.#sessionUpdates = new GameSessionUpdateRetrier(deps.sessionRepo, deps.writeConflictBackoff);
     this.#packs = new SessionPackLoader(deps.packRepo);
   }
 

@@ -63,7 +63,7 @@ The composition roots are `src/app-runtime.ts`, the handler files under `netlify
 
 - **Aggregates**: `GameSession` (participants, rounds, chains, verdicts, assessments, survey, phase state machine, pinned `packVersion`), `CurriculumPack` (identified by `PackId` + `version`; system/archived flags, `createdBy`), `InstructorAccount` (email, password hash, sign-in lock).
 - Domain code returns values or throws `DomainError` subclasses (`src/domain/errors/domain-errors.ts`), never HTTP status codes.
-- **Outbound ports** (`src/application/ports/`): `CurriculumPackRepositoryPort`, `GameSessionRepositoryPort`, `InstructorAccountRepositoryPort`, `CapabilityTokenPort` / `CapabilityTokenSignerPort`, `AccountTokenSignerPort` / `AccountTokenVerifierPort`, `PasswordHasherPort`, `ClockPort`, `IdGeneratorPort`, `SeededRandomPort` / `BoardSeedGeneratorPort`, `LoggerPort`. There is no narrative-adjudicator or event-publisher port.
+- **Outbound ports** (`src/application/ports/`): `CurriculumPackRepositoryPort`, `GameSessionRepositoryPort`, `InstructorAccountRepositoryPort`, `CapabilityTokenPort` / `CapabilityTokenSignerPort`, `AccountTokenSignerPort` / `AccountTokenVerifierPort`, `PasswordHasherPort`, `ClockPort`, `WriteConflictBackoffPort`, `IdGeneratorPort`, `SeededRandomPort` / `BoardSeedGeneratorPort`, `LoggerPort`. There is no narrative-adjudicator or event-publisher port.
 - **Role-aware projection**: `curriculum-pack-projector.ts` and `public-session-state-projector.ts` strip answers (`correctIndex`, `explanation`) and private state unless the caller's token allows it. Never mutate the aggregate to hide fields.
 - **Pack Version pinning** (ADR-0007): sessions store `packVersion`; `SessionPackLoader` loads the pinned version and falls back to the latest one for old sessions.
 
@@ -110,12 +110,12 @@ Every `/api/v1` route uses this one middy chain. `before` steps run in this orde
 
 - `AppRuntime` (`src/app-runtime.ts`) is a static class:
   - `loadEnvConfig` reads env vars, falling back to `.env.dev.yaml` through `EnvYamlConfigLoader`: `MONGODB_URI`, `MONGODB_DB_NAME`, `CAPABILITY_TOKEN_SECRET`, `ACCOUNT_TOKEN_SECRET`, `API_KEY`, `LOG_LEVEL` (`logging.level`), `LOG_PRETTY` (`logging.pretty`);
-  - `buildProductionDependencies` wires the Mongo repositories, token adapters, clock, seed/random, argon2 hasher, id generator and `PinoLogger` (`buildLogger`);
+  - `buildProductionDependencies` wires the Mongo repositories, token adapters, clock, write-conflict backoff (`TimerWriteConflictBackoff`), seed/random, argon2 hasher, id generator and `PinoLogger` (`buildLogger`);
   - `getProductionDependencies` caches that wiring per warm container;
   - `setProductionDependencies` lets tests swap it.
 - Many `ProductionDependencies` fields are optional, and handlers force them with `!`. A missing dependency therefore fails at runtime, not at compile time (environment backlog, 2026-11-19).
 - MongoDB goes through mongoose (`*.schema.ts`), with `MongoConnectionManager` in `mongo-client-singleton.ts` caching the connection.
-- Game Sessions use optimistic concurrency: a `version` field, and a conditional update on `{ _id, version }` that stores `version + 1`. A conflict throws `ConcurrentUpdateConflictError`, which `GameSessionUpdateRetrier` retries a bounded number of times.
+- Game Sessions use optimistic concurrency: a `version` field, and a conditional update on `{ _id, version }` that stores `version + 1`. A conflict throws `ConcurrentUpdateConflictError`, which `GameSessionUpdateRetrier` retries up to `MAX_ATTEMPTS` (10) attempts in total, waiting an exponential, fully jittered backoff (base 20 ms, cap 500 ms) through `WriteConflictBackoffPort` before each retry. Handlers built with test dependencies and no backoff retry at once; tests inject `FakeWriteConflictBackoff`.
 - Pack versions are stored under `_id` `<packId>@<version>`; the latest version is picked with `semver`.
 - `netlify.toml`: functions directory `netlify/functions`, esbuild, `external_node_modules = ["mongoose", "mongodb", "@node-rs/argon2"]`; `[dev]` port 8888.
 
@@ -208,7 +208,7 @@ Every line below is emitted through the request's child logger, so it also carri
 | Area | `msg` | Fields |
 |---|---|---|
 | Board deal | `"board dealt"` | `sessionId`, `roundNumber`, `seed`, `rows`, `cols` |
-| Concurrency | `"session write conflict; retrying"` | `sessionId`, `attempt` |
+| Concurrency | `"session write conflict; retrying"` | `sessionId`, `attempt`, `delayMs` |
 | Pack loader | `"session pack loaded"` | `packId`, `packVersion`, `fellBackToLatest` |
 | Pack validator | `"pack validated"` | `packId`, `errorCount` |
 | Request schema | `"request body rejected"` | `field`, `reason` |

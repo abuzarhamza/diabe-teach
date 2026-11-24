@@ -32,7 +32,7 @@ export class SubmitPerceptionSurveyUseCase implements SubmitPerceptionSurveyUseC
 
   public constructor(deps: SubmitPerceptionSurveyDependencies) {
     this.#sessionRepo = deps.sessionRepo;
-    this.#sessionUpdates = new GameSessionUpdateRetrier(deps.sessionRepo);
+    this.#sessionUpdates = new GameSessionUpdateRetrier(deps.sessionRepo, deps.writeConflictBackoff);
     this.#packs = new SessionPackLoader(deps.packRepo);
   }
 

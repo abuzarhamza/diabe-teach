@@ -596,7 +596,8 @@ paths:
           description: >-
             CONCURRENT_UPDATE_CONFLICT. Other requests kept changing the Game
             Session while this one was being saved, and it still conflicted
-            after 3 attempts. Nothing was recorded. Safe to retry.
+            after 10 attempts with jittered backoff. Nothing was recorded. Safe
+            to retry.
           content:
             application/json:
               schema:
@@ -708,7 +709,8 @@ paths:
 
             CONCURRENT_UPDATE_CONFLICT. Other requests kept changing the Game
             Session while this one was being saved, and it still conflicted
-            after 3 attempts. Nothing was recorded. Safe to retry.
+            after 10 attempts with jittered backoff. Nothing was recorded. Safe
+            to retry.
           content:
             application/json:
               schema:
@@ -765,7 +767,8 @@ paths:
 
             CONCURRENT_UPDATE_CONFLICT. Other requests kept changing the Game
             Session while this one was being saved, and it still conflicted
-            after 3 attempts. Nothing was recorded. Safe to retry.
+            after 10 attempts with jittered backoff. Nothing was recorded. Safe
+            to retry.
           content:
             application/json:
               schema:
@@ -810,7 +813,8 @@ paths:
 
             CONCURRENT_UPDATE_CONFLICT. Other requests kept changing the Game
             Session while this one was being saved, and it still conflicted
-            after 3 attempts. Nothing was recorded. Safe to retry.
+            after 10 attempts with jittered backoff. Nothing was recorded. Safe
+            to retry.
           content:
             application/json:
               schema:
@@ -861,7 +865,8 @@ paths:
           description: >-
             CONCURRENT_UPDATE_CONFLICT. Other requests kept changing the Game
             Session while this one was being saved, and it still conflicted
-            after 3 attempts. Nothing was recorded. Safe to retry.
+            after 10 attempts with jittered backoff. Nothing was recorded. Safe
+            to retry.
           content:
             application/json:
               schema:
@@ -1004,7 +1009,8 @@ paths:
 
             CONCURRENT_UPDATE_CONFLICT. Other requests kept changing the Game
             Session while this one was being saved, and it still conflicted
-            after 3 attempts. Nothing was recorded. Safe to retry.
+            after 10 attempts with jittered backoff. Nothing was recorded. Safe
+            to retry.
           content:
             application/json:
               schema:
@@ -1069,7 +1075,8 @@ paths:
 
             CONCURRENT_UPDATE_CONFLICT. Other requests kept changing the Game
             Session while this one was being saved, and it still conflicted
-            after 3 attempts. Nothing was recorded. Safe to retry.
+            after 10 attempts with jittered backoff. Nothing was recorded. Safe
+            to retry.
           content:
             application/json:
               schema:
@@ -1167,7 +1174,8 @@ paths:
 
             CONCURRENT_UPDATE_CONFLICT. Other requests kept changing the Game
             Session while this one was being saved, and it still conflicted
-            after 3 attempts. Nothing was recorded. Safe to retry.
+            after 10 attempts with jittered backoff. Nothing was recorded. Safe
+            to retry.
           content:
             application/json:
               schema:
@@ -1228,7 +1236,8 @@ paths:
 
             CONCURRENT_UPDATE_CONFLICT. Other requests kept changing the Game
             Session while this one was being saved, and it still conflicted
-            after 3 attempts. Nothing was recorded. Safe to retry.
+            after 10 attempts with jittered backoff. Nothing was recorded. Safe
+            to retry.
           content:
             application/json:
               schema:

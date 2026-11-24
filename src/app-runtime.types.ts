@@ -8,6 +8,7 @@ import type { IdGeneratorPort } from "./application/ports/id-generator.port.js";
 import type { InstructorAccountRepositoryPort } from "./application/ports/instructor-account-repository.port.js";
 import type { LoggerPort, LogLevel } from "./application/ports/logger.port.js";
 import type { PasswordHasherPort } from "./application/ports/password-hasher.port.js";
+import type { WriteConflictBackoffPort } from "./application/ports/write-conflict-backoff.port.js";
 
 export interface RuntimeEnvConfig {
   readonly mongoUri?: string;
@@ -30,6 +31,8 @@ export interface ProductionDependencies {
   readonly tokenSigner?: CapabilityTokenSignerPort;
   readonly tokenVerifier?: CapabilityTokenPort;
   readonly clock?: ClockPort;
+  /** Jittered waits between Game Session write-conflict retries. */
+  readonly writeConflictBackoff?: WriteConflictBackoffPort;
   readonly seededRandom?: SeededRandomPort;
   readonly seedGenerator?: BoardSeedGeneratorPort;
   readonly accountRepo: InstructorAccountRepositoryPort;

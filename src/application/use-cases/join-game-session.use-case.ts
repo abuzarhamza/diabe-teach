@@ -20,7 +20,7 @@ export class JoinGameSessionUseCase implements JoinGameSessionUseCasePort {
 
   public constructor(deps: JoinGameSessionDependencies) {
     this.#sessionRepo = deps.sessionRepo;
-    this.#sessionUpdates = new GameSessionUpdateRetrier(deps.sessionRepo);
+    this.#sessionUpdates = new GameSessionUpdateRetrier(deps.sessionRepo, deps.writeConflictBackoff);
     this.#tokenSigner = deps.tokenSigner;
   }
 

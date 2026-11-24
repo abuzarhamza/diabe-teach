@@ -37,7 +37,7 @@ implements TransitionSessionPhaseUseCasePort {
 
   public constructor(deps: TransitionSessionPhaseDependencies) {
     this.#sessionRepo = deps.sessionRepo;
-    this.#sessionUpdates = new GameSessionUpdateRetrier(deps.sessionRepo);
+    this.#sessionUpdates = new GameSessionUpdateRetrier(deps.sessionRepo, deps.writeConflictBackoff);
     this.#packs = new SessionPackLoader(deps.packRepo);
     this.#clock = deps.clock;
     this.#seededRandom = deps.seededRandom;

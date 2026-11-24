@@ -4,12 +4,15 @@ import type { ClockPort } from "./clock.port.js";
 import type { CurriculumPackRepositoryPort } from "./curriculum-pack-repository.port.js";
 import type { GameSessionRepositoryPort } from "./game-session-repository.port.js";
 import type { LoggerPort } from "./logger.port.js";
+import type { WriteConflictBackoffPort } from "./write-conflict-backoff.port.js";
 
 export interface SubmitConceptChainDependencies {
   readonly sessionRepo: GameSessionRepositoryPort;
   /** Supplies the minimum chain length, from the session's pinned Pack Version. */
   readonly packRepo: CurriculumPackRepositoryPort;
   readonly clock: ClockPort;
+  /** Waits between write-conflict retries; without one the retrier retries at once. */
+  readonly writeConflictBackoff?: WriteConflictBackoffPort;
 }
 
 export interface SubmitConceptChainCommand {
