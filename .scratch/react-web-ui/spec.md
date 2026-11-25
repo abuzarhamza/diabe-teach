@@ -2,6 +2,8 @@
 
 **Status:** ready-for-agent
 
+> **Drift note (2026-11-25):** `react-web-setup` 01–02 are done (`web/` package, no-`useEffect` lint, boundary rules). The real prototype screens are `claudPoc/concept-chain/{login,setup,lobby,teacher,participant}.html` (not the per-phase HTML files listed below), and the stylesheet is `shared.css` (already copied to `web/src/styles.css`). Routes below are kept; the prototype is the visual reference only. Implementation slices: `issues/01`–`14`.
+
 ## Problem Statement
 
 While the backend API (`src/` and `netlify/functions/`) and manual Bruno documentation (`docs/api/bruno/`) are complete across all 24 endpoints, the browser UI in `claudPoc/concept-chain/` is still a collection of disconnected static HTML files (`login.html`, `game-setup.html`, `lobby.html`, `pretest.html`, `round.html`, `adjudication.html`, `posttest.html`, `survey.html`, `results.html`, `pack-library.html`, `pack-detail.html`, `pack-new.html`) where only teacher login and pack discovery call the real API (`account-api.js`) and all Game Session gameplay, board dealing, chain submissions, adjudication, assessments, survey, and analytics still run against an in-browser fake (`app.js`).
