@@ -20,7 +20,9 @@
 - [Reference: `useSyncExternalStore` (react.dev)](https://react.dev/reference/react/useSyncExternalStore)
   Official reference for subscribing to an external store. Use for: `useSignedInAccount` reading the Account Token store.
 - [Documentation: TanStack Query, Overview](https://tanstack.com/query/latest/docs/framework/react/overview) and [Mutations](https://tanstack.com/query/latest/docs/framework/react/guides/mutations)
-  Official docs for `useQuery` (server reads, polling) and `useMutation` (writes from event handlers).
+  Official docs for `useQuery` (server reads, polling) and `useMutation` (writes from event handlers). **Primary source for lesson 0003.**
+- [Documentation: TanStack Query, Important Defaults](https://tanstack.com/query/latest/docs/framework/react/guides/important-defaults) and [Does this replace client state?](https://tanstack.com/query/latest/docs/framework/react/guides/does-this-replace-client-state)
+  Official: cached data is stale by default; failed queries retry; the client state left after moving async code to TanStack Query "is usually very tiny". Use for: why the app has no Redux, and for "why did it fetch again?" questions.
 - [Documentation: React Router, Data Loading](https://reactrouter.com/start/data/data-loading) and [`redirect`](https://reactrouter.com/api/utils/redirect)
   Official docs for route `loader` functions. Use for: the `requireTeacher` guard in `web/src/features/shared/`.
 - [Documentation: Testing Library, Guiding Principles](https://testing-library.com/docs/guiding-principles) and [Queries](https://testing-library.com/docs/queries/about)
