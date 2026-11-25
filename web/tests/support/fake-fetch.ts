@@ -5,6 +5,10 @@ export interface FakeReply {
   body?: unknown;
 }
 
+// A reply may be given later (a function returning a promise, to hold the request pending), or
+// "network-error" to make fetch itself reject, as it does when the API is not running.
+export type FakeAnswer = FakeReply | "network-error" | (() => Promise<FakeReply>);
+
 export interface RecordedRequest {
   method: string;
   path: string;
@@ -14,7 +18,7 @@ export interface RecordedRequest {
 
 // Replaces the global fetch with one that answers per "METHOD /path" with contract-shaped JSON,
 // and records every request so a test can check what was sent.
-export function installFakeFetch(replies: Record<string, FakeReply>): RecordedRequest[] {
+export function installFakeFetch(replies: Record<string, FakeAnswer>): RecordedRequest[] {
   const requests: RecordedRequest[] = [];
   vi.stubGlobal("fetch", vi.fn(async (input: string, init: RequestInit = {}) => {
     const method = (init.method ?? "GET").toUpperCase();
@@ -28,10 +32,15 @@ export function installFakeFetch(replies: Record<string, FakeReply>): RecordedRe
         ? JSON.parse(init.body)
         : undefined,
     });
-    const reply = replies[`${method} ${path}`] ?? {
-      status: 404,
-      body: { code: "NOT_FOUND", message: `No fake reply for ${method} ${path}.`, details: null },
-    };
+    const answer = replies[`${method} ${path}`];
+    if (answer === "network-error")
+      throw new TypeError("Failed to fetch");
+    const reply = typeof answer === "function"
+      ? await answer()
+      : answer ?? {
+        status: 404,
+        body: { code: "NOT_FOUND", message: `No fake reply for ${method} ${path}.`, details: null },
+      };
     return new Response(reply.body === undefined
       ? null
       : JSON.stringify(reply.body), {
