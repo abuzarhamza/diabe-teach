@@ -13,6 +13,19 @@ To confidently build, debug, review, and extend all 14 OpenAPI endpoints of the 
 - Use everyday `inbound` and `outbound` adapter terminology rather than `driving` and `driven`.
 - Rely on established frameworks (`openapi-backend` reading `docs/api/openapi.yaml`) with a single Netlify entrypoint (`netlify/functions/api.ts`).
 
+## React web app (added 2026-11-25)
+
+### Why
+To find, change and extend any behaviour of the React web app in `web/` (ADR-0008) with the same confidence as the API, building on prior React knowledge from the Namaste React course.
+
+### Success looks like
+- Name the folder and file for any web behaviour in under a minute: a game or error rule (`web/src/domain/`), an HTTP call or browser storage (`web/src/api/`), a screen (`web/src/features/`), a route or guard (`web/src/routes.tsx`).
+- Trace a click step by step from a React event handler through `useMutation` / `useQuery`, `apiRequest`, `fetch`, the token store, and back to the screen.
+- Write a new screen with no `useEffect`, and a test that drives it through the rendered app over a fake `fetch`.
+
+### Constraints
+- `useEffect` is banned in `web/src`; use TanStack Query, event handlers, pure `domain/` functions, `useSyncExternalStore` and `key` instead.
+- Only `web/src/api/` may call `fetch` or touch `localStorage` / `sessionStorage`.
+
 ## Out of scope
-- Frontend React/Canvas UI rendering of the 7x7 board.
 - Replacing REST + OpenAPI 3.1 with GraphQL or gRPC.

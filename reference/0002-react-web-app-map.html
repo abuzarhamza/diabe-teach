@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Reference 0002 · React web app map</title>
+  <link rel="stylesheet" href="../assets/tufte-course.css" />
+</head>
+<body>
+  <main class="tufte-page">
+    <header class="lesson-header">
+      <div class="eyebrow">Reference Sheet 0002 · Diabe-Teach React web app</div>
+      <h1>React web app map</h1>
+      <p class="subtitle">Where each behaviour of <code>web/</code> lives, as of commit <code>5853312</code> (2026-11-25).</p>
+      <nav class="nav-bar">
+        <a href="../lessons/0002-navigate-the-react-web-app.html">Lesson 0002</a>
+        <a href="0001-request-pipeline-cheatsheet.html">Reference 0001 (API)</a>
+        <a href="../web/README.md">web/README.md</a>
+        <a href="../docs/adr/0008-simple-three-layer-ddd-react-vite-frontend.md">ADR-0008</a>
+      </nav>
+    </header>
+
+    <h2>I want to change… → go to…</h2>
+    <table class="ref-table">
+      <tr><th>I want to change…</th><th>Go to</th><th>Layer</th></tr>
+      <tr><td>A URL, or which screens need a signed-in teacher</td><td><code>web/src/routes.tsx</code></td><td>routes</td></tr>
+      <tr><td>What a screen shows, or a button's handler</td><td><code>web/src/features/&lt;area&gt;/*Page.tsx</code></td><td>features</td></tr>
+      <tr><td>The sentence for an API error, or a form pre-check</td><td><code>web/src/domain/login-errors.ts</code></td><td>domain</td></tr>
+      <tr><td>Headers, the <code>[API]</code> log, error parsing</td><td><code>web/src/api/http-client.ts</code></td><td>api</td></tr>
+      <tr><td>An Instructor Account call (sign-in, sign-up, me)</td><td><code>web/src/api/accounts-api.ts</code></td><td>api</td></tr>
+      <tr><td>How the Account Token is stored, read or expires</td><td><code>web/src/api/account-token-store.ts</code></td><td>api</td></tr>
+      <tr><td>The one-time “why you were sent to login” sentence</td><td><code>web/src/api/login-reason-store.ts</code></td><td>api</td></tr>
+      <tr><td>The teacher guard</td><td><code>features/shared/require-teacher.ts</code> (loader) + <code>TeacherRoute.tsx</code> (element)</td><td>features</td></tr>
+      <tr><td>How a refusal looks on screen</td><td><code>web/src/features/shared/ErrorBanner.tsx</code></td><td>features</td></tr>
+      <tr><td>The Query client or router setup</td><td><code>web/src/main.tsx</code>, <code>web/src/App.tsx</code></td><td>shell</td></tr>
+      <tr><td>The dev <code>/api</code> proxy (port 8888)</td><td><code>web/vite.config.ts</code></td><td>tooling</td></tr>
+      <tr><td>A screen test, or the fake <code>fetch</code></td><td><code>web/tests/features/…</code>, <code>web/tests/support/fake-fetch.ts</code></td><td>tests</td></tr>
+    </table>
+
+    <h2>Import rules</h2>
+    <table class="ref-table">
+      <tr><th>Layer</th><th>May import</th><th>May not</th></tr>
+      <tr><td><code>domain/</code></td><td>other <code>domain/</code> files</td><td>React, router, TanStack Query, <code>api/</code>, <code>features/</code>, <code>fetch</code>, storage</td></tr>
+      <tr><td><code>api/</code></td><td><code>domain/</code>, other <code>api/</code> files</td><td>React, <code>features/</code></td></tr>
+      <tr><td><code>features/</code></td><td>React, router, TanStack Query, <code>api/</code>, <code>domain/</code></td><td>direct <code>fetch</code>, direct storage, <code>useEffect</code></td></tr>
+    </table>
+
+    <h2>Instead of <code>useEffect</code></h2>
+    <table class="ref-table">
+      <tr><th>Need</th><th>Use</th><th>Example in the code</th></tr>
+      <tr><td>Read server data / poll</td><td><code>useQuery</code> (+ <code>refetchInterval</code>)</td><td><code>TeacherRoute</code> → <code>getCurrentAccount</code></td></tr>
+      <tr><td>Write on a click or submit</td><td>event handler + <code>useMutation</code>, navigate in <code>onSuccess</code></td><td><code>LoginPage</code> → <code>signIn</code></td></tr>
+      <tr><td>A value computed from state</td><td>pure function, called during render</td><td><code>loginErrorView(serverError)</code></td></tr>
+      <tr><td>Browser storage other tabs change</td><td><code>useSyncExternalStore</code></td><td><code>useSignedInAccount</code></td></tr>
+      <tr><td>Check before a screen opens</td><td>router <code>loader</code> + <code>redirect</code></td><td><code>requireTeacher</code></td></tr>
+      <tr><td>Reset a form when a phase changes</td><td><code>key</code> prop</td><td>planned: <code>&lt;ChainMappingView key={state.phase} /&gt;</code></td></tr>
+    </table>
+
+    <h2>The “Sign in” trace</h2>
+    <pre><code>LoginPage.handleSubmit                         features
+  └─ signInCredentialsProblem()               domain   (empty field → stop, nothing sent)
+  └─ signIn.mutate()  (useMutation)           features
+       └─ signInInstructor()                  api
+            └─ apiRequest("POST", …/sign-in)  api      fetch · [API] log · ApiHttpError
+            └─ saveAccount()                  api      localStorage + notify listeners
+       └─ onSuccess → navigate("/setup")      features
+            └─ requireTeacher (loader)        features token ok → continue
+            └─ TeacherRoute → useQuery(/me)   features 401 → token cleared → /login + reason
+on error: signIn.error → loginErrorView() (domain) → ErrorBanner (features)</code></pre>
+
+    <h2>Commands</h2>
+    <table class="ref-table">
+      <tr><th>Do</th><th>Command (repo root)</th></tr>
+      <tr><td>Run API without key check</td><td><code>npm run dev:prototype</code> → wait for <code>DEV READY</code></td></tr>
+      <tr><td>Run the web app</td><td><code>npm run dev:web</code> → <code>http://localhost:5173/login</code></td></tr>
+      <tr><td>Web tests only</td><td><code>npx vitest run --project web</code></td></tr>
+      <tr><td>Checks (one at a time)</td><td><code>typecheck:web</code> → tests → <code>lint:web</code> → <code>lint:boundaries</code> → <code>build:web</code></td></tr>
+    </table>
+  </main>
+</body>
+</html>

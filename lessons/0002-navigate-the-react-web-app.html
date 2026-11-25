@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lesson 0002 · Find your way around the React web app</title>
+  <link rel="stylesheet" href="../assets/tufte-course.css" />
+</head>
+<body>
+  <main class="tufte-page">
+    <header class="lesson-header">
+      <div class="eyebrow">Lesson 0002 · Diabe-Teach React web app</div>
+      <h1>Find your way around <code>web/</code></h1>
+      <p class="subtitle">
+        One win for today: for any behaviour of the app, you can name the folder and the file in under a minute.
+      </p>
+      <nav class="nav-bar">
+        <a href="0001-netlify-to-domain-request-flow.html">← Lesson 0001 (API request flow)</a>
+        <a href="../reference/0002-react-web-app-map.html">Reference: React web app map</a>
+        <a href="../web/README.md">web/README.md</a>
+        <a href="../docs/adr/0008-simple-three-layer-ddd-react-vite-frontend.md">ADR-0008</a>
+      </nav>
+    </header>
+
+    <section>
+      <h2>Why this matters for your mission</h2>
+      <p>
+        Your mission now has a React half: change and extend the web app with the same confidence as the API.
+        Every change starts with one question: <em>where does this live?</em>
+        In this app the answer is never "somewhere in a component". It is always one of three folders.
+      </p>
+      <p>
+        You already know React from Namaste React. Keep components, props, JSX and routes.
+        Three habits from the course change here. The table shows them.
+      </p>
+      <table class="ref-table">
+        <tr><th>In the course you…</th><th>Here you…</th><th>Folder</th></tr>
+        <tr><td>called <code>fetch</code> inside <code>useEffect</code></td><td>call a function from <code>api/</code> through <code>useQuery</code> (reads) or <code>useMutation</code> (writes)</td><td><code>web/src/api/</code></td></tr>
+        <tr><td>kept helpers in <code>utils/</code> and filtered lists into a second <code>useState</code></td><td>write a pure function and call it during render</td><td><code>web/src/domain/</code></td></tr>
+        <tr><td>read <code>localStorage</code> in a component</td><td>read a store in <code>api/</code> with <code>useSyncExternalStore</code></td><td><code>web/src/api/</code></td></tr>
+      </table>
+      <p>
+        Why no <code>useEffect</code>? React's own guide says most effects are not needed: derive values during render, and do user work in event handlers
+        (<a href="https://react.dev/learn/you-might-not-need-an-effect">react.dev, <em>You Might Not Need an Effect</em></a>).
+        ESLint refuses <code>useEffect</code> in <code>web/src</code> (<code>web/eslint.config.js</code>).
+      </p>
+    </section>
+
+    <section>
+      <h2>The map: three layers and one route table</h2>
+      <pre><code>web/src/
+├── main.tsx        creates the router (createBrowserRouter) and the QueryClient
+├── App.tsx         QueryClientProvider + RouterProvider
+├── routes.tsx      every URL → screen; teacher-only screens sit under requireTeacher
+├── domain/         PURE rules. No React, no fetch, no storage.     login-errors.ts
+├── api/            The ONLY place for fetch and browser storage.   http-client.ts, accounts-api.ts,
+│                                                                   account-token-store.ts, login-reason-store.ts
+└── features/       React screens, grouped by area
+    ├── accounts/       LoginPage.tsx, use-signed-in-account.ts
+    ├── game-session/   GameSetupPage.tsx (placeholder)
+    └── shared/         ErrorBanner.tsx, TeacherRoute.tsx, require-teacher.ts
+web/tests/          screen tests: render the real app over a fake fetch</code></pre>
+      <p>
+        Imports go one way: <code>features → api</code> and <code>features → domain</code>.
+        <code>domain</code> may not import <code>api</code> or React. <code>api</code> may not import <code>features</code> or React.
+        <code>npm run lint:boundaries</code> enforces this.
+      </p>
+    </section>
+
+    <section>
+      <h2>Trace one click: “Sign in”</h2>
+      <p>Open each file as you read its step. The colour shows the layer.</p>
+      <div class="pipeline-list">
+        <article class="step-card layer-features">
+          <div class="step-header"><span class="step-badge">1 · Event handler</span><span class="step-file">features/accounts/LoginPage.tsx · handleSubmit</span></div>
+          <p>The form's <code>onSubmit</code> reads the email and password. It calls <code>signInCredentialsProblem</code> first. With an empty field, it stops here and sends nothing.</p>
+        </article>
+        <article class="step-card layer-domain">
+          <div class="step-header"><span class="step-badge">2 · Pure rule</span><span class="step-file">domain/login-errors.ts · signInCredentialsProblem</span></div>
+          <p>Returns <code>null</code> or <code>{ sentence, focusField }</code>. No React, no network: easy to reason about.</p>
+        </article>
+        <article class="step-card layer-features">
+          <div class="step-header"><span class="step-badge">3 · Mutation</span><span class="step-file">LoginPage.tsx · signIn = useMutation(…)</span></div>
+          <p><code>signIn.mutate(credentials)</code> runs <code>mutationFn</code>. TanStack Query tracks <code>isPending</code> and <code>error</code>, so the buttons disable themselves (<a href="https://tanstack.com/query/latest/docs/framework/react/guides/mutations">TanStack Query, Mutations</a>).</p>
+        </article>
+        <article class="step-card layer-api">
+          <div class="step-header"><span class="step-badge">4 · API function</span><span class="step-file">api/accounts-api.ts · signInInstructor</span></div>
+          <p>Trims the email and calls <code>apiRequest("POST", "/api/v1/accounts/sign-in", …)</code>.</p>
+        </article>
+        <article class="step-card layer-api">
+          <div class="step-header"><span class="step-badge">5 · The one HTTP client</span><span class="step-file">api/http-client.ts · apiRequest</span></div>
+          <p>Calls <code>fetch</code>. Logs <code>[API] POST /api/v1/accounts/sign-in -&gt; 200</code> in development. Turns any refusal into an <code>ApiHttpError { status, code, message, details }</code>.</p>
+        </article>
+        <article class="step-card layer-api">
+          <div class="step-header"><span class="step-badge">6 · Token store</span><span class="step-file">api/account-token-store.ts · saveAccount</span></div>
+          <p>Writes the Account Token to <code>localStorage</code> and notifies its listeners. <code>useSignedInAccount</code> subscribes with <code>useSyncExternalStore</code>, so every screen that shows the teacher re-renders (<a href="https://react.dev/reference/react/useSyncExternalStore">react.dev, useSyncExternalStore</a>).</p>
+        </article>
+        <article class="step-card layer-features">
+          <div class="step-header"><span class="step-badge">7 · Navigate</span><span class="step-file">LoginPage.tsx · onSuccess → navigate("/setup")</span></div>
+          <p>The route <code>/setup</code> sits under the <code>requireTeacher</code> loader in <code>routes.tsx</code>. The loader runs <em>before</em> the screen renders (<a href="https://reactrouter.com/start/data/data-loading">React Router, Data Loading</a>). A token exists, so <code>TeacherRoute</code> renders and confirms it with <code>useQuery</code> → <code>GET /api/v1/accounts/me</code>.</p>
+        </article>
+      </div>
+      <p>
+        <strong>On failure</strong> the path turns at step 5. <code>apiRequest</code> throws an <code>ApiHttpError</code>, and <code>signIn.error</code> holds it.
+        During render, <code>loginErrorView(error)</code> in <code>domain/</code> turns it into a sentence. <code>ErrorBanner</code> shows that sentence.
+      </p>
+    </section>
+
+    <section>
+      <h2>Practice 1: pick the folder</h2>
+      <p>Answer from memory first. Scroll up only after you commit to an answer.</p>
+      <div class="quiz-container" id="folder-quiz"></div>
+    </section>
+
+    <section>
+      <h2>Practice 2: type the file</h2>
+      <p>Harder: no options. Type the path from memory, for example <code>web/src/api/http-client.ts</code>.</p>
+      <div class="quiz-container" id="path-hunt"></div>
+    </section>
+
+    <section>
+      <h2>Practice 3: find it in the running app</h2>
+      <ol>
+        <li>Start the app (see <a href="../web/README.md">web/README.md, Quick start</a>): <code>npm run dev:prototype</code>, then <code>npm run dev:web</code>.</li>
+        <li>Open <code>http://localhost:5173/login</code> and the browser console.</li>
+        <li>Sign in with a wrong password. Find the <code>[API] … -&gt; 401</code> line.</li>
+        <li>Without searching, name the file that printed it and the file that chose the sentence on screen. Then check with <code>grep -rn "\[API\]" web/src</code>.</li>
+        <li>Delete <code>cc-account-token-v1</code> in DevTools → Application → Local Storage while on <code>/setup</code>. Before you reload, write down where you will land and which sentence you will read. Then reload and check. (Bonus: why did nothing change <em>before</em> the reload? Hint: which tabs receive the <code>storage</code> event?)</li>
+      </ol>
+    </section>
+
+    <section class="callout-box">
+      <h3>Primary source</h3>
+      <p>
+        Read <a href="https://react.dev/learn/you-might-not-need-an-effect">You Might Not Need an Effect</a> on react.dev (about 20 minutes).
+        It explains, from the React team, every replacement this app uses for <code>useEffect</code>.
+      </p>
+      <h3>Ask your teacher</h3>
+      <p>
+        Anything unclear? Ask the agent. Good next questions: “Why does <code>TeacherRoute</code> navigate to the same page?” or
+        “How would I add <code>/packs</code> as a teacher-only screen?”
+      </p>
+    </section>
+  </main>
+
+  <script src="../assets/quiz-widget.js"></script>
+  <script src="../assets/path-hunt.js"></script>
+  <script>
+    const LAYERS = {
+      domain: "<code>web/src/domain/</code>",
+      api: "<code>web/src/api/</code>",
+      features: "<code>web/src/features/</code>",
+      routes: "<code>web/src/routes.tsx</code>",
+    };
+    initRetrievalQuiz("folder-quiz", [
+      {
+        prompt: "The lock message shows the wrong time format. Where do you fix the sentence?",
+        options: [LAYERS.api, LAYERS.domain, LAYERS.routes, LAYERS.features],
+        correctIndex: 1,
+        explanation: "error → sentence is a pure rule: loginErrorView in domain/login-errors.ts.",
+        hint: "Is turning an error into a sentence a screen, a network call, or a pure rule?",
+      },
+      {
+        prompt: "Every request must now send a new header. Where do you add it?",
+        options: [LAYERS.features, LAYERS.routes, LAYERS.domain, LAYERS.api],
+        correctIndex: 3,
+        explanation: "every request goes through apiRequest in api/http-client.ts (requestHeaders).",
+        hint: "Which single file is allowed to call fetch?",
+      },
+      {
+        prompt: "A new screen at /packs must open only for signed-in teachers. Where?",
+        options: [LAYERS.routes, LAYERS.features, LAYERS.api, LAYERS.domain],
+        correctIndex: 0,
+        explanation: "add it as a child of the requireTeacher route in routes.tsx; the guard already exists.",
+        hint: "The guard is already written. Where are screens attached to URLs?",
+      },
+      {
+        prompt: "Add a “Forgot password?” link under the form. Where?",
+        options: [LAYERS.domain, LAYERS.api, LAYERS.features, LAYERS.routes],
+        correctIndex: 2,
+        explanation: "it is markup on the Login screen: features/accounts/LoginPage.tsx.",
+        hint: "It is only something the teacher sees. Which layer renders things?",
+      },
+      {
+        prompt: "The app still treats an expired token as signed in. Where do you look?",
+        options: [LAYERS.api, LAYERS.features, LAYERS.domain, LAYERS.routes],
+        correctIndex: 0,
+        explanation: "accountFromSnapshot in api/account-token-store.ts checks expiresAt; storage belongs to api/.",
+        hint: "The token lives in localStorage. Which layer owns browser storage?",
+      },
+      {
+        prompt: "Which hook re-renders LoginPage when another tab signs out?",
+        options: ["<code>useQuery</code>", "<code>useMutation</code>", "<code>useEffect</code>", "<code>useSyncExternalStore</code>"],
+        correctIndex: 3,
+        explanation: "useSignedInAccount subscribes to the token store (and the storage event) with useSyncExternalStore.",
+        hint: "The token is not server data, and useEffect is banned. What subscribes to an outside store?",
+      },
+    ]);
+    initPathHunt("path-hunt", [
+      {
+        prompt: "The file that logs <code>[API] METHOD path -&gt; status</code>.",
+        answers: ["web/src/api/http-client.ts"],
+        hint: "It is the only file that calls fetch.",
+        explanation: "logInDevelopment inside apiRequest.",
+      },
+      {
+        prompt: "The function that runs before a teacher-only screen and may redirect to /login.",
+        answers: ["web/src/features/shared/require-teacher.ts"],
+        hint: "It is a router loader, shared by every teacher screen, in features/shared/.",
+        explanation: "requireTeacher, attached as the loader in routes.tsx.",
+      },
+      {
+        prompt: "The file that keeps the one-time “why you were sent to login” sentence.",
+        answers: ["web/src/api/login-reason-store.ts"],
+        hint: "It uses sessionStorage, so which layer? Its name ends in -store.",
+        explanation: "setLoginReason / takeLoginReason over sessionStorage.",
+      },
+      {
+        prompt: "The test helper that answers each <code>METHOD /path</code> with contract-shaped JSON.",
+        answers: ["web/tests/support/fake-fetch.ts"],
+        hint: "Tests live in web/tests/, helpers in support/.",
+        explanation: "installFakeFetch replaces global fetch and records requests.",
+      },
+    ]);
+  </script>
+</body>
+</html>
