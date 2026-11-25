@@ -7,6 +7,7 @@ import { useRef, useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { clearAccount } from "../../api/account-token-store.ts";
 import { signInInstructor, signUpInstructor } from "../../api/accounts-api.ts";
+import { takeLoginReason } from "../../api/login-reason-store.ts";
 import { loginErrorView, MIN_PASSWORD_LENGTH, signInCredentialsProblem, signUpCredentialsProblem } from "../../domain/login-errors.ts";
 import { ErrorBanner } from "../shared/ErrorBanner.tsx";
 import { useSignedInAccount } from "./use-signed-in-account.ts";
@@ -35,6 +36,8 @@ export function LoginPage() {
   const focusEmailOnShowRef = useRef(false);
   // A refusal found before anything is sent (pre-checks); server refusals come from the mutations.
   const [localProblem, setLocalProblem] = useState<LoginErrorView | null>(null);
+  // Why a teacher screen sent the teacher here, taken once when the screen opens (gone after a reload).
+  const [sentHereReason] = useState(takeLoginReason);
 
   function focusField(field: LoginField | null) {
     if (field === "email")
@@ -113,6 +116,8 @@ export function LoginPage() {
           </h1>
           <p>Teacher login</p>
         </div>
+
+        {sentHereReason && <p className="toast warn" role="alert">{sentHereReason}</p>}
 
         {account
           ? (

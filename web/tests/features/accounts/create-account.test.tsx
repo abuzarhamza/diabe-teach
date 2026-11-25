@@ -53,7 +53,7 @@ describe("teacher Login screen: Create account (react-login-screen 03)", () => {
 
     expect(await screen.findByRole("heading", { name: "Game setup" })).toBeTruthy();
     expect(router.state.location.pathname).toBe("/setup");
-    expect(requests).toHaveLength(1);
+    // The sign-up comes first; Game Setup's guard then confirms the teacher (react-login-screen 05).
     expect(requests[0]).toMatchObject({
       method: "POST",
       path: "/api/v1/accounts/sign-up",

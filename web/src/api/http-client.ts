@@ -3,6 +3,11 @@
 // server runs with the key check off), adds `Authorization: Bearer <token>` only when the caller names
 // the token kind (ADR-0007: an Account Token is never sent where a Capability Token is expected), and
 // turns every refusal into an ApiHttpError carrying the server's { code, message, details }.
+// A 401 on an Account-Token request signs the teacher out: the token is cleared and the Login screen is
+// told why ("not accepted"); the teacher route guard, which watches the token, then sends them to /login.
+
+import { clearAccount } from "./account-token-store.ts";
+import { setLoginReason, SIGN_IN_NOT_ACCEPTED } from "./login-reason-store.ts";
 
 export type ApiErrorDetails = Record<string, unknown> | null;
 
@@ -96,6 +101,10 @@ export async function apiRequest<T>(method: HttpMethod, path: string, options: A
   }
   logInDevelopment(method, path, response.status);
   const data = parseJson(await response.text());
+  if (response.status === 401 && options.auth?.kind === "account") {
+    setLoginReason(SIGN_IN_NOT_ACCEPTED);
+    clearAccount();
+  }
   if (!response.ok)
     throw toApiHttpError(response.status, data);
   return data as T;

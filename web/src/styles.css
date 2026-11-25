@@ -58,7 +58,7 @@ textarea{resize:vertical;min-height:64px}
 .row.between{justify-content:space-between}
 .note,.empty{font-size:13px;color:var(--muted)}
 .toast{min-height:20px;font-size:14px;font-weight:700}
-.toast.err{color:var(--bad)} .toast.ok{color:var(--good)}
+.toast.err{color:var(--bad)} .toast.ok{color:var(--good)} .toast.warn{color:var(--warn)}
 .toast-code{margin-left:8px;font-family:var(--font-mono);font-size:12px;font-weight:400;color:var(--muted)}
 
 .board-shell{position:relative;width:100%;max-width:min(100%,720px);aspect-ratio:1;margin:0 auto}

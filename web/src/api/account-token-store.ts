@@ -4,7 +4,8 @@
 //
 // Screens read it with useSyncExternalStore(subscribeToStoredAccount, readStoredAccountSnapshot) and turn
 // the snapshot into the teacher with accountFromSnapshot during render. The snapshot is the raw stored
-// string, so it stays the same value between changes, as useSyncExternalStore requires.
+// string while it holds a valid, unexpired account and null otherwise, so it stays the same value between
+// changes, as useSyncExternalStore requires, and turns null when the token expires.
 
 export const ACCOUNT_TOKEN_KEY = "cc-account-token-v1";
 
@@ -41,22 +42,56 @@ export function clearAccount(): void {
 }
 
 export function readStoredAccountSnapshot(): string | null {
-  return localStorage.getItem(ACCOUNT_TOKEN_KEY);
+  const snapshot = localStorage.getItem(ACCOUNT_TOKEN_KEY);
+  return accountFromSnapshot(snapshot)
+    ? snapshot
+    : null;
 }
 
+// setTimeout's longest delay (about 24.8 days); a later expiry is reached in more than one step.
+const MAX_TIMER_DELAY_MS = 2_147_483_647;
+
 // Calls onChange when the Account Token changes in this tab or another one (`key` is null when another tab
-// clears all of localStorage). Returns the unsubscribe function.
+// clears all of localStorage), and when the stored token reaches its expiresAt while the screen stays open.
+// Returns the unsubscribe function.
 export function subscribeToStoredAccount(onChange: () => void): () => void {
+  let expiryTimer: ReturnType<typeof setTimeout> | undefined;
+
+  function watchExpiry() {
+    clearTimeout(expiryTimer);
+    const account = accountFromSnapshot(localStorage.getItem(ACCOUNT_TOKEN_KEY));
+    if (account)
+      expiryTimer = setTimeout(changed, Math.min(Date.parse(account.expiresAt) - Date.now(), MAX_TIMER_DELAY_MS));
+  }
+  function changed() {
+    watchExpiry();
+    onChange();
+  }
   function onStorage(event: StorageEvent) {
     if (event.key === ACCOUNT_TOKEN_KEY || event.key === null)
-      onChange();
+      changed();
   }
-  listeners.add(onChange);
+  listeners.add(changed);
   window.addEventListener("storage", onStorage);
+  watchExpiry();
   return () => {
-    listeners.delete(onChange);
+    clearTimeout(expiryTimer);
+    listeners.delete(changed);
     window.removeEventListener("storage", onStorage);
   };
+}
+
+// Why no teacher is signed in: "missing" (nothing stored, or not a readable account) or "expired"
+// (a readable account past its expiresAt); null when a valid Account Token is stored.
+export type SignedOutCause = "missing" | "expired";
+
+export function signedOutCause(now: number = Date.now()): SignedOutCause | null {
+  const snapshot = localStorage.getItem(ACCOUNT_TOKEN_KEY);
+  if (accountFromSnapshot(snapshot, now))
+    return null;
+  return snapshot !== null && accountFromSnapshot(snapshot, Number.NEGATIVE_INFINITY)
+    ? "expired"
+    : "missing";
 }
 
 function parseJson(text: string): unknown {

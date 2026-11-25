@@ -13,6 +13,12 @@ const accountTokenResponse = {
   expiresAt: "2099-01-01T12:00:00.000Z",
 };
 
+const instructorAccountView = {
+  accountId: "acc_01",
+  email: "rahman.s@aku.edu",
+  createdAt: "2026-01-01T09:00:00.000Z",
+};
+
 afterEach(() => {
   vi.unstubAllGlobals();
 });
@@ -41,6 +47,7 @@ describe("teacher Login screen (react-login-screen 01)", () => {
   it("signs in with a trimmed email, stores the Account Token and lands on Game Setup", async () => {
     const requests = installFakeFetch({
       "POST /api/v1/accounts/sign-in": { status: 200, body: accountTokenResponse },
+      "GET /api/v1/accounts/me": { status: 200, body: instructorAccountView },
     });
     const user = userEvent.setup();
     const { router } = renderApp("/login");
@@ -51,7 +58,7 @@ describe("teacher Login screen (react-login-screen 01)", () => {
 
     expect(await screen.findByRole("heading", { name: "Game setup" })).toBeTruthy();
     expect(router.state.location.pathname).toBe("/setup");
-    expect(requests).toHaveLength(1);
+    // The sign-in, then Game Setup's guard confirming the teacher (react-login-screen 05).
     expect(requests[0]).toMatchObject({
       method: "POST",
       path: "/api/v1/accounts/sign-in",
@@ -82,9 +89,13 @@ describe("teacher Login screen (react-login-screen 01)", () => {
     expect(router.state.location.pathname).toBe("/login");
   });
 
-  it("renders the Game Setup placeholder at /setup", () => {
+  it("renders the Game Setup placeholder at /setup for a signed-in teacher", async () => {
+    installFakeFetch({
+      "GET /api/v1/accounts/me": { status: 200, body: instructorAccountView },
+    });
+    localStorage.setItem(ACCOUNT_KEY, JSON.stringify(accountTokenResponse));
     renderApp("/setup");
 
-    expect(screen.getByRole("heading", { name: "Game setup" })).toBeTruthy();
+    expect(await screen.findByRole("heading", { name: "Game setup" })).toBeTruthy();
   });
 });
