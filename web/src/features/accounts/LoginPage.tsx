@@ -4,10 +4,12 @@ import type { ApiHttpError } from "../../api/http-client.ts";
 import type { LoginErrorView, LoginField } from "../../domain/login-errors.ts";
 import { useMutation } from "@tanstack/react-query";
 import { useRef, useState } from "react";
-import { useNavigate } from "react-router";
+import { Link, useNavigate } from "react-router";
+import { clearAccount } from "../../api/account-token-store.ts";
 import { signInInstructor } from "../../api/accounts-api.ts";
 import { loginErrorView, signInCredentialsProblem } from "../../domain/login-errors.ts";
 import { ErrorBanner } from "../shared/ErrorBanner.tsx";
+import { useSignedInAccount } from "./use-signed-in-account.ts";
 
 interface Credentials {
   email: string;
@@ -23,10 +25,13 @@ function credentialsFrom(form: HTMLFormElement): Credentials {
 }
 
 // Teacher login (claudPoc/concept-chain/login.html): sign in to an Instructor Account, then Game Setup.
+// A teacher who is already signed in sees the signed-in panel instead of the form.
 export function LoginPage() {
   const navigate = useNavigate();
+  const account = useSignedInAccount();
   const emailRef = useRef<HTMLInputElement>(null);
   const passwordRef = useRef<HTMLInputElement>(null);
+  const focusEmailOnShowRef = useRef(false);
   // A refusal found before anything is sent (empty field); server refusals come from the mutation.
   const [localProblem, setLocalProblem] = useState<LoginErrorView | null>(null);
 
@@ -61,6 +66,20 @@ export function LoginPage() {
     signIn.mutate(credentials);
   }
 
+  function handleSignOut() {
+    // The Email field does not exist until the form renders, so its ref callback takes the cursor then.
+    focusEmailOnShowRef.current = true;
+    clearAccount();
+  }
+
+  function attachEmail(input: HTMLInputElement | null) {
+    emailRef.current = input;
+    if (input && focusEmailOnShowRef.current) {
+      focusEmailOnShowRef.current = false;
+      input.focus();
+    }
+  }
+
   return (
     <div className="wrap">
       <section className="panel login">
@@ -73,21 +92,37 @@ export function LoginPage() {
           <p>Teacher login</p>
         </div>
 
-        <form className="col" noValidate onSubmit={handleSubmit}>
-          <div className="field">
-            <label htmlFor="email">Email</label>
-            <input ref={emailRef} type="email" id="email" name="email" maxLength={254} autoComplete="username" required placeholder="name@school.org" />
-          </div>
-          <div className="field">
-            <label htmlFor="password">Password</label>
-            <input ref={passwordRef} type="password" id="password" name="password" maxLength={1024} autoComplete="current-password" required />
-          </div>
-          <div className="row">
-            <button className="btn primary" type="submit" disabled={signIn.isPending}>Sign in</button>
-            <button className="btn" type="button" disabled={signIn.isPending}>Create account</button>
-          </div>
-          <ErrorBanner sentence={shown?.sentence} error={localProblem ? null : signIn.error} />
-        </form>
+        {account
+          ? (
+              <div className="col">
+                <p>
+                  Signed in as
+                  {" "}
+                  <b>{account.email}</b>
+                </p>
+                <div className="row">
+                  <Link className="btn primary" to="/setup">Continue to Game setup →</Link>
+                  <button className="btn sm" type="button" onClick={handleSignOut}>Sign out</button>
+                </div>
+              </div>
+            )
+          : (
+              <form className="col" noValidate onSubmit={handleSubmit}>
+                <div className="field">
+                  <label htmlFor="email">Email</label>
+                  <input ref={attachEmail} type="email" id="email" name="email" maxLength={254} autoComplete="username" required placeholder="name@school.org" />
+                </div>
+                <div className="field">
+                  <label htmlFor="password">Password</label>
+                  <input ref={passwordRef} type="password" id="password" name="password" maxLength={1024} autoComplete="current-password" required />
+                </div>
+                <div className="row">
+                  <button className="btn primary" type="submit" disabled={signIn.isPending}>Sign in</button>
+                  <button className="btn" type="button" disabled={signIn.isPending}>Create account</button>
+                </div>
+                <ErrorBanner sentence={shown?.sentence} error={localProblem ? null : signIn.error} />
+              </form>
+            )}
 
         <p className="foot">Learners don't sign in: they join with the room code on the learner screen.</p>
       </section>
