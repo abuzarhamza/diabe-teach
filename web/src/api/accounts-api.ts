@@ -16,3 +16,15 @@ export async function signInInstructor(email: string, password: string): Promise
   });
   return saveAccount(response);
 }
+
+// POST /api/v1/accounts/sign-up (201): creates the Instructor Account and signs it in at once.
+// The email is trimmed here; the server lower-cases it. The returned Account Token is saved.
+export async function signUpInstructor(email: string, password: string): Promise<StoredAccount> {
+  const response = await apiRequest<AccountTokenResponse>("POST", "/api/v1/accounts/sign-up", {
+    body: {
+      email: email.trim(),
+      password,
+    },
+  });
+  return saveAccount(response);
+}

@@ -1,4 +1,4 @@
-import type { FormEvent } from "react";
+import type { FormEvent, MouseEvent } from "react";
 import type { StoredAccount } from "../../api/account-token-store.ts";
 import type { ApiHttpError } from "../../api/http-client.ts";
 import type { LoginErrorView, LoginField } from "../../domain/login-errors.ts";
@@ -6,8 +6,8 @@ import { useMutation } from "@tanstack/react-query";
 import { useRef, useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { clearAccount } from "../../api/account-token-store.ts";
-import { signInInstructor } from "../../api/accounts-api.ts";
-import { loginErrorView, signInCredentialsProblem } from "../../domain/login-errors.ts";
+import { signInInstructor, signUpInstructor } from "../../api/accounts-api.ts";
+import { loginErrorView, MIN_PASSWORD_LENGTH, signInCredentialsProblem, signUpCredentialsProblem } from "../../domain/login-errors.ts";
 import { ErrorBanner } from "../shared/ErrorBanner.tsx";
 import { useSignedInAccount } from "./use-signed-in-account.ts";
 
@@ -24,7 +24,8 @@ function credentialsFrom(form: HTMLFormElement): Credentials {
   };
 }
 
-// Teacher login (claudPoc/concept-chain/login.html): sign in to an Instructor Account, then Game Setup.
+// Teacher login (claudPoc/concept-chain/login.html): sign in to an Instructor Account, or create one
+// (sign-up signs the teacher in at once), then Game Setup.
 // A teacher who is already signed in sees the signed-in panel instead of the form.
 export function LoginPage() {
   const navigate = useNavigate();
@@ -32,7 +33,7 @@ export function LoginPage() {
   const emailRef = useRef<HTMLInputElement>(null);
   const passwordRef = useRef<HTMLInputElement>(null);
   const focusEmailOnShowRef = useRef(false);
-  // A refusal found before anything is sent (empty field); server refusals come from the mutation.
+  // A refusal found before anything is sent (pre-checks); server refusals come from the mutations.
   const [localProblem, setLocalProblem] = useState<LoginErrorView | null>(null);
 
   function focusField(field: LoginField | null) {
@@ -48,22 +49,43 @@ export function LoginPage() {
     onError: error => focusField(loginErrorView(error).focusField),
   });
 
-  // Derived during render: the sentence to show, from the local check or the server's refusal.
-  const shown = localProblem ?? (signIn.error
-    ? loginErrorView(signIn.error)
+  const signUp = useMutation<StoredAccount, ApiHttpError, Credentials>({
+    mutationFn: ({ email, password }) => signUpInstructor(email, password),
+    onSuccess: () => navigate("/setup"),
+    onError: error => focusField(loginErrorView(error).focusField),
+  });
+
+  // Derived during render: only one mutation holds an error at a time (each send resets the other).
+  const isPending = signIn.isPending || signUp.isPending;
+  const serverError = signIn.error ?? signUp.error;
+  const shown = localProblem ?? (serverError
+    ? loginErrorView(serverError)
     : null);
+
+  // Runs the pre-check, then sends with `send` (one mutation) after clearing every earlier refusal.
+  function attempt(credentials: Credentials, problem: LoginErrorView | null, send: typeof signIn) {
+    setLocalProblem(problem);
+    signIn.reset();
+    signUp.reset();
+    if (problem) {
+      focusField(problem.focusField);
+      return;
+    }
+    send.mutate(credentials);
+  }
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const credentials = credentialsFrom(event.currentTarget);
-    const problem = signInCredentialsProblem(credentials.email, credentials.password);
-    setLocalProblem(problem);
-    if (problem) {
-      signIn.reset();
-      focusField(problem.focusField);
+    attempt(credentials, signInCredentialsProblem(credentials.email, credentials.password), signIn);
+  }
+
+  function handleCreateAccount(event: MouseEvent<HTMLButtonElement>) {
+    const form = event.currentTarget.form;
+    if (!form)
       return;
-    }
-    signIn.mutate(credentials);
+    const credentials = credentialsFrom(form);
+    attempt(credentials, signUpCredentialsProblem(credentials.email, credentials.password), signUp);
   }
 
   function handleSignOut() {
@@ -114,13 +136,14 @@ export function LoginPage() {
                 </div>
                 <div className="field">
                   <label htmlFor="password">Password</label>
-                  <input ref={passwordRef} type="password" id="password" name="password" maxLength={1024} autoComplete="current-password" required />
+                  <input ref={passwordRef} type="password" id="password" name="password" maxLength={1024} autoComplete="current-password" required aria-describedby="password-hint" />
+                  <span className="note" id="password-hint">{`At least ${MIN_PASSWORD_LENGTH} characters.`}</span>
                 </div>
                 <div className="row">
-                  <button className="btn primary" type="submit" disabled={signIn.isPending}>Sign in</button>
-                  <button className="btn" type="button" disabled={signIn.isPending}>Create account</button>
+                  <button className="btn primary" type="submit" disabled={isPending}>Sign in</button>
+                  <button className="btn" type="button" disabled={isPending} onClick={handleCreateAccount}>Create account</button>
                 </div>
-                <ErrorBanner sentence={shown?.sentence} error={localProblem ? null : signIn.error} />
+                <ErrorBanner sentence={shown?.sentence} error={localProblem ? null : serverError} />
               </form>
             )}
 
