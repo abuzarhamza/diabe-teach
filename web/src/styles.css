@@ -95,3 +95,10 @@ table.lb{width:100%;border-collapse:collapse;font-size:14px;font-variant-numeric
 .lb td.n,.lb th.n{text-align:right}
 .lb tr.me td{font-weight:700;background:var(--sunk)}
 .visually-hidden{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+/* Teacher login (claudPoc/concept-chain/login.html) */
+.login{max-width:440px;width:100%;margin:8vh auto 0}
+.field{display:flex;flex-direction:column;gap:4px}
+.field label{font-size:12px;font-weight:700;color:var(--muted)}
+.foot{font-size:13px;color:var(--muted)}
+.foot a{color:var(--accent)}
