@@ -17,6 +17,7 @@
       <nav class="nav-bar">
         <a href="0002-navigate-the-react-web-app.html">← Lesson 0002 (navigate web/)</a>
         <a href="../reference/0003-web-modules-and-libraries.html">Reference: what each module does</a>
+        <a href="0004-convert-useeffect-to-a-named-hook.html">Next: Lesson 0004 (named hooks) →</a>
         <a href="../reference/0002-react-web-app-map.html">Reference: web app map</a>
         <a href="../docs/adr/0008-simple-three-layer-ddd-react-vite-frontend.md">ADR-0008</a>
       </nav>
@@ -47,7 +48,7 @@
       <h2>Same job, two ways</h2>
       <p>
         <code>TeacherRoute</code> must confirm the teacher with <code>GET /api/v1/accounts/me</code>.
-        First is how the course would write it. Second is the real code in <code>web/src/features/shared/TeacherRoute.tsx</code>.
+        First is how the course would write it. Second is the real code, written in <code>TeacherRoute.tsx</code> when this lesson was made; since commit <code>5efbd2c</code> it lives in <code>useCurrentAccount</code> in <code>web/src/features/accounts/account-hooks.ts</code> (<a href="0004-convert-useeffect-to-a-named-hook.html">lesson 0004</a>).
       </p>
       <h3>Course style: <code>useEffect</code> + <code>useState</code> (not allowed here)</h3>
       <pre><code>const [data, setData] = useState(null);

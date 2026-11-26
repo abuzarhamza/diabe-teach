@@ -23,6 +23,10 @@
   Official docs for `useQuery` (server reads, polling) and `useMutation` (writes from event handlers). **Primary source for lesson 0003.**
 - [Documentation: TanStack Query, Important Defaults](https://tanstack.com/query/latest/docs/framework/react/guides/important-defaults) and [Does this replace client state?](https://tanstack.com/query/latest/docs/framework/react/guides/does-this-replace-client-state)
   Official: cached data is stale by default; failed queries retry; the client state left after moving async code to TanStack Query "is usually very tiny". Use for: why the app has no Redux, and for "why did it fetch again?" questions.
+- [Article: Reusing Logic with Custom Hooks (react.dev)](https://react.dev/learn/reusing-logic-with-custom-hooks)
+  Official guide to custom hooks. Use for: `account-hooks.ts` (`useSignIn`, `useCurrentAccount`). **Primary source for lesson 0004.**
+- [Documentation: TanStack Query, Dependent Queries](https://tanstack.com/query/latest/docs/framework/react/guides/dependent-queries)
+  Official guide to `enabled`. Use for: `useCurrentAccount` asking only while signed in.
 - [Documentation: React Router, Data Loading](https://reactrouter.com/start/data/data-loading) and [`redirect`](https://reactrouter.com/api/utils/redirect)
   Official docs for route `loader` functions. Use for: the `requireTeacher` guard in `web/src/features/shared/`.
 - [Documentation: Testing Library, Guiding Principles](https://testing-library.com/docs/guiding-principles) and [Queries](https://testing-library.com/docs/queries/about)

@@ -390,3 +390,14 @@ table.ref-table th {
 @media print {
   .hunt-row, .quiz-options { display: none; }
 }
+
+/* Conversion Stepper (assets/conversion-stepper.js): old code → new code, one block at a time */
+.stepper-panes { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+@media (max-width: 760px) { .stepper-panes { grid-template-columns: 1fr; } }
+.stepper-panes h3 { margin-top: 0; }
+.stepper-old, .stepper-new { min-height: 12rem; white-space: pre; }
+.stepper-line { display: inline; }
+.stepper-line.active { background: color-mix(in srgb, var(--accent-amber) 22%, transparent); }
+.stepper-line.replaced { text-decoration: line-through; color: var(--ink-muted); }
+.stepper-no { color: var(--ink-muted); user-select: none; }
+.stepper-new { border-left-color: var(--accent-green); }

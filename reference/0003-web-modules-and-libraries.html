@@ -11,10 +11,11 @@
     <header class="lesson-header">
       <div class="eyebrow">Reference Sheet 0003 · Diabe-Teach React web app</div>
       <h1>What each module of <code>web/</code> does</h1>
-      <p class="subtitle">Every library and every source file, with why it is here. As of commit <code>84ea4db</code> (2026-11-25).</p>
+      <p class="subtitle">Every library and every source file, with why it is here. As of commit <code>dcbf8eb</code> (2026-11-25).</p>
       <nav class="nav-bar">
         <a href="../lessons/0002-navigate-the-react-web-app.html">Lesson 0002</a>
         <a href="../lessons/0003-why-tanstack-query.html">Lesson 0003 (TanStack Query)</a>
+        <a href="../lessons/0004-convert-useeffect-to-a-named-hook.html">Lesson 0004 (named hooks)</a>
         <a href="0002-react-web-app-map.html">Reference 0002 (map)</a>
         <a href="../web/README.md">web/README.md</a>
       </nav>
@@ -27,7 +28,7 @@
       <tr><td><code>react</code></td><td>Components, JSX, hooks (<code>useState</code>, <code>useRef</code>, <code>useSyncExternalStore</code>)</td><td>The UI library (ADR-0008). <code>useEffect</code> is banned by lint.</td><td>every <code>features/</code> file</td></tr>
       <tr><td><code>react-dom</code></td><td>Puts React components into the page (<code>createRoot</code>)</td><td>React's browser renderer</td><td><code>main.tsx</code></td></tr>
       <tr><td><code>react-router</code> v7</td><td>URLs → screens; <code>loader</code> runs before a screen; <code>redirect</code>, <code>Navigate</code>, <code>Link</code>, <code>useNavigate</code></td><td>A single-page app needs client routing; loaders give a clean teacher guard without effects (<a href="https://reactrouter.com/start/data/data-loading">docs</a>)</td><td><code>main.tsx</code>, <code>routes.tsx</code>, <code>require-teacher.ts</code>, <code>TeacherRoute.tsx</code>, <code>LoginPage.tsx</code></td></tr>
-      <tr><td><code>@tanstack/react-query</code></td><td>Fetches, caches and refreshes <strong>server state</strong>: <code>useQuery</code> (read), <code>useMutation</code> (write), <code>QueryClient</code> (cache)</td><td>Replaces <code>useEffect</code> + <code>useState</code> fetching: loading/error flags, retries, late answers, polling (<code>refetchInterval: 2000</code>) — see <a href="../lessons/0003-why-tanstack-query.html">lesson 0003</a></td><td><code>main.tsx</code>, <code>App.tsx</code>, <code>TeacherRoute.tsx</code>, <code>LoginPage.tsx</code></td></tr>
+      <tr><td><code>@tanstack/react-query</code></td><td>Fetches, caches and refreshes <strong>server state</strong>: <code>useQuery</code> (read), <code>useMutation</code> (write), <code>QueryClient</code> (cache)</td><td>Replaces <code>useEffect</code> + <code>useState</code> fetching: loading/error flags, retries, late answers, polling (<code>refetchInterval: 2000</code>) — see <a href="../lessons/0003-why-tanstack-query.html">lesson 0003</a></td><td><code>features/accounts/account-hooks.ts</code> only (plus <code>main.tsx</code>, <code>App.tsx</code>); lint refuses it elsewhere</td></tr>
     </table>
 
     <h2>Tools for building, checking and testing</h2>
@@ -53,13 +54,14 @@
       <tr><td><code>routes.tsx</code></td><td>shell</td><td>The route table: <code>/login</code>, teacher-only <code>/setup</code>, everything else → <code>/login</code></td><td><code>main.tsx</code>, tests</td></tr>
       <tr><td><code>domain/login-errors.ts</code></td><td>domain</td><td>Pure rules: error → <code>{ sentence, focusField }</code>; sign-in and sign-up pre-checks; <code>MIN_PASSWORD_LENGTH</code></td><td><code>LoginPage.tsx</code></td></tr>
       <tr><td><code>api/http-client.ts</code></td><td>api</td><td><code>apiRequest</code>: the only <code>fetch</code>; headers; <code>[API]</code> log; <code>ApiHttpError</code>; a 401 on an Account Token clears it</td><td>every <code>*-api.ts</code></td></tr>
-      <tr><td><code>api/accounts-api.ts</code></td><td>api</td><td><code>signInInstructor</code>, <code>signUpInstructor</code> (save the token), <code>getCurrentAccount</code> (<code>/me</code>)</td><td><code>LoginPage.tsx</code>, <code>TeacherRoute.tsx</code></td></tr>
+      <tr><td><code>api/accounts-api.ts</code></td><td>api</td><td><code>signInInstructor</code>, <code>signUpInstructor</code> (save the token), <code>getCurrentAccount</code> (<code>/me</code>)</td><td><code>account-hooks.ts</code></td></tr>
       <tr><td><code>api/account-token-store.ts</code></td><td>api</td><td>Account Token in <code>localStorage</code>: save, clear, read, expiry, subscribe (tabs + expiry timer)</td><td><code>http-client.ts</code>, <code>accounts-api.ts</code>, <code>use-signed-in-account.ts</code>, <code>require-teacher.ts</code></td></tr>
       <tr><td><code>api/login-reason-store.ts</code></td><td>api</td><td>One-time “why you were sent to login” sentence in <code>sessionStorage</code></td><td><code>http-client.ts</code>, <code>require-teacher.ts</code>, <code>LoginPage.tsx</code></td></tr>
       <tr><td><code>features/accounts/LoginPage.tsx</code></td><td>features</td><td>The <code>/login</code> screen: form, signed-in panel, Sign out, errors with focus</td><td><code>routes.tsx</code></td></tr>
+      <tr><td><code>features/accounts/account-hooks.ts</code></td><td>features</td><td>The only TanStack Query file for accounts: <code>useSignIn</code>, <code>useCreateAccount</code> (writes), <code>useCurrentAccount</code> (reads <code>/me</code>)</td><td><code>LoginPage.tsx</code>, <code>TeacherRoute.tsx</code></td></tr>
       <tr><td><code>features/accounts/use-signed-in-account.ts</code></td><td>features</td><td>Hook: the signed-in teacher or <code>null</code>, via <code>useSyncExternalStore</code></td><td><code>LoginPage.tsx</code>, <code>TeacherRoute.tsx</code></td></tr>
       <tr><td><code>features/shared/require-teacher.ts</code></td><td>features</td><td>Router loader: no valid token → set reason → <code>redirect("/login")</code></td><td><code>routes.tsx</code></td></tr>
-      <tr><td><code>features/shared/TeacherRoute.tsx</code></td><td>features</td><td>Guard element: confirms with <code>useQuery(/me)</code>; re-checks when the token disappears</td><td><code>routes.tsx</code></td></tr>
+      <tr><td><code>features/shared/TeacherRoute.tsx</code></td><td>features</td><td>Guard element: confirms with <code>useCurrentAccount</code> (<code>/me</code>); re-checks when the token disappears</td><td><code>routes.tsx</code></td></tr>
       <tr><td><code>features/shared/ErrorBanner.tsx</code></td><td>features</td><td>Shows a refusal as one sentence (+ code in dev) in an <code>aria-live</code> region</td><td><code>LoginPage.tsx</code>, <code>TeacherRoute.tsx</code></td></tr>
       <tr><td><code>features/game-session/GameSetupPage.tsx</code></td><td>features</td><td>Placeholder for Game Setup</td><td><code>routes.tsx</code></td></tr>
       <tr><td><code>styles.css</code></td><td>—</td><td>The prototype's design system (<code>claudPoc/concept-chain/shared.css</code>)</td><td><code>main.tsx</code></td></tr>

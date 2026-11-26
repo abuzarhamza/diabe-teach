@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lesson 0004 · From useEffect to a named hook</title>
+  <link rel="stylesheet" href="../assets/tufte-course.css" />
+</head>
+<body>
+  <main class="tufte-page">
+    <header class="lesson-header">
+      <div class="eyebrow">Lesson 0004 · Diabe-Teach React web app</div>
+      <h1>From <code>useEffect</code> to a named hook</h1>
+      <p class="subtitle">
+        One win for today: you can open <code>account-hooks.ts</code>, point at any option, and say which line of your old course code it replaces.
+      </p>
+      <nav class="nav-bar">
+        <a href="0003-why-tanstack-query.html">← Lesson 0003 (why TanStack Query)</a>
+        <a href="../reference/0003-web-modules-and-libraries.html">Reference: what each module does</a>
+        <a href="../web/src/features/accounts/account-hooks.ts">account-hooks.ts</a>
+      </nav>
+    </header>
+
+    <section>
+      <h2>Warm-up: from memory</h2>
+      <p>Before you scroll: say out loud the three TanStack words this app uses, and what each one does.</p>
+      <details>
+        <summary>Check</summary>
+        <p><code>useQuery</code> reads server data. <code>useMutation</code> changes it. <code>queryKey</code> is the cache's name for the data (<a href="0003-why-tanstack-query.html">lesson 0003</a>).</p>
+      </details>
+    </section>
+
+    <section>
+      <h2>What changed in the code (commit <code>5efbd2c</code>)</h2>
+      <p>
+        You said TanStack Query felt like too much for a first React project. So the screens no longer use it directly.
+        They call hooks named for what they do. Only <code>web/src/features/accounts/account-hooks.ts</code> talks to TanStack.
+        ESLint now refuses a TanStack import anywhere else, except <code>main.tsx</code> and <code>App.tsx</code>.
+      </p>
+      <pre><code>// TeacherRoute.tsx — before
+const confirmation = useQuery&lt;InstructorAccountView, ApiHttpError&gt;({ queryKey: …, queryFn: …, enabled: …, retry: … });
+
+// TeacherRoute.tsx — now
+const confirmation = useCurrentAccount(account);</code></pre>
+      <p>
+        A <strong>custom hook</strong> is a function whose name starts with <code>use</code> and that calls other hooks.
+        It hides <em>how</em> behind a name that says <em>what</em> (<a href="https://react.dev/learn/reusing-logic-with-custom-hooks">react.dev, Reusing Logic with Custom Hooks</a>).
+        You wrote custom hooks in Namaste React (<code>useRestaurantMenu</code>). This is the same idea, with <code>useQuery</code> inside instead of <code>useEffect</code>.
+      </p>
+    </section>
+
+    <section>
+      <h2>Practice: convert the course code yourself</h2>
+      <p>
+        On the left is the <code>/me</code> check written the course way. Each step lights up some lines.
+        Pick the <code>useQuery</code> option that replaces them. Watch the right side grow into the real hook.
+      </p>
+      <div class="quiz-container" id="stepper"></div>
+    </section>
+
+    <section>
+      <h2>The real hooks</h2>
+      <h3>Read: <code>useCurrentAccount</code></h3>
+      <pre><code>export function useCurrentAccount(account: StoredAccount | null) {
+  return useQuery&lt;InstructorAccountView, ApiHttpError&gt;({
+    queryKey: ["accounts", "me", account?.accountId],   // a new teacher → a fresh answer
+    queryFn: getCurrentAccount,                          // from web/src/api/
+    enabled: account !== null,                           // ask only while signed in
+    retry: (failureCount, error) =&gt; error.status !== 401 &amp;&amp; failureCount &lt; MAX_RETRIES,
+  });
+}</code></pre>
+      <p>
+        Did your right-hand side match? <code>enabled</code> has its own guide: <a href="https://tanstack.com/query/latest/docs/framework/react/guides/dependent-queries">Dependent Queries</a>.
+      </p>
+      <h3>Write: <code>useSignIn</code></h3>
+      <pre><code>// account-hooks.ts
+export function useSignIn({ onSuccess, onError }: SendCallbacks) {
+  return useMutation&lt;StoredAccount, ApiHttpError, Credentials&gt;({
+    mutationFn: ({ email, password }) =&gt; signInInstructor(email, password),
+    onSuccess,
+    onError,
+  });
+}
+
+// LoginPage.tsx — the screen decides what happens next
+const signIn = useSignIn({
+  onSuccess: () =&gt; navigate("/setup"),
+  onError: error =&gt; focusField(loginErrorView(error).focusField),
+});
+// in handleSubmit:  signIn.mutate(credentials)
+// in render:        signIn.isPending · signIn.error</code></pre>
+      <p>
+        Why pass <code>onSuccess</code> in? Navigation and focus belong to the screen. The hook only knows how to sign in.
+        This mirrors the course's “lifting state up”: the parent decides, the child does.
+      </p>
+    </section>
+
+    <section>
+      <h2>Practice: break it, predict, run</h2>
+      <p>Write your prediction down before each run. Use <code>npx vitest run --project web</code> from the repo root (about 3 seconds).</p>
+      <ol>
+        <li>
+          In <code>useSignIn</code> only, change <code>onSuccess,</code> to <code>onSuccess: () =&gt; {},</code>. How many of the 41 tests fail, and what will the error say?
+          <details><summary>Check</summary>
+            <p>3 sign-in tests fail with <code>expected '/login' to be '/setup'</code>. The teacher is signed in but never leaves the Login screen. The tests watch where the teacher lands, so they catch it.</p>
+          </details>
+        </li>
+        <li>Undo it: <code>git checkout -- web/src/features/accounts/account-hooks.ts</code>.</li>
+        <li>
+          In <code>useCurrentAccount</code>, change <code>enabled: account !== null</code> to <code>enabled: true</code>. How many tests fail?
+          <details><summary>Check</summary>
+            <p>None: 41 pass. <code>getCurrentAccount</code> already refuses without a token before any <code>fetch</code> (<code>api/accounts-api.ts</code>). And <code>TeacherRoute</code> sends a signed-out teacher to <code>/login</code> anyway.
+            So <code>enabled</code> only saves work the teacher cannot see. Screen tests check what the teacher sees. The same is true today for <code>accountId</code> in the key, because no screen shows the <code>/me</code> answer yet.</p>
+          </details>
+        </li>
+        <li>Undo it again with the same <code>git checkout</code> command. Check with <code>git status</code> that nothing is left changed.</li>
+      </ol>
+    </section>
+
+    <section class="callout-box">
+      <h3>Primary source</h3>
+      <p>
+        Read <a href="https://react.dev/learn/reusing-logic-with-custom-hooks">Reusing Logic with Custom Hooks</a> on react.dev (about 25 minutes).
+        It explains why a hook named for its purpose makes components easier to read.
+      </p>
+      <h3>Ask your teacher</h3>
+      <p>
+        Unclear? Ask the agent. Good next questions: “What would <code>useSessionState(sessionId)</code> look like with 2-second polling?” or
+        “When should a hook take callbacks, and when should it return them?”
+      </p>
+    </section>
+  </main>
+
+  <script src="../assets/conversion-stepper.js"></script>
+  <script>
+    const OPT = ["<code>queryFn</code>", "<code>queryKey</code>", "<code>enabled</code>", "<code>retry</code>"];
+    initConversionStepper("stepper", {
+      oldTitle: "Course way: useEffect + useState",
+      newTitle: "This app: useQuery",
+      oldLines: [
+        "const [data, setData] = useState(null);",
+        "const [error, setError] = useState(null);",
+        "const [isPending, setIsPending] = useState(true);",
+        "",
+        "useEffect(() => {",
+        "  if (!account) return;",
+        "  let cancelled = false;",
+        "  async function load(attempt = 0) {",
+        "    try {",
+        "      const me = await getCurrentAccount();",
+        "      if (!cancelled) setData(me);",
+        "    } catch (e) {",
+        "      if (e.status !== 401 && attempt < 3) return load(attempt + 1);",
+        "      if (!cancelled) setError(e);",
+        "    } finally {",
+        "      if (!cancelled) setIsPending(false);",
+        "    }",
+        "  }",
+        "  load();",
+        "  return () => { cancelled = true; };",
+        "}, [account?.accountId]);",
+      ],
+      newHeader: ["const confirmation = useQuery({"],
+      newFooter: ["});"],
+      steps: [
+        {
+          lines: [4, 6, 19, 20],
+          prompt: "These lines re-run when the teacher changes (the dependency list) and ignore late answers. Which option names the data, so a new teacher gets a fresh answer?",
+          options: [OPT[2], OPT[0], OPT[1], OPT[3]],
+          correctIndex: 2,
+          explanation: "queryKey replaces the dependency list. The library itself ignores late answers and cleans up, so the cancelled flag goes too.",
+          hint: "Which option is the cache's name for the data?",
+          adds: ["  queryKey: [\"accounts\", \"me\", account?.accountId],"],
+        },
+        {
+          lines: [7, 8, 9, 17, 18],
+          prompt: "These lines define and start the call that fetches the answer. Which option replaces them?",
+          options: [OPT[0], OPT[3], OPT[2], OPT[1]],
+          correctIndex: 0,
+          explanation: "queryFn is the call. The library decides when to run it.",
+          hint: "Which option is a function that returns the data?",
+          adds: ["  queryFn: getCurrentAccount,"],
+        },
+        {
+          lines: [5],
+          prompt: "This line skips the call while nobody is signed in. Which option?",
+          options: [OPT[1], OPT[3], OPT[0], OPT[2]],
+          correctIndex: 3,
+          explanation: "enabled: false means “don't ask yet”.",
+          hint: "Which option switches the query on and off?",
+          adds: ["  enabled: account !== null,"],
+        },
+        {
+          lines: [11, 12],
+          prompt: "This hand-written loop tries again, except after a 401. Which option?",
+          options: [OPT[2], OPT[3], OPT[1], OPT[0]],
+          correctIndex: 1,
+          explanation: "retry decides per failure whether to try again.",
+          hint: "The answer is in the line's own idea: trying again.",
+          adds: ["  retry: (failureCount, error) => error.status !== 401 && failureCount < 3,"],
+        },
+        {
+          lines: [0, 1, 2, 3, 10, 13, 14, 15, 16],
+          prompt: "Where do data, error and isPending come from now?",
+          options: [
+            "three new useState calls",
+            "a React Context provider",
+            "the returned result object",
+            "the browser localStorage store",
+          ],
+          correctIndex: 2,
+          explanation: "useQuery returns { data, error, isPending }. No setState anywhere: confirmation.data, confirmation.error, confirmation.isPending.",
+          hint: "What does useQuery give back when you call it?",
+          adds: [],
+        },
+      ],
+    });
+  </script>
+</body>
+</html>
