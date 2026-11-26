@@ -66,6 +66,52 @@ describe("web 3-layer Simple DDD guardrails (ADR-0008, react-web-setup 02)", () 
     expect(result!.messages.some(msg => msg.message.includes("useEffect is banned in web/src (ADR-0008)"))).toBe(true);
   });
 
+  it("forbids importing @tanstack/react-query in a screen (react-login-screen 06)", async () => {
+    const code = [
+      "import { useQuery } from \"@tanstack/react-query\";",
+      "",
+      "export function BadScreen() {",
+      "  const query = useQuery({ queryKey: [\"x\"], queryFn: async () => 1 });",
+      "  return <div>{query.data}</div>;",
+      "}",
+      "",
+    ].join("\n");
+
+    const [result] = await eslint.lintText(code, {
+      filePath: join(WEB_ROOT, "src/features/accounts/BadScreen.tsx"),
+    });
+    const restricted = result!.messages.filter(msg => msg.ruleId === "no-restricted-imports");
+    expect(restricted.some(msg => msg.message.includes("*-hooks.ts"))).toBe(true);
+  });
+
+  it("allows @tanstack/react-query in a *-hooks.ts file, and still bans useEffect there", async () => {
+    const hooksCode = [
+      "import { useQuery } from \"@tanstack/react-query\";",
+      "",
+      "export function useThing() {",
+      "  return useQuery({ queryKey: [\"thing\"], queryFn: async () => 1 });",
+      "}",
+      "",
+    ].join("\n");
+    const [accepted] = await eslint.lintText(hooksCode, {
+      filePath: join(WEB_ROOT, "src/features/accounts/thing-hooks.ts"),
+    });
+    expect(accepted!.messages.filter(msg => msg.ruleId === "no-restricted-imports")).toEqual([]);
+
+    const effectCode = [
+      "import { useEffect } from \"react\";",
+      "",
+      "export function useBadThing() {",
+      "  useEffect(() => {}, []);",
+      "}",
+      "",
+    ].join("\n");
+    const [refused] = await eslint.lintText(effectCode, {
+      filePath: join(WEB_ROOT, "src/features/accounts/bad-thing-hooks.ts"),
+    });
+    expect(refused!.messages.some(msg => msg.message.includes("useEffect is banned in web/src (ADR-0008)"))).toBe(true);
+  });
+
   it("enforces web-domain-stays-pure and web-api-no-react-or-features in .dependency-cruiser.cjs", () => {
     const domainRule = depcruiseConfig.forbidden.find(rule => rule.name === "web-domain-stays-pure");
     const apiRule = depcruiseConfig.forbidden.find(rule => rule.name === "web-api-no-react-or-features");

@@ -130,7 +130,7 @@ The app has three layers. dependency-cruiser enforces the import rules (`npm run
  ├── domain/      # pure TypeScript rules: no React, no fetch, no storage      (e.g. login-errors.ts)
  ├── api/         # the ONLY place for fetch() and localStorage/sessionStorage  (http-client.ts, token stores)
  ├── features/    # React screens and components, grouped by domain area
- │   ├── accounts/       # LoginPage, useSignedInAccount
+ │   ├── accounts/       # LoginPage, useSignedInAccount, account-hooks.ts
  │   ├── game-session/   # GameSetupPage (placeholder)
  │   └── shared/         # ErrorBanner, TeacherRoute + requireTeacher guard
  ├── routes.tsx   # all routes; teacher-only routes sit under the requireTeacher loader
@@ -151,14 +151,19 @@ Rules:
 1. Put a game rule or an error-to-sentence rule in `domain/`. Test it through the screen.
 2. Send every HTTP call through `apiRequest` in `api/http-client.ts`. It adds the headers. It turns each refusal into an `ApiHttpError` with `{ status, code, message, details }`.
 3. Do not use `useEffect`. ESLint refuses it. Use these instead:
-   - server data and polling: `useQuery` (TanStack Query)
-   - user actions: event handlers and `useMutation`
+   - server data and polling: a named query hook (e.g. `useCurrentAccount`)
+   - user actions: event handlers and a named mutation hook (e.g. `useSignIn`, `useCreateAccount`)
    - derived values: a pure function in `domain/`, called during render
    - storage that other tabs change: `useSyncExternalStore`
    - state reset on a phase change: a `key` prop
-4. Keep the Account Token and the Capability Token apart ([ADR-0007](../docs/adr/0007-instructor-accounts-and-shared-pack-library.md)). Name the token kind when you call `apiRequest`.
-5. Use the words from [`GLOSSARY.md`](../GLOSSARY.md) (Instructor Account, Account Token, Curriculum Pack, Game Session).
-6. Copy the look from the prototype in `../claudPoc/concept-chain/`. `src/styles.css` comes from its `shared.css`.
+4. Screens do not import TanStack Query. Each feature area has one hooks file, such as
+   `features/accounts/account-hooks.ts`. It owns the `useQuery` and `useMutation` calls, their query keys
+   and options, with a comment on each. Screens call its hooks by what they do and get back `data`,
+   `error`, `isPending`, `mutate` and `reset`. ESLint refuses `@tanstack/react-query` in `src/` except in
+   `*-hooks.ts` files, `main.tsx` and `App.tsx` (the app shell). Tests in `tests/` may import it.
+5. Keep the Account Token and the Capability Token apart ([ADR-0007](../docs/adr/0007-instructor-accounts-and-shared-pack-library.md)). Name the token kind when you call `apiRequest`.
+6. Use the words from [`GLOSSARY.md`](../GLOSSARY.md) (Instructor Account, Account Token, Curriculum Pack, Game Session).
+7. Copy the look from the prototype in `../claudPoc/concept-chain/`. `src/styles.css` comes from its `shared.css`.
 
 ## Debug
 

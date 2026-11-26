@@ -1,14 +1,9 @@
-import type { InstructorAccountView } from "../../api/accounts-api.ts";
-import type { ApiHttpError } from "../../api/http-client.ts";
-import { useQuery } from "@tanstack/react-query";
 import { Navigate, Outlet, useLocation } from "react-router";
-import { getCurrentAccount } from "../../api/accounts-api.ts";
+import { useCurrentAccount } from "../accounts/account-hooks.ts";
 import { useSignedInAccount } from "../accounts/use-signed-in-account.ts";
 import { ErrorBanner } from "./ErrorBanner.tsx";
 
 // The teacher route guard's element; its loader is requireTeacher (require-teacher.ts).
-
-const MAX_RETRIES = 3;
 
 // Confirms the teacher with GET /api/v1/accounts/me while the screen shows. A 401 clears the token
 // (http-client.ts); the token expiring, or another tab signing out, clears it too. Any of these makes the
@@ -17,12 +12,7 @@ const MAX_RETRIES = 3;
 export function TeacherRoute() {
   const account = useSignedInAccount();
   const location = useLocation();
-  const confirmation = useQuery<InstructorAccountView, ApiHttpError>({
-    queryKey: ["accounts", "me", account?.accountId],
-    queryFn: getCurrentAccount,
-    enabled: account !== null,
-    retry: (failureCount, error) => error.status !== 401 && failureCount < MAX_RETRIES,
-  });
+  const confirmation = useCurrentAccount(account);
 
   if (!account)
     return <Navigate to={location} replace />;

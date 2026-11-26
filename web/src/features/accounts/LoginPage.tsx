@@ -1,21 +1,14 @@
 import type { FormEvent, MouseEvent } from "react";
-import type { StoredAccount } from "../../api/account-token-store.ts";
-import type { ApiHttpError } from "../../api/http-client.ts";
 import type { LoginErrorView, LoginField } from "../../domain/login-errors.ts";
-import { useMutation } from "@tanstack/react-query";
+import type { Credentials } from "./account-hooks.ts";
 import { useRef, useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { clearAccount } from "../../api/account-token-store.ts";
-import { signInInstructor, signUpInstructor } from "../../api/accounts-api.ts";
 import { takeLoginReason } from "../../api/login-reason-store.ts";
 import { loginErrorView, MIN_PASSWORD_LENGTH, signInCredentialsProblem, signUpCredentialsProblem } from "../../domain/login-errors.ts";
 import { ErrorBanner } from "../shared/ErrorBanner.tsx";
+import { useCreateAccount, useSignIn } from "./account-hooks.ts";
 import { useSignedInAccount } from "./use-signed-in-account.ts";
-
-interface Credentials {
-  email: string;
-  password: string;
-}
 
 function credentialsFrom(form: HTMLFormElement): Credentials {
   const data = new FormData(form);
@@ -46,14 +39,12 @@ export function LoginPage() {
       passwordRef.current?.focus();
   }
 
-  const signIn = useMutation<StoredAccount, ApiHttpError, Credentials>({
-    mutationFn: ({ email, password }) => signInInstructor(email, password),
+  const signIn = useSignIn({
     onSuccess: () => navigate("/setup"),
     onError: error => focusField(loginErrorView(error).focusField),
   });
 
-  const signUp = useMutation<StoredAccount, ApiHttpError, Credentials>({
-    mutationFn: ({ email, password }) => signUpInstructor(email, password),
+  const signUp = useCreateAccount({
     onSuccess: () => navigate("/setup"),
     onError: error => focusField(loginErrorView(error).focusField),
   });

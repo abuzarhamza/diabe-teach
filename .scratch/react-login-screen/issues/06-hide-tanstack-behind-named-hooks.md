@@ -6,12 +6,16 @@ Decided on 2026-11-25 by the user (option A after a discussion about TanStack Qu
 
 **Blocked by:** 05 (Teacher screens send signed-out teachers back to login with a reason)
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] `LoginPage` and `TeacherRoute` (and any other screen) no longer import `@tanstack/react-query`; they call the named hooks.
-- [ ] The hooks live in `web/src/features/` (they use React, so not `api/`), take their fetch functions from `web/src/api/`, and keep today's options (query key with `accountId`, `enabled`, the no-retry-on-401 rule, navigation in `onSuccess` stays in the screen or is passed in, whichever reads more simply).
-- [ ] ESLint rejects importing `@tanstack/react-query` in `web/src/**` except in `*-hooks.ts` files, `main.tsx` and `App.tsx`, with a message pointing to the hooks convention; test support files are allowed.
-- [ ] `tests/web/web-architecture-guards.test.ts` proves the rule: a screen importing `@tanstack/react-query` is rejected, and a `*-hooks.ts` file is accepted.
-- [ ] All existing web screen tests pass without changing what they assert (only imports may change).
-- [ ] `web/README.md` ("Where code goes") and `web/src/features/README.md` describe the hooks convention.
-- [ ] No `useEffect`; typecheck, typecheck:web, vitest, lint:web 0/0, boundaries ≤ 6, build:web all pass.
+- [x] `LoginPage` and `TeacherRoute` (and any other screen) no longer import `@tanstack/react-query`; they call the named hooks.
+- [x] The hooks live in `web/src/features/` (they use React, so not `api/`), take their fetch functions from `web/src/api/`, and keep today's options (query key with `accountId`, `enabled`, the no-retry-on-401 rule, navigation in `onSuccess` stays in the screen or is passed in, whichever reads more simply).
+- [x] ESLint rejects importing `@tanstack/react-query` in `web/src/**` except in `*-hooks.ts` files, `main.tsx` and `App.tsx`, with a message pointing to the hooks convention; test support files are allowed.
+- [x] `tests/web/web-architecture-guards.test.ts` proves the rule: a screen importing `@tanstack/react-query` is rejected, and a `*-hooks.ts` file is accepted.
+- [x] All existing web screen tests pass without changing what they assert (only imports may change).
+- [x] `web/README.md` ("Where code goes") and `web/src/features/README.md` describe the hooks convention.
+- [x] No `useEffect`; typecheck, typecheck:web, vitest, lint:web 0/0, boundaries ≤ 6, build:web all pass.
+
+## Comments
+
+- **2026-11-25:** All criteria met. The hooks are in `web/src/features/accounts/account-hooks.ts`: `useSignIn(callbacks)`, `useCreateAccount(callbacks)` and `useCurrentAccount(account)`. `TeacherRoute` (in `shared/`) imports `useCurrentAccount` from `accounts/`, as it already did `useSignedInAccount`. Navigation and focus stay in `LoginPage` and go in as `onSuccess` / `onError`. ESLint: `src/**` bans both `useEffect` and `@tanstack/react-query`, and a later entry for `*-hooks.ts`, `main.tsx` and `App.tsx` lists `useEffect` alone. ESLint does not merge `paths` across entries, so each entry lists everything it bans. Test files live in `web/tests/`, outside `src/`, so the rule does not reach them. The guard test checks only `no-restricted-imports` on the accepted hooks file, because antfu's style rules also fire on the one-line snippet.
