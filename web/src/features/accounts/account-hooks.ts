@@ -33,7 +33,7 @@ export function useSignIn({ onSuccess, onError }: SendCallbacks) {
   });
 }
 
-// Create an Instructor Account: POST /api/v1/accounts. Signs the teacher in at once on success.
+// Create an Instructor Account: POST /api/v1/accounts/sign-up. Signs the teacher in at once on success.
 export function useCreateAccount({ onSuccess, onError }: SendCallbacks) {
   return useMutation<StoredAccount, ApiHttpError, Credentials>({
     // The call `mutate(credentials)` makes.
