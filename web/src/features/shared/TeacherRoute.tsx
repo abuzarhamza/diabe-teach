@@ -2,6 +2,7 @@ import { Navigate, Outlet, useLocation } from "react-router";
 import { useCurrentAccount } from "../accounts/account-hooks.ts";
 import { useSignedInAccount } from "../accounts/use-signed-in-account.ts";
 import { ErrorBanner } from "./ErrorBanner.tsx";
+import { TopBar } from "./TopBar.tsx";
 
 // The teacher route guard's element; its loader is requireTeacher (require-teacher.ts).
 
@@ -19,6 +20,7 @@ export function TeacherRoute() {
 
   return (
     <>
+      <TopBar />
       {confirmation.error && confirmation.error.status !== 401 && (
         <ErrorBanner error={confirmation.error} />
       )}

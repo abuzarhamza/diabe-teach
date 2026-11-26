@@ -132,7 +132,7 @@ The app has three layers. dependency-cruiser enforces the import rules (`npm run
  ├── features/    # React screens and components, grouped by domain area
  │   ├── accounts/       # LoginPage, useSignedInAccount, account-hooks.ts
  │   ├── game-session/   # GameSetupPage (placeholder)
- │   └── shared/         # ErrorBanner, TeacherRoute + requireTeacher guard
+ │   └── shared/         # ErrorBanner, TopBar (who is signed in + Sign out), TeacherRoute + requireTeacher guard
  ├── routes.tsx   # all routes; teacher-only routes sit under the requireTeacher loader
  └── App.tsx      # router + QueryClientProvider
 ```

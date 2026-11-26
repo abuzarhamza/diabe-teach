@@ -18,6 +18,12 @@ export function setLoginReasonUnlessPending(sentence: string): void {
     setLoginReason(sentence);
 }
 
+// A deliberate Sign out from a teacher screen: leaves an empty reason waiting, so the teacher route
+// guard adds none (setLoginReasonUnlessPending keeps it) and the Login screen shows no warning.
+export function markSignedOutOnPurpose(): void {
+  setLoginReason("");
+}
+
 // Reads the reason and removes it, so it is shown once: a reload of /login finds nothing.
 export function takeLoginReason(): string | null {
   const sentence = sessionStorage.getItem(LOGIN_REASON_KEY);
