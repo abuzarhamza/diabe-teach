@@ -1,8 +1,10 @@
 # 01: Tracer — teacher signs in / signs up through the real API
 
-**Status:** ready-for-agent
+**Status:** done
 **Blocked by:** none
 **Detailed spec:** `.scratch/react-login-screen/spec.md` (supersedes the acceptance criteria below; test seam is the rendered LoginPage over a fake fetch).
+
+> **Superseded (2026-11-27):** built as `.scratch/react-login-screen/` 01–06: `9ecbf41` (01 sign in), `09a8594` (02 refusals), `50ed5d2` (03 create account), `ea0f068` (04 signed-in panel and sign out), `95b686b` (05 signed-out teachers sent to login), `5efbd2c` (06 named hooks; only `*-hooks.ts` import TanStack Query). `d2c2a42` added the signed-in teacher and Sign out to the TopBar. The real files are `web/src/api/{account-token-store,login-reason-store,http-client,accounts-api}.ts`, and the tests are rendered-screen tests in `web/tests/features/` over `web/tests/support/`. The text below is the original plan, kept for history.
 
 **What to build:** The thinnest end-to-end slice through all three layers, proving the architecture:
 - `web/src/api/http-client.ts` — `apiRequest()` (JSON headers, optional `x-api-key`, explicit `Authorization: Bearer`, `[API] METHOD path -> status` dev log, throws typed `ApiHttpError {status, code, message, details}`).

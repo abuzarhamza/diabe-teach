@@ -6,4 +6,5 @@
 **What to build:** `sessionsApi.getSessionAnalytics`; `views/ResultsView.tsx` — learner `participantReport` (knowledge-gain delta, guessing-reduction delta, Chain Diversity Index, neglected cards); instructor `cohortSummary` incl. Board Neglect Heatmap grid.
 
 ## Acceptance criteria
-- [ ] Heatmap intensity computed by a pure `domain/` function with a unit test.
+- [ ] Heatmap intensity computed by a pure `domain/` function with a unit test in `web/tests/domain/`.
+- [ ] `web/tests/features/game-session/results-view.test.tsx` (rendered over the fake fetch): learner sees their report, instructor sees the cohort summary.
