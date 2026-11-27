@@ -19,12 +19,22 @@ tests {
     expect(res.status).to.equal(200);
     expect(res.body.packs).to.be.an("array");
   });
+
+  test("marks the diabe-teach System Pack with isSystemPack: true", function() {
+    const systemPack = res.body.packs.find(function(pack) { return pack.id === "diabe-teach"; });
+    expect(systemPack.isSystemPack).to.equal(true);
+    res.body.packs.forEach(function(pack) {
+      expect(pack.isSystemPack).to.be.a("boolean");
+    });
+  });
 }
 
 docs {
   # GET /api/v1/packs (`listCurriculumPacks`)
 
-  Lists the latest **Pack Version** of each unarchived **Curriculum Pack** in the shared library (`packId`, `title`, `version`, `description`, `cardCount`, `domainCount`, `isSystemPack`, `isArchived`, `authorName`, `authorHandle`).
+  Lists the latest **Pack Version** of each unarchived **Curriculum Pack** in the shared library (`id`, `title`, `version`, `subjectDomain`, `boardConfig`, `cardCount`, `domainCount`, `hasAssessmentInstrument`, `hasPerceptionSurvey`, `authorHandle`, `isArchived`, `isSystemPack`).
+
+  - `isSystemPack` is `true` for a built-in **System Pack** (`diabe-teach`): exactly the packs whose archive or new version is refused with `403 PACK_IS_SYSTEM_PACK`, so a client can hide those actions.
 
   ## Query Parameters
   - `includeArchived` *(optional, boolean)*: Enable `includeArchived=true` in the Params tab to also include archived Curriculum Packs.

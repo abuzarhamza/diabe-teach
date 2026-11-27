@@ -383,7 +383,7 @@ paths:
                 required: [pack]
                 properties:
                   pack:
-                    $ref: "#/components/schemas/PublicCurriculumPack"
+                    $ref: "#/components/schemas/CurriculumPackDetail"
         "401":
           $ref: "#/components/responses/UnauthorizedError"
         "404":
@@ -1706,7 +1706,7 @@ components:
       allOf:
         - $ref: "#/components/schemas/CurriculumPackSummary"
         - type: object
-          required: [authorHandle, isArchived]
+          required: [authorHandle, isArchived, isSystemPack]
           properties:
             authorHandle:
               type: [string, "null"]
@@ -1718,6 +1718,16 @@ components:
             isArchived:
               type: boolean
               description: True only when listed with `includeArchived=true`.
+            isSystemPack:
+              $ref: "#/components/schemas/IsSystemPack"
+
+    IsSystemPack:
+      type: boolean
+      description: >-
+        True for a built-in System Pack (for example `diabe-teach`). It is true
+        exactly when archiving the pack or registering a new version of it is
+        refused with 403 `PACK_IS_SYSTEM_PACK`, so a client can hide those
+        actions instead of waiting for the refusal.
 
     PublicCurriculumPack:
       type: object
@@ -1759,6 +1769,18 @@ components:
               type: array
               items:
                 $ref: "#/components/schemas/PerceptionSurveyItem"
+
+    CurriculumPackDetail:
+      description: >-
+        A pack as `GET /api/v1/packs/{packId}` returns it: the pack's content
+        plus whether it is a System Pack. Not accepted as a request body.
+      allOf:
+        - $ref: "#/components/schemas/PublicCurriculumPack"
+        - type: object
+          required: [isSystemPack]
+          properties:
+            isSystemPack:
+              $ref: "#/components/schemas/IsSystemPack"
 
     CurriculumPackInput:
       allOf:

@@ -9,7 +9,6 @@ import type {
 } from "../ports/register-curriculum-pack.port.js";
 import { CurriculumPack } from "../../domain/curriculum-pack/curriculum-pack.js";
 import { PackId } from "../../domain/curriculum-pack/pack-id.js";
-import { PackIsSystemPackError } from "../../domain/errors/domain-errors.js";
 import { PackValidator } from "../services/pack-validator.js";
 import { SilentLogger } from "../services/silent-logger.js";
 
@@ -59,9 +58,7 @@ implements RegisterCurriculumPackUseCasePort {
     // The library is shared (ADR-0007): any signed-in teacher may release a
     // new Pack Version of any pack, except a System Pack.
     const latest = await this.#packRepo.findById(PackId.create(pack.id));
-    if (latest?.isSystemPack) {
-      throw new PackIsSystemPackError(pack.id);
-    }
+    latest?.assertTeachersMayChange();
 
     // A new version always starts unarchived, so releasing a new version of
     // an archived pack puts it back in the list.

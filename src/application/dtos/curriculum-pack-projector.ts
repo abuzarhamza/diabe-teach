@@ -30,6 +30,7 @@ export class CurriculumPackProjector {
       ...CurriculumPackProjector.toSummaryDto(pack),
       authorHandle,
       isArchived: pack.isArchived,
+      isSystemPack: pack.isSystemPack,
     };
   }
 
@@ -68,6 +69,7 @@ export class CurriculumPackProjector {
           }
         : null,
       perceptionSurvey: pack.perceptionSurvey,
+      isSystemPack: pack.isSystemPack,
     };
   }
 }

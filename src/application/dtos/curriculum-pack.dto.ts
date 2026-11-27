@@ -30,6 +30,11 @@ export interface CurriculumPackListItemDto extends CurriculumPackSummaryDto {
    */
   readonly authorHandle: string | null;
   readonly isArchived: boolean;
+  /**
+   * True for a built-in System Pack, which teachers cannot archive or release
+   * a new version of (`CurriculumPack.assertTeachersMayChange`).
+   */
+  readonly isSystemPack: boolean;
 }
 
 export interface PublicAssessmentQuestionDto {
@@ -55,6 +60,8 @@ export interface PublicCurriculumPackDto {
     readonly questions: readonly PublicAssessmentQuestionDto[];
   } | null;
   readonly perceptionSurvey: PerceptionSurvey | null;
+  /** Same meaning as `CurriculumPackListItemDto.isSystemPack`. */
+  readonly isSystemPack: boolean;
 }
 
 export interface CurriculumPackProjectionOptions {

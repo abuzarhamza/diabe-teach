@@ -15,19 +15,22 @@ tests {
     expect(res.status).to.equal(200);
     expect(res.body.pack.id).to.be.a("string");
     expect(res.body.pack.cards).to.be.an("array");
+    expect(res.body.pack.isSystemPack).to.be.a("boolean");
   });
 }
 
 docs {
   # GET /api/v1/packs/:packId (`getCurriculumPackById`)
 
-  Retrieves the latest **Pack Version** of a **Curriculum Pack** by its `packId` (defaults to `{{packId}}` = `diabe-teach`), including its `boardConfig`, **Semantic Domains**, **Keyword Cards**, **Adjudication Rubric**, assessment instrument, and perception survey.
+  Retrieves the latest **Pack Version** of a **Curriculum Pack** by its `packId` (defaults to `{{packId}}` = `diabe-teach`), including its `boardConfig`, **Semantic Domains**, **Keyword Cards**, **Adjudication Rubric**, assessment instrument, and perception survey, plus `isSystemPack`.
+
+  - `isSystemPack` is `true` for a built-in **System Pack** (`diabe-teach`), which cannot be archived or given a new version (`403 PACK_IS_SYSTEM_PACK`).
 
   - Without an instructor **Capability Token**, MCQ `correctOptionIndex` and `explanation` fields are redacted (`null`) so learners cannot inspect the answer key.
   - With `Authorization: Bearer {{instructorToken}}`, the unredacted answer key is included.
 
   ## Responses & Error Codes (`ApiErrorCode`)
-  - **`200 OK`**: Full `CurriculumPack` object.
+  - **`200 OK`**: `{ pack: CurriculumPackDetail }`.
   - **`401 UNAUTHORIZED_TOKEN`**: Invalid or wrong-kind bearer token when an `Authorization` header is supplied.
   - **`404 PACK_NOT_FOUND`**: No Curriculum Pack exists with `packId`.
 }

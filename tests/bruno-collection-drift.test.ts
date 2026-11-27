@@ -132,6 +132,37 @@ function loadOpenApiImplementedOperations(): Map<string, { operationId: string; 
   return map;
 }
 
+interface OpenApiSchemaNode {
+  readonly $ref?: string;
+  readonly allOf?: readonly OpenApiSchemaNode[];
+  readonly properties?: Record<string, unknown>;
+}
+
+/** Property names of a component schema, following local `$ref`s and `allOf`. */
+function openApiSchemaPropertyNames(schemaName: string): string[] {
+  const doc = parseYaml(readFileSync(OPENAPI_PATH, "utf8")) as {
+    components: { schemas: Record<string, OpenApiSchemaNode> };
+  };
+  const collect = (node: OpenApiSchemaNode): string[] => {
+    if (node.$ref) {
+      return collect(doc.components.schemas[node.$ref.replace("#/components/schemas/", "")]!);
+    }
+    return [
+      ...Object.keys(node.properties ?? {}),
+      ...(node.allOf ?? []).flatMap(collect),
+    ];
+  };
+  return collect(doc.components.schemas[schemaName]!);
+}
+
+/** The backticked field names inside the first comma-separated `(...)` list of a docs block. */
+function documentedFieldList(docs: string): string[] {
+  const list = /\(([^),`]*`[^),]*,[^)]*)\)/.exec(docs)?.[1] ?? "";
+  return [
+    ...list.matchAll(/`(\w+)`/g),
+  ].map(match => match[1]!);
+}
+
 describe("bruno manual testing collection and standalone HTML documentation (bruno-api-docs)", () => {
   const bruRequests = loadBruRequests();
   const netlifyRoutes = loadNetlifyFunctionRoutes();
@@ -239,6 +270,18 @@ describe("bruno manual testing collection and standalone HTML documentation (bru
       const valid = validate(parsedJson);
       expect(valid, `${req.filePath} (${openApiOp.operationId}): ${JSON.stringify(validate.errors)}`).toBe(true);
     }
+  });
+
+  it("the pack list docs name exactly the fields of CurriculumPackListItem, and the pack detail docs name isSystemPack", () => {
+    const byFile = new Map(bruRequests.map(req => [req.filePath, req]));
+    const listDocs = byFile.get("03-Curriculum-Packs/01-list-packs.bru")?.docs ?? "";
+    const detailDocs = byFile.get("03-Curriculum-Packs/02-get-pack-by-id.bru")?.docs ?? "";
+
+    expect(documentedFieldList(listDocs).sort()).toEqual(
+      openApiSchemaPropertyNames("CurriculumPackListItem").sort(),
+    );
+    expect(openApiSchemaPropertyNames("CurriculumPackDetail")).toContain("isSystemPack");
+    expect(detailDocs).toContain("`isSystemPack`");
   });
 
   it("generates standalone interactive HTML documentation at docs/api/api-docs.html containing all endpoints and environments", () => {
