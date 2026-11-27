@@ -16,6 +16,7 @@ This directory is the maintained source for verifying the user-facing behavior o
 - Every recipe starts from the baseline unless its preconditions say otherwise. Use a new email per recipe, because accounts persist until cleanup.
 - Find elements by role and accessible name (`find`, then a `ref`). Don't use coordinates or tab order.
 - Type into fields (`computer left_click` with the ref, then `computer type`). Submit by clicking the named button.
+- Wait for the result by polling for the element you expect, not with a fixed pause (see [`../SKILL.md`](../SKILL.md#drive)). After `Sign in`, wait for `/setup` before you `navigate` to any teacher route.
 - Read results with one `javascript_tool` expression that returns the route and the visible text. Refusals are in the `role="status"` region inside their form. The one-time reason is the `role="alert"` above the form.
 - Do API-only setup (a Game Session, a second account) with `vapi req` and `--save`. Then do the user's part in the browser.
 - Treat every quoted label, sentence and command as literal.
@@ -44,10 +45,10 @@ Keep implementation details out of the map. Name only user paths, stable handles
 
 | Feature | Last proven |
 |---|---|
-| [Teacher sign in](./teacher-sign-in.md): sign in, empty field, wrong password, lockout | not yet run |
-| [Create a teacher account](./create-account.md): sign up, local refusals, email already registered | not yet run |
-| [Signed-in panel, TopBar and Sign out](./signed-in-panel-and-sign-out.md): panel at `/login`, TopBar on `/setup`, Sign out from each, second-tab sync | not yet run |
-| [Signed-out redirect to /login](./signed-out-redirect.md): signed out, expired, not accepted | not yet run |
-| [Learner joins the Lobby](./learner-join-lobby.md): join refusals, join, live roster across two tabs | 2026-11-27 at `0f7f61a`, run `proof-web-learner-lobby` (all bullets except `join-local-refusals` and `join-no-seat`) |
-| [Pack Library and Pack Detail](./pack-library.md): signed-out redirect, list, archive, show archived, unarchive, detail sections, System Pack, Start Game with Pack | 2026-11-27 on `ba77446` + this change, run `proof-web-pack-library` (all bullets) |
-| [Pack Editor](./pack-editor.md): TopBar Packs link, New pack, paste words, upload a .csv, copy a pack's words, Remove / Clear all, multi-line typing, local refusals, publish, unique id against archived packs, Cancel, Check pack, publish warnings on detail, 409 refusal, Edit → save as new version (open, reload, publish, unarchived, hidden on System Packs) | 2026-11-27 on `1ccf0fe` + 01, run `proof-web-pack-editor` (01 bullets); 2026-11-27 on `98d12d7` + 02, run `proof-web-pack-editor-02` (upload, copy, remove/clear, multi-line typing); 2026-11-27 on `f2445de` + 03, run `proof-web-pack-editor-03` (Check pack, publish warnings, 409 race, buttons disabled while held); 2026-11-27 on `4b22b5e` + 04, run `proof-web-pack-editor-04` (the five `version-*` bullets) |
+| [Teacher sign in](./teacher-sign-in.md): sign in, empty field, wrong password, lockout | 2026-11-27 at `a342c5c`, run `maintain-web-2026-11-27` (all bullets) |
+| [Create a teacher account](./create-account.md): sign up, local refusals, email already registered | 2026-11-27 at `a342c5c`, run `maintain-web-2026-11-27` (all bullets) |
+| [Signed-in panel, TopBar and Sign out](./signed-in-panel-and-sign-out.md): panel at `/login`, TopBar on teacher screens, Sign out from each, second-tab sync | 2026-11-27 at `a342c5c`, run `maintain-web-2026-11-27` (all bullets) |
+| [Signed-out redirect to /login](./signed-out-redirect.md): signed out, expired, not accepted | 2026-11-27 at `a342c5c`, run `maintain-web-2026-11-27` (all bullets; storage stand-ins for expired and not accepted) |
+| [Learner joins the Lobby](./learner-join-lobby.md): join refusals, join, live roster across two tabs | 2026-11-27 at `a342c5c`, run `maintain-web-2026-11-27` (all bullets) |
+| [Pack Library and Pack Detail](./pack-library.md): signed-out redirect, list, archive, show archived, unarchive, detail sections, System Pack, Start Game with Pack | 2026-11-27 at `a342c5c`, run `maintain-web-2026-11-27` (all bullets) |
+| [Pack Editor](./pack-editor.md): TopBar Packs link, New pack, paste words, upload a .csv, copy a pack's words, Remove / Clear all, multi-line typing, local refusals, publish, unique id against archived packs, Cancel, Check pack, publish warnings on detail, 409 refusal, Edit → save as new version (open, reload, publish, unarchived, hidden on System Packs) | 2026-11-27 on `1ccf0fe` + 01, run `proof-web-pack-editor` (01 bullets); 2026-11-27 on `98d12d7` + 02, run `proof-web-pack-editor-02` (upload, copy, remove/clear, multi-line typing); 2026-11-27 on `f2445de` + 03, run `proof-web-pack-editor-03` (Check pack, publish warnings, 409 race, buttons disabled while held); 2026-11-27 on `4b22b5e` + 04, run `proof-web-pack-editor-04` (the five `version-*` bullets); 2026-11-27 at `a342c5c`, run `maintain-web-2026-11-27` (all bullets) |

@@ -23,25 +23,27 @@ A signed-in teacher opens `/packs` and sees the shared library's Curriculum Pack
 Preconditions:
 
 - Baseline from [README](./README.md), and `vweb doctor` is healthy.
-- A teacher account and one non-system pack, set up through the API (the browser can't register a pack until the Pack Editor exists):
+- A teacher account and one non-system pack, set up through the API (quicker than the [Pack Editor](./pack-editor.md), and the pack has two domains). The byline shows whoever registered it, so register it with this teacher's token:
   `vapi req pack-library setup-sign-up POST /api/v1/accounts/sign-up --json '{"email":"packs.teacher@example.edu","password":"correct horse battery"}' --expect 201 --save accountToken=accountToken`, then `vapi set customPackId=endocrine-intro`, then `vapi req pack-library setup-register-pack POST /api/v1/packs --auth accountToken --bru-body docs/api/bruno/03-Curriculum-Packs/04-register-pack.bru`. That pack ("Endocrine Pathophysiology Intro", 9 cards, 3 × 3) has no assessment questions and no survey.
 
 Steps:
 
 - **`library-signed-out`.** `navigate` to `http://localhost:5173/packs` before signing in. The path becomes `/login` and the `role="alert"` reads "Sign in to continue.".
-- **Sign in.** In `form "Teacher sign in"`, type the setup email and password and click `Sign in`, then `navigate` to `/packs`.
+- **Sign in.** In `form "Teacher sign in"`, type the setup email and password and click `Sign in`, wait for `/setup`, then click `Packs` in the TopBar (or `navigate` to `/packs`).
 - **`library-list`.** Read `ul[aria-label="Curriculum Packs"] > li` with `javascript_tool`. You see two items: "Diabe-teach: …" with `System Pack`, "by unknown · v1.0.0", `Start Game with Pack` and no Archive; and "Endocrine Pathophysiology Intro" with "by packs.teacher · v1.0.0", "9 cards · Endocrinology and Glucose Homeostasis", `Start Game with Pack` and `Archive`. Record it and keep a screenshot.
 - **`library-archive`.** `find` `button "Archive pack Endocrine Pathophysiology Intro"` and click it. Within about 2 s only Diabe-teach is listed, and the page's `role="status"` is empty.
 - **`library-show-archived`.** Click `checkbox "Show archived"`. The Endocrine pack comes back with "Archived" and `button "Unarchive pack Endocrine Pathophysiology Intro"`, and without `Start Game with Pack`. Record and screenshot. Second view: `vapi req pack-library api-sees-archived GET '/api/v1/packs?includeArchived=true' --expect 200` shows `endocrine-intro` with `isArchived: true`.
 - **`library-unarchive`.** Click `Unarchive pack Endocrine Pathophysiology Intro`. The pack loses "Archived" and shows `Start Game with Pack` and `Archive` again.
 - **`detail-sections`.** Click `link "Endocrine Pathophysiology Intro"`. The path is `/packs/endocrine-intro`. Read each `section h3` and its text: Board "3 × 3 board · chains of 3+ cards · any of the 8 neighbouring cards", Semantic Domains (Hormones & Signaling, Glucose Metabolism), Keyword Cards grouped by domain ("Hormones & Signaling (4)" …), Adjudication Rubric (Evaluator, Subject, criteria), Assessment questions "This pack has no assessment questions.", Survey items "This pack has no perception survey.". Record and screenshot.
 - **`detail-system-pack`.** `navigate` to `/packs/diabe-teach`. The header shows "v1.0.0" and "System Pack", there is no Archive/Unarchive button, and the question and survey lists are filled.
-- **`start-game`.** Click `link "Start Game with Pack Diabe-teach: …"`. The path is `/setup` with search `?packId=diabe-teach`, heading "Game setup". `read_console_messages` with pattern `\[API\]` shows `GET /api/v1/packs/diabe-teach -> 200`.
+- **`start-game`.** Click `link "Start Game with Pack Diabe-teach: …"`. The path is `/setup` with search `?packId=diabe-teach`, heading "Game setup". No `[API]` request follows the click: Game Setup is a placeholder and does not read `packId` yet (the `GET /api/v1/packs/diabe-teach -> 200` you may see is Pack Detail's own load, before the click).
 - **Finish.** Click `Sign out`, close the tab, run cleanup.
 
 ## Gotchas
 
 - The 403 `PACK_IS_SYSTEM_PACK` banner ("Built-in System Packs can't be archived or given new versions.") is only a fallback for a stale list; the browser can't reach it, because System Packs get no Archive button. The screen test covers it.
-- The console log clears on navigation, so read `[API]` lines on the page where they happened.
+- The console tool keeps a tab's messages across navigations, so old lines show up: `read_console_messages` with `clear: true` right before the action you want to prove.
+- Pack Detail of an archived pack still shows `Start Game with Pack` (the library hides it for archived packs; the detail response has no archived flag). Seen in run `maintain-web-2026-11-27` and reported as a product gap; no bullet here checks Pack Detail of an archived pack.
+- Two packs with the same title get controls with the same name (`Archive pack Diabetes basics` twice). Give recipe packs distinct titles, or pick the control by its list item.
 - After `Archive` with `Show archived` off the pack simply disappears: there is no success message. Tick `Show archived` to see it again.
 - Pack Detail fetches without a token, so the assessment answer keys stay redacted; that is intended.

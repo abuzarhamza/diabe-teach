@@ -23,12 +23,12 @@ Preconditions:
 
 Steps:
 
-- **Find the form.** `navigate` to `/login`. Then `find` with `"Email textbox, Password textbox, Sign in button"` returns `textbox "Email"`, `textbox "Password"` (with hint "At least 10 characters.") and `button "Sign in"`.
+- **Find the form.** `navigate` to `/login`. Then `find` with `"Email textbox, Password textbox, Sign in button"` returns `textbox "name@school.org" label "Email"`, `textbox "Password"` (with hint "At least 10 characters.") and `button "Sign in"`.
 - **`sign-in-empty`.** Click `Sign in` with both fields empty. The status in `form[aria-label="Teacher sign in"]` reads "Enter your email and password." and focus is on Email (`document.activeElement.id === "email"`). Type an email only and click `Sign in`: the same sentence, and focus is on Password. The console (`\[API\]`) shows no `POST /api/v1/accounts/sign-in`.
 - **`sign-in-wrong`.** Type `signin.teacher@example.edu` and `not my password`, then click `Sign in`. The status reads "Wrong email or password." followed by `INVALID_CREDENTIALS`, focus is on Password, and the path stays `/login`. Repeat with `nobody@example.edu`: the sentence is the same.
-- **`sign-in-locked`.** With `lock.teacher@example.edu`, submit a wrong password five times. Attempts 1 to 4 read "Wrong email or password.". Attempt 5 reads "Too many wrong passwords: sign-in is temporarily locked until HH:MM. Try again later." followed by `ACCOUNT_TEMPORARILY_LOCKED`, where HH:MM is local 24-hour time about 15 minutes ahead. Then type the correct password: it gets the same lock sentence.
+- **`sign-in-locked`.** With `lock.teacher@example.edu`, submit a wrong password five times. Attempts 1 to 4 read "Wrong email or password.". Attempt 5 reads "Too many wrong passwords: sign-in is temporarily locked until HH:MM. Try again later." followed by `ACCOUNT_TEMPORARILY_LOCKED`, where HH:MM is local 24-hour time about 15 minutes ahead. Then type the correct password: it gets the same lock sentence. Console: attempts 1 to 4 are `POST /api/v1/accounts/sign-in -> 401`, attempt 5 and the correct password `-> 423`.
 - **`sign-in-ok`.** Type `signin.teacher@example.edu` and `correct horse battery`, then click `Sign in`. The path becomes `/setup`, the TopBar reads "Signed in as signin.teacher@example.edu", and "Game setup" is shown. `localStorage` key `cc-account-token-v1` is present. The console shows `POST /api/v1/accounts/sign-in -> 200`, then `GET /api/v1/accounts/me -> 200`.
-- **Second view.** Open a new tab at `/setup`. It opens without a redirect, because the Account Token is shared by tabs.
+- **Second view.** Wait for `/setup` in this tab first (see [SKILL.md](../SKILL.md#drive)), then open a new tab at `/setup`. It opens without a redirect, because the Account Token is shared by tabs.
 - **Proof.** For each sub-feature, `vweb record` the path, status text and focused field id, and keep a screenshot of the lock sentence and of `/setup`. End with `Sign out`.
 
 ## Gotchas
@@ -38,4 +38,6 @@ Steps:
 - The lock time is the browser's local time in HH:MM (24-hour), not the prototype's locale format.
 - `/login` has two `role="status"` regions. Scope to `form[aria-label="Teacher sign in"]`.
 - A teacher signed in from an earlier run sees the panel instead of the form. Sign out first.
+- `innerText` of the status joins the sentence and the code with no space ("Wrong email or password.INVALID_CREDENTIALS").
+- Opening a teacher route with `navigate` straight after clicking `Sign in` lands on `/login` with "Sign in to continue.": the full page load drops the sign-in reply before the token is saved. It is the harness, not the app (run `maintain-web-2026-11-27`, `login-landing-investigation/`). Wait for `/setup` first.
 - In production builds the API code is not shown after the sentence. This map assumes the Vite dev server.

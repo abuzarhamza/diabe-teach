@@ -5,7 +5,7 @@ description: "Launch, health-check and drive the diabe-teach React web app (web/
 
 # Verify the diabe-teach web app
 
-`web/` is a Vite + React 19 single-page app (ADR-0008). A user touches it in a browser at `http://localhost:5173`. Vite proxies `/api/*` to the API on `:8888` (`web/vite.config.ts`). Screens as of `36cc398` (`web/src/routes.tsx`):
+`web/` is a Vite + React 19 single-page app (ADR-0008). A user touches it in a browser at `http://localhost:5173`. Vite proxies `/api/*` to the API on `:8888` (`web/vite.config.ts`). Screens as of `a342c5c` (`web/src/routes.tsx`):
 
 | Route | Who | What |
 |---|---|---|
@@ -67,9 +67,15 @@ It checks that the `:5173` listener descends from this run's `web.pid` and that 
 
 How to act like the user, with stable handles:
 
-- **Find by role and name**, never by coordinates: `find` with `"Room code textbox, Your name textbox, Join button"` returns refs like `textbox "Room code"`, `button "Join"`. Forms have accessible names: `form "Teacher sign in"` and `form "Join a game"`.
+- **Find by role and name**, never by coordinates: `find` with `"Room code textbox, Your name textbox, Join button"` returns refs like `textbox "e.g. K7Q2MX" label "Room code"`, `button "Join"` (a field with a placeholder is listed by its placeholder, then its label). Forms have accessible names: `form "Teacher sign in"` and `form "Join a game"`. Refs die with the page: `find` again after every navigation, and after a click that renders a new screen, wait for the screen before you `find` (a `find` straight after `New pack` still returned the library's refs).
 - **Type like a user**: `computer left_click` with `ref`, then `computer type`. To replace a value, `triple_click` the ref, then `type`. The forms are uncontrolled (read with `FormData` on submit), so `form_input` also works, but typing is closer to the user.
-- **Navigate by route path**: `navigate` to `http://localhost:5173/login`, `/setup`, `/sessions/<id>`.
+- **Navigate by route path**: `navigate` to `http://localhost:5173/login`, `/setup`, `/sessions/<id>`. `navigate` is a full page load: it drops any request still in flight. So after `Sign in` (about 0.5 s under netlify dev), wait until the app has moved before you `navigate` anywhere, or you land on `/login` with "Sign in to continue." and no Account Token (reproduced 3 of 3 times in run `maintain-web-2026-11-27`; the server had signed the teacher in each time). Wait like this:
+
+  ```js
+  const t0 = performance.now(); while (location.pathname !== '/setup' && performance.now() - t0 < 8000) await new Promise(r => setTimeout(r, 50)); location.pathname
+  ```
+
+- **Wait for the result, not for a fixed time.** API calls go through netlify dev and take 0.5 to 1.5 s (the first call to a function can take longer). Poll in one `javascript_tool` call for the element you expect (the Lobby roster, `#pack-detail-heading`, `section.check-results`) with the loop above, and keep each call under about 40 s (the tool times out at 45 s).
 - **Read the outcome** with one `javascript_tool` expression that returns what the user sees, for example:
 
   ```js
@@ -78,9 +84,11 @@ How to act like the user, with stable handles:
      roster: [...document.querySelectorAll('ul[aria-labelledby="roster-heading"] li')].map(li => li.innerText.replace(/\s+/g, ' ').trim()) })
   ```
 
+  Name the fields of that result neutrally: the tool replaces any field whose **name** looks sensitive (`token`, `password`) with `[BLOCKED: Sensitive key]`, even when the value is a boolean (use `acct: … ? 'present' : 'absent'`). It also replaces **values** shaped like a version ("v1.0.0", "1.1.0") with `[BLOCKED: JWT token]`: return them with a space inserted (`.replace(/v(\d)/gi, 'v $1')`) and say so in the evidence.
+
   Refusals appear in a `role="status"` region inside their form (`ErrorBanner`). In development it ends with the API `code`, for example `…ROOM_CODE_NOT_FOUND`. The one-time "why you were sent here" message is a `role="alert"` paragraph above the form.
 - **Second learner or second teacher view**: open another tab with `tabs_create_mcp`. Each tab keeps its own seats (`sessionStorage`, `cc-session-seats-v1`), while the teacher's Account Token (`localStorage`, `cc-account-token-v1`) is shared by every tab.
-- **Console**: `read_console_messages` with pattern `\[API\]` lists every call as `[API] METHOD /path -> status`.
+- **Console**: `read_console_messages` with pattern `\[API\]` lists every call as `[API] METHOD /path -> status`. The tool keeps a tab's messages across navigations (even a full `navigate`), so earlier pages' lines show up too: call it with `clear: true` right before the action, then read again after it.
 - **What the browser cannot do yet**: create a Game Session (Game Setup is a placeholder). Do that with `vapi` and an Account Token, then drive the learner side in the browser.
 
 The recipes are in the feature map, [`features/README.md`](features/README.md). Pick the feature, check its preconditions, and run its bullets in order.

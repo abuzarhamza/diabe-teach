@@ -1,12 +1,12 @@
 # Signed-in panel, TopBar and Sign out
 
-A signed-in teacher who opens `/login` sees a panel instead of the form: "Signed in as <email>", a `Continue to Game setup →` link and `Sign out`. Every teacher-only screen (today `/setup`) has a TopBar with "Signed in as <email>" and `Sign out`. Signing out from either place removes the Account Token in this browser. The panel switches back to the form with the cursor in Email, and from the TopBar the teacher lands on `/login` with no warning. Other open tabs follow.
+A signed-in teacher who opens `/login` sees a panel instead of the form: "Signed in as <email>", a `Continue to Game setup →` link and `Sign out`. Every teacher-only screen (`/setup`, `/packs`, `/packs/new`, `/packs/<id>`, `/packs/<id>/new-version`) has a TopBar with a `Packs` link, "Signed in as <email>" and `Sign out`. Signing out from either place removes the Account Token in this browser. The panel switches back to the form with the cursor in Email, and from the TopBar the teacher lands on `/login` with no warning. Other open tabs follow.
 
 ## Sub-features
 
 - `panel-shown`: `/login` shows the panel, not the form, while signed in.
 - `panel-continue`: `Continue to Game setup →` opens `/setup`.
-- `topbar-shown`: `/setup` shows the TopBar with the teacher's email.
+- `topbar-shown`: `/setup` shows the TopBar with `Packs`, the teacher's email and `Sign out`.
 - `panel-sign-out`: `Sign out` on the panel shows the form, with focus in Email.
 - `topbar-sign-out`: `Sign out` in the TopBar lands on `/login` with no "Sign in to continue." alert.
 - `second-tab-sync`: signing out in one tab turns another tab's panel into the form, and sends another tab's `/setup` to `/login`.
@@ -24,7 +24,7 @@ Preconditions:
 
 Steps:
 
-- **`topbar-shown`.** After signing in, tab 1 is at `/setup`. A `banner` (header) contains "Signed in as panel.teacher@example.edu" and `button "Sign out"`, and the heading "Game setup" is shown.
+- **`topbar-shown`.** After signing in, tab 1 is at `/setup`. The `header.top` reads "Packs Signed in as panel.teacher@example.edu Sign out" (`link "Packs"` in `navigation "Teacher screens"`, `button "Sign out"`), and the heading "Game setup" is shown. Wait for `/setup` after `Sign in` before you `navigate` anywhere.
 - **`panel-shown`.** `navigate` tab 1 to `/login`. The form `Teacher sign in` is absent, and the page shows "Signed in as panel.teacher@example.edu", `link "Continue to Game setup →"` and `button "Sign out"`. The `Join a game` form is still below.
 - **`panel-continue`.** Click `Continue to Game setup →`. The path becomes `/setup`.
 - **`second-tab-sync` (prepare).** `tabs_create_mcp` (tab 2) and `navigate` to `/login`. It shows the panel.
