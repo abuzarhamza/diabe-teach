@@ -25,8 +25,10 @@ export class ApiHttpError extends Error {
   }
 }
 
+// The token kind a route's security scheme expects (ADR-0007): "account" for AccountAuth (the teacher's
+// Account Token), "capability" for BearerAuth (a Game Session's Capability Token, from a session seat).
 export interface ApiAuth {
-  kind: "account";
+  kind: "account" | "capability";
   token: string;
 }
 

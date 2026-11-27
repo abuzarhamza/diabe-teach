@@ -1,5 +1,5 @@
 import type { FakeReply } from "../../support/fake-fetch.ts";
-import { screen, waitFor } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { installFakeFetch } from "../../support/fake-fetch.ts";
@@ -50,7 +50,7 @@ describe("teacher Login screen: sign-in refusals (react-login-screen 02)", () =>
     await signInWith("rahman.s@aku.edu", "wrong-password-123");
 
     expect(await screen.findByText("Wrong email or password.")).toBeTruthy();
-    expect(screen.getByRole("status").textContent).toContain("Wrong email or password.");
+    expect(within(screen.getByRole("form", { name: "Teacher sign in" })).getByRole("status").textContent).toContain("Wrong email or password.");
     expect(document.activeElement).toBe(screen.getByLabelText("Password"));
     expect(router.state.location.pathname).toBe("/login");
     expect(localStorage.getItem(ACCOUNT_KEY)).toBeNull();

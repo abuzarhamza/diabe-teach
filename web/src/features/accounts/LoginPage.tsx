@@ -6,6 +6,7 @@ import { Link, useNavigate } from "react-router";
 import { clearAccount } from "../../api/account-token-store.ts";
 import { takeLoginReason } from "../../api/login-reason-store.ts";
 import { loginErrorView, MIN_PASSWORD_LENGTH, signInCredentialsProblem, signUpCredentialsProblem } from "../../domain/login-errors.ts";
+import { JoinSessionForm } from "../game-session/JoinSessionForm.tsx";
 import { ErrorBanner } from "../shared/ErrorBanner.tsx";
 import { useCreateAccount, useSignIn } from "./account-hooks.ts";
 import { useSignedInAccount } from "./use-signed-in-account.ts";
@@ -21,6 +22,7 @@ function credentialsFrom(form: HTMLFormElement): Credentials {
 // Teacher login (claudPoc/concept-chain/login.html): sign in to an Instructor Account, or create one
 // (sign-up signs the teacher in at once), then Game Setup.
 // A teacher who is already signed in sees the signed-in panel instead of the form.
+// Below it, the learner's Quick Join (room code and name), which needs no account.
 export function LoginPage() {
   const navigate = useNavigate();
   const account = useSignedInAccount();
@@ -125,7 +127,7 @@ export function LoginPage() {
               </div>
             )
           : (
-              <form className="col" noValidate onSubmit={handleSubmit}>
+              <form className="col" aria-label="Teacher sign in" noValidate onSubmit={handleSubmit}>
                 <div className="field">
                   <label htmlFor="email">Email</label>
                   <input ref={attachEmail} type="email" id="email" name="email" maxLength={254} autoComplete="username" required placeholder="name@school.org" />
@@ -143,7 +145,14 @@ export function LoginPage() {
               </form>
             )}
 
-        <p className="foot">Learners don't sign in: they join with the room code on the learner screen.</p>
+        <p className="foot">Learners don't sign in: they join with the room code below.</p>
+      </section>
+
+      <section className="panel login">
+        <div className="brand">
+          <p>Join your class game</p>
+        </div>
+        <JoinSessionForm />
       </section>
     </div>
   );

@@ -1,5 +1,5 @@
 import type { FakeReply } from "../../support/fake-fetch.ts";
-import { screen, waitFor } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { installFakeFetch } from "../../support/fake-fetch.ts";
@@ -99,7 +99,7 @@ describe("teacher Login screen: Create account (react-login-screen 03)", () => {
     await createAccountWith("rahman.s@aku.edu", "correct-horse-battery");
 
     expect(await screen.findByText("That email is already registered. Sign in instead.")).toBeTruthy();
-    expect(screen.getByRole("status").textContent).toContain("That email is already registered. Sign in instead.");
+    expect(within(screen.getByRole("form", { name: "Teacher sign in" })).getByRole("status").textContent).toContain("That email is already registered. Sign in instead.");
     expect(document.activeElement).toBe(screen.getByLabelText("Email"));
     expect(router.state.location.pathname).toBe("/login");
     expect(localStorage.getItem(ACCOUNT_KEY)).toBeNull();
