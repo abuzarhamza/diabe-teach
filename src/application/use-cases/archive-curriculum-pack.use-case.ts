@@ -10,7 +10,6 @@ import type { LoggerPort } from "../ports/logger.port.js";
 import { PackId } from "../../domain/curriculum-pack/pack-id.js";
 import {
   PackAlreadyArchivedError,
-  PackIsSystemPackError,
   PackNotFoundError,
 } from "../../domain/errors/domain-errors.js";
 import { SilentLogger } from "../services/silent-logger.js";
@@ -38,9 +37,7 @@ implements ArchiveCurriculumPackUseCasePort {
       throw new PackNotFoundError(input.packId);
     }
 
-    if (pack.isSystemPack) {
-      throw new PackIsSystemPackError(input.packId);
-    }
+    pack.assertTeachersMayChange();
 
     if (pack.isArchived) {
       throw new PackAlreadyArchivedError(input.packId);

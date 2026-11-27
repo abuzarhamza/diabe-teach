@@ -128,3 +128,47 @@ dl.facts dt{color:var(--muted)} dl.facts dd{margin:0;font-weight:700}
 
 /* Learner Quick Join (claudPoc/concept-chain/participant.html join form) */
 .code-input{font-family:var(--font-mono);letter-spacing:.12em;text-transform:uppercase}
+
+/* Pack Library and Pack Detail (the pack panel of claudPoc/concept-chain/setup.html) */
+a.btn{display:inline-block;text-decoration:none;color:inherit}
+.packs{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:8px;list-style:none;margin:0;padding:0}
+.pack{display:flex;gap:8px;align-items:center;border:1px solid var(--line);border-radius:8px;padding:8px 10px;background:var(--surface)}
+.pack .nm{font-weight:700;display:block}
+.pack .nm a{color:inherit}
+.pack .nm a:hover{color:var(--accent)}
+.pack .by,.cards-list .by{display:block;font-size:12px;color:var(--muted)}
+.tag{background:var(--sunk);border-radius:999px;padding:1px 8px;font-size:12px;font-weight:700;margin-left:6px;color:var(--muted)}
+.tag.good{color:var(--good)} .tag.bad{color:var(--bad)}
+.packitem{display:flex;flex-direction:column;gap:4px}
+.packitem .pack{flex:1}
+.packitem .acts{display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap}
+.packitem.archived .pack{opacity:.7;border-style:dashed}
+.archtoggle{display:inline-flex;gap:6px;align-items:center;font-size:14px;align-self:flex-start}
+.card-group h4{margin:12px 0 6px}
+.cards-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px;list-style:none;margin:0;padding:0}
+.cards-list li{display:flex;flex-direction:column;gap:2px;border:1px solid var(--line);border-radius:8px;padding:8px 10px;background:var(--surface);font-size:14px}
+
+/* Pack Editor (the "New pack" panel of claudPoc/concept-chain/setup.html) */
+.editor{display:flex;flex-direction:column;gap:10px}
+.editor .field>label,.editor .lbl{font-weight:700;font-size:14px;color:inherit}
+.editor .row{gap:8px;flex-wrap:wrap;align-items:center}
+.opt{font-weight:400;color:var(--muted)}
+.kwchips{display:flex;flex-wrap:wrap;gap:4px;max-height:220px;overflow:auto;padding:6px;background:var(--sunk);border-radius:8px;min-height:44px;align-content:flex-start;list-style:none;margin:0}
+.editor .row select{flex:1;min-width:180px;width:auto}
+.kwchips .chip{display:inline-flex;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:1px 2px 1px 9px;font-size:13px;max-width:100%}
+.kwchips .chip span{overflow-wrap:anywhere}
+.kwchips .chip button{border:0;background:transparent;padding:2px 7px;border-radius:999px;line-height:1;font-size:13px;cursor:pointer;color:inherit}
+.kwchips .chip button:hover{background:var(--sunk)}
+.editor label.btn{display:inline-block;cursor:pointer}
+.editor .visually-hidden:focus-visible+label.btn{outline:2px solid var(--accent);outline-offset:2px}
+.editor .warn{color:var(--warn);font-size:14px;margin:0}
+.editor .ok{color:var(--good);font-size:14px;margin:0}
+.count{font-size:14px;font-weight:700}
+.err{color:var(--bad);font-size:13px;font-weight:700;margin:0}
+header.top nav a{font-weight:700;color:var(--accent)}
+/* Check pack results and publish warnings (react-pack-editor 03): errors and warnings in separate lists. */
+.check-results{margin-top:12px}
+.check-results .ok{color:var(--good);font-size:14px;font-weight:700;margin:0}
+.issues h4{margin:10px 0 4px}
+.issues ul{margin:0;padding-left:20px;font-size:14px;overflow-wrap:anywhere}
+.issues.err li::marker{color:var(--bad)} .issues.warn li::marker{color:var(--warn)}

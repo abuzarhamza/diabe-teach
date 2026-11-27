@@ -1,3 +1,7 @@
+## Node on PATH
+
+The repo pins Node 24 (`.nvmrc`, `engines`). Agent shells started outside an interactive terminal (for example from Herdr) may have no `node`/`npx` on PATH, because nvm is only loaded by the interactive shell profile. If `node -v` fails, run `export PATH="$HOME/.nvm/versions/node/$(ls $HOME/.nvm/versions/node | grep '^v24' | tail -1)/bin:$PATH"` once, then run the checks.
+
 ## Agent skills
 
 ### Issue tracker

@@ -59,6 +59,24 @@ Feature: Teacher account journey
     Then the response status should be 200
     And the participant count should be 1
 
+  # react-packs 00: the web app hides Archive and "save as new version" on System Packs.
+  @packs
+  Scenario: The pack list and pack detail mark the System Pack and not a teacher's pack
+    Given a teacher with a new email address
+    When the teacher signs up with the password "correct horse battery"
+    And the teacher registers a new pack
+    Then the response status should be 201
+    When the teacher lists the packs
+    Then the response status should be 200
+    And the pack "diabe-teach" should be listed as a System Pack
+    And the registered pack should be listed as not a System Pack
+    When someone opens the pack "diabe-teach"
+    Then the response status should be 200
+    And the opened pack should be marked as a System Pack
+    When someone opens the registered pack
+    Then the response status should be 200
+    And the opened pack should be marked as not a System Pack
+
   @packs
   Scenario: Registering a pack without signing in is refused
     When someone who has not signed in tries to register a new pack

@@ -2,6 +2,7 @@
 
 **Status:** ready-for-agent
 **Blocked by:** 03
+**Detailed spec:** `.scratch/react-pack-editor/spec.md` (2026-11-27; supersedes the "What to build" and acceptance criteria below: a keyword editor like the prototype, not a JSON editor, tested as rendered screens only).
 
 **What to build:** `packsApi.validatePack`, `registerPack` (with hooks in `features/packs/pack-hooks.ts`); `/packs/new` (`PackEditorPage`) with a JSON editor (keyword entry from `setup.html` editor is a stretch goal), "Validate" showing errors/warnings, "Publish" registering and navigating to `/packs/:packId`.
 

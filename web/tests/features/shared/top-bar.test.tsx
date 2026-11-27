@@ -50,4 +50,13 @@ describe("top bar on teacher screens", () => {
     expect(localStorage.getItem(ACCOUNT_KEY)).toBeNull();
     expect(screen.queryByRole("alert")).toBeNull();
   });
+
+  it("links to the Pack Library from every teacher screen", async () => {
+    const { router } = openSetupSignedIn();
+
+    await userEvent.click(await screen.findByRole("link", { name: "Packs" }));
+
+    await waitFor(() => expect(router.state.location.pathname).toBe("/packs"));
+    expect(await screen.findByRole("heading", { name: "Pack Library" })).toBeTruthy();
+  });
 });

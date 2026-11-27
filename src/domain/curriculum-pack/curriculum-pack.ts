@@ -7,6 +7,7 @@ import type {
   PerceptionSurvey,
   SemanticDomain,
 } from "./curriculum-pack.types.js";
+import { PackIsSystemPackError } from "../errors/domain-errors.js";
 import { PackId } from "./pack-id.js";
 
 interface CardIndices {
@@ -87,6 +88,18 @@ export class CurriculumPack {
 
   public static create(props: CurriculumPackProps): CurriculumPack {
     return new CurriculumPack(props);
+  }
+
+  /**
+   * The one rule for System Packs: teachers may not archive them or release a
+   * new Pack Version of them (403 PACK_IS_SYSTEM_PACK). The pack list and pack
+   * detail report the same `isSystemPack` this checks, so the web app can hide
+   * those actions instead of waiting for the refusal.
+   */
+  public assertTeachersMayChange(): void {
+    if (this.isSystemPack) {
+      throw new PackIsSystemPackError(this.id.value);
+    }
   }
 
   /**

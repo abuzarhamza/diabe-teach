@@ -5,6 +5,7 @@ import { expect } from "chai";
 import { DIABE_TEACH_PACK } from "../../../src/domain/curriculum-pack/diabe-teach-pack.js";
 import {
   archivePack,
+  getPackById,
   listPacks,
   postOversizedPackPayload,
   registerPack,
@@ -162,5 +163,58 @@ Then(
     expect(listed!.version).to.equal(version);
     expect(listed!.isArchived).to.equal(false);
     expect(JSON.stringify(body)).to.not.include(this.teacherEmail!);
+  },
+);
+
+function listedPack(world: TestWorld, packId: string): Record<string, unknown> {
+  const body = world.lastResponseBody as { packs: Array<Record<string, unknown>> };
+  const listed = body.packs.find(pack => pack.id === packId);
+  expect(listed, `pack ${packId} should be listed`).to.not.equal(undefined);
+  return listed!;
+}
+
+Then(
+  "the pack {string} should be listed as a System Pack",
+  function (this: TestWorld, packId: string) {
+    expect(listedPack(this, packId).isSystemPack).to.equal(true);
+  },
+);
+
+Then(
+  "the registered pack should be listed as not a System Pack",
+  function (this: TestWorld) {
+    expect(listedPack(this, this.registeredPackId!).isSystemPack).to.equal(false);
+  },
+);
+
+When(
+  "someone opens the pack {string}",
+  async function (this: TestWorld, packId: string) {
+    this.lastResponse = await getPackById(packId);
+    this.parseLastResponse();
+  },
+);
+
+When(
+  "someone opens the registered pack",
+  async function (this: TestWorld) {
+    this.lastResponse = await getPackById(this.registeredPackId!);
+    this.parseLastResponse();
+  },
+);
+
+Then(
+  "the opened pack should be marked as a System Pack",
+  function (this: TestWorld) {
+    const body = this.lastResponseBody as { pack: Record<string, unknown> };
+    expect(body.pack.isSystemPack).to.equal(true);
+  },
+);
+
+Then(
+  "the opened pack should be marked as not a System Pack",
+  function (this: TestWorld) {
+    const body = this.lastResponseBody as { pack: Record<string, unknown> };
+    expect(body.pack.isSystemPack).to.equal(false);
   },
 );

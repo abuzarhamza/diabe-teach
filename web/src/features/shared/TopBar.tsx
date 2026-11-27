@@ -1,9 +1,9 @@
-import { useNavigate } from "react-router";
+import { Link, useNavigate } from "react-router";
 import { clearAccount } from "../../api/account-token-store.ts";
 import { markSignedOutOnPurpose } from "../../api/login-reason-store.ts";
 import { useSignedInAccount } from "../accounts/use-signed-in-account.ts";
 
-// The bar at the top of every teacher-only screen: who is signed in, and Sign out.
+// The bar at the top of every teacher-only screen: a link to the Pack Library, who is signed in, and Sign out.
 export function TopBar() {
   const account = useSignedInAccount();
   const navigate = useNavigate();
@@ -21,6 +21,9 @@ export function TopBar() {
 
   return (
     <header className="top">
+      <nav aria-label="Teacher screens">
+        <Link to="/packs">Packs</Link>
+      </nav>
       <p>
         Signed in as
         {" "}
