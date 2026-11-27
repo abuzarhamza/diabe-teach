@@ -1,7 +1,7 @@
 // Pack Editor rules: cleaning pasted words, sizing the board, making ids, and building the
 // CurriculumPackInput of a new pack. Pure rules: no React, no fetch, no storage. Ported from the
-// prototype (cleanKeywords in claudPoc/concept-chain/shared.js; slug, cardIds and packInput without
-// `base` in claudPoc/concept-chain/account-api.js; newPackId in setup.html).
+// prototype (cleanKeywords in claudPoc/concept-chain/shared.js; slug, cardIds, nextVersion and packInput,
+// with and without `base`, in claudPoc/concept-chain/account-api.js; newPackId in setup.html).
 
 // A pack needs at least 9 distinct words, enough for the smallest (3 × 3) board.
 export const MIN_PACK_WORDS = 9;
@@ -244,5 +244,92 @@ export function newPackInput(draft: NewPackDraft, takenIds: readonly string[]): 
     },
     assessmentInstrument: null,
     perceptionSurvey: null,
+  };
+}
+
+// The Pack Version a new version releases: a minor bump of MAJOR.MINOR.PATCH ("1.1.0" → "1.2.0");
+// any other version becomes "1.0.0".
+export function nextVersion(version: string): string {
+  const match = /^(\d+)\.(\d+)\.\d+$/.exec(version);
+  return match
+    ? `${match[1]}.${Number(match[2]) + 1}.0`
+    : "1.0.0";
+}
+
+// A Keyword Card as a pack carries it.
+export interface PackCard {
+  id: string;
+  verbatimLabel: string;
+  displayLabel: string;
+  aliases: string[];
+  domainId: string;
+  summary: string;
+}
+
+// The current Pack Version a new version is built from (a pack detail response satisfies it).
+export interface PackVersionBase {
+  id: string;
+  title: string;
+  version: string;
+  description: string;
+  boardConfig: { rows: number; cols: number };
+  domains: readonly { id: string }[];
+  cards: readonly PackCard[];
+  adjudicationRubric: unknown;
+  assessmentInstrument?: unknown;
+  perceptionSurvey?: unknown;
+}
+
+// The new version's body: only CurriculumPackInput's fields, so response-only fields of the base
+// (such as isSystemPack) are never sent.
+export interface PackVersionInput<B extends PackVersionBase> {
+  id: string;
+  title: string;
+  version: string;
+  description: string;
+  boardConfig: B["boardConfig"];
+  domains: B["domains"];
+  cards: PackCard[];
+  adjudicationRubric: B["adjudicationRubric"];
+  assessmentInstrument: Exclude<B["assessmentInstrument"], undefined> | null;
+  perceptionSurvey: Exclude<B["perceptionSurvey"], undefined> | null;
+}
+
+// A new Pack Version of `base` from the draft: same id, the next version, and the title and description
+// replaced only if given. Words matched to a card by label (ignoring case) keep that card unchanged;
+// new words get new unique card ids in the first Semantic Domain. The board shrinks to fit the word
+// count (never below 3 × 3). Domains, rubric, assessment and survey are kept.
+export function packVersionInput<B extends PackVersionBase>(draft: NewPackDraft, base: B): PackVersionInput<B> {
+  const title = normalisedName(draft.name);
+  const description = [draft.level, draft.objective].map(part => part.trim()).filter(Boolean).join(" · ");
+  const byLabel = new Map(base.cards.map(card => [
+    (card.displayLabel || card.verbatimLabel).toLowerCase(),
+    card,
+  ]));
+  const kept = draft.words.map(word => byLabel.get(word.toLowerCase()) ?? null);
+  const keptIds = new Set(kept.filter(card => card !== null).map(card => card.id));
+  const newIds = cardIds(draft.words.filter((_, i) => !kept[i]), keptIds);
+  const domainId = base.domains[0]?.id ?? "general";
+  let next = 0;
+  const cards = draft.words.map((word, i) => kept[i] ?? {
+    id: newIds[next++]!,
+    verbatimLabel: word,
+    displayLabel: word,
+    aliases: [],
+    domainId,
+    summary: word,
+  });
+  const side = Math.max(MIN_BOARD_SIZE, Math.min(base.boardConfig.rows, Math.floor(Math.sqrt(cards.length))));
+  return {
+    id: base.id,
+    title: title || base.title,
+    version: nextVersion(base.version),
+    description: description || base.description,
+    boardConfig: { ...base.boardConfig, rows: side, cols: side },
+    domains: base.domains,
+    cards,
+    adjudicationRubric: base.adjudicationRubric,
+    assessmentInstrument: (base.assessmentInstrument ?? null) as PackVersionInput<B>["assessmentInstrument"],
+    perceptionSurvey: (base.perceptionSurvey ?? null) as PackVersionInput<B>["perceptionSurvey"],
   };
 }

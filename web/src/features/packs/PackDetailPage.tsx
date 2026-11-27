@@ -114,6 +114,10 @@ function PackContent({ pack }: PackContentProps) {
           <Link className="btn primary" to={`/setup?packId=${encodeURIComponent(pack.id)}`} aria-label={`Start Game with Pack ${pack.title}`}>
             Start Game with Pack
           </Link>
+          {/* System Packs can't be given new versions (403 PACK_IS_SYSTEM_PACK), so the action is hidden. */}
+          {!pack.isSystemPack && (
+            <Link className="btn" to={`/packs/${encodeURIComponent(pack.id)}/new-version`}>Edit → save as new version</Link>
+          )}
           <Link className="btn" to="/packs">Back to the Pack Library</Link>
         </div>
       </section>

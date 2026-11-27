@@ -1,11 +1,13 @@
 import type { ChangeEvent } from "react";
+import type { CurriculumPackDetail } from "../../api/packs-api.ts";
 import type { PackEditorField, PackEditorProblem, WordsAdded } from "../../domain/pack-editor.ts";
 import { useRef, useState } from "react";
-import { Link, useNavigate } from "react-router";
+import { Link, useNavigate, useParams } from "react-router";
 import {
   addWords,
   MIN_PACK_WORDS,
   newPackProblem,
+  nextVersion,
   packWords,
   wordCountNote,
   wordFileProblem,
@@ -13,7 +15,7 @@ import {
 } from "../../domain/pack-editor.ts";
 import { packCheckSummary, packRefusalIssues, packRefusalSentence } from "../../domain/pack-library.ts";
 import { ErrorBanner } from "../shared/ErrorBanner.tsx";
-import { useCheckPack, useFetchPack, usePackList, usePublishPack } from "./pack-hooks.ts";
+import { useCheckPack, useFetchPack, usePack, usePackList, usePublishPack } from "./pack-hooks.ts";
 import { PackIssueList } from "./PackIssueList.tsx";
 
 // The prototype's learner level suggestions (setup.html, datalist "levels").
@@ -32,10 +34,47 @@ function plural(count: number, word: string): string {
     : "s"}`;
 }
 
-// The Pack Editor (/packs/new): a new Curriculum Pack from pasted, uploaded or copied words (look from the "New pack" panel
-// of claudPoc/concept-chain/setup.html). Check pack dry-runs the server's validator; Publish registers the pack
-// and opens its Pack Detail, handing it the validator's warnings.
+// The Pack Editor (/packs/new): a new Curriculum Pack from pasted, uploaded or copied words.
 export function PackEditorPage() {
+  return <PackEditor base={null} />;
+}
+
+// Edit → save as new version (/packs/:packId/new-version): the Pack Editor prefilled from the pack's
+// current version. The pack is read from the URL, so a reload gives the same prefill.
+export function PackVersionEditorPage() {
+  const { packId = "" } = useParams();
+  const pack = usePack(packId);
+  if (pack.data)
+    return <PackEditor base={pack.data} />;
+  return (
+    <div className="wrap">
+      {pack.isPending && <p className="note">Loading the pack…</p>}
+      {pack.error && (
+        <section className="panel">
+          <Link className="btn" to="/packs">Back to the Pack Library</Link>
+        </section>
+      )}
+      <ErrorBanner
+        sentence={pack.error
+          ? packRefusalSentence(pack.error)
+          : null}
+        error={pack.error}
+      />
+    </div>
+  );
+}
+
+interface PackEditorProps {
+  // The pack's current version, for a new Pack Version; null for a new pack.
+  base: CurriculumPackDetail | null;
+}
+
+// The editor (look from the "New pack" panel of claudPoc/concept-chain/setup.html). Check pack dry-runs the
+// server's validator; Publish registers the pack (or the new version) and opens its Pack Detail, handing it the
+// validator's warnings.
+function PackEditor(props: PackEditorProps) {
+  // The version being edited stays as it was opened, even when a publish refetches the pack.
+  const [base] = useState(props.base);
   const navigate = useNavigate();
   const publish = usePublishPack();
   const check = useCheckPack();
@@ -43,9 +82,11 @@ export function PackEditorPage() {
   const fetchPack = useFetchPack();
   const [fromId, setFromId] = useState("");
   const [pasted, setPasted] = useState("");
-  const [words, setWords] = useState<string[]>([]);
+  const [words, setWords] = useState<string[]>(() => base
+    ? packWords(base)
+    : []);
   const [addedNote, setAddedNote] = useState("");
-  const [name, setName] = useState("");
+  const [name, setName] = useState(base?.title ?? "");
   const [level, setLevel] = useState("");
   const [objective, setObjective] = useState("");
   const [problem, setProblem] = useState<PackEditorProblem | null>(null);
@@ -147,14 +188,27 @@ export function PackEditorPage() {
   }
 
   function handleCheck() {
-    if (draftReady())
-      check.mutate({ name, level, objective, words });
+    if (draftReady()) {
+      check.mutate({
+        name,
+        level,
+        objective,
+        words,
+        base: base ?? undefined,
+      });
+    }
   }
 
   function handlePublish() {
     if (!draftReady())
       return;
-    publish.mutate({ name, level, objective, words }, {
+    publish.mutate({
+      name,
+      level,
+      objective,
+      words,
+      base: base ?? undefined,
+    }, {
       // The warnings ride along in the location state, for Pack Detail to show.
       onSuccess: result => navigate(`/packs/${encodeURIComponent(result.packId)}`, {
         state: { publishWarnings: result.warnings },
@@ -172,7 +226,11 @@ export function PackEditorPage() {
     <div className="wrap">
       <section className="panel" aria-labelledby="pack-editor-heading">
         <div className="row between">
-          <h2 id="pack-editor-heading">New pack</h2>
+          <h2 id="pack-editor-heading">
+            {base
+              ? `Edit “${base.title}” → save as v${nextVersion(base.version)}`
+              : "New pack"}
+          </h2>
           <span className="eyebrow">Saved to the shared pack library</span>
         </div>
         <div className="editor">

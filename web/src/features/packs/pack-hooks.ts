@@ -3,7 +3,7 @@ import type { CurriculumPackDetail, CurriculumPackInput, CurriculumPackListItem,
 import type { NewPackDraft } from "../../domain/pack-editor.ts";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { archivePack, getPackById, listPacks, registerPack, unarchivePack, validatePack } from "../../api/packs-api.ts";
-import { newPackInput } from "../../domain/pack-editor.ts";
+import { newPackInput, packVersionInput } from "../../domain/pack-editor.ts";
 
 // The only packs file that uses TanStack Query. Screens call these hooks by what they do;
 // each returns TanStack's result object (`data`, `error`, `isPending`, `mutate`, ...).
@@ -84,9 +84,18 @@ export function useUnarchivePack() {
   });
 }
 
-// The pack a draft becomes: every pack id is read first (archived ones too, fresh, not from the cache)
-// so the new id is unique, as Check pack and Publish both need.
-async function draftPackInput(draft: NewPackDraft): Promise<CurriculumPackInput> {
+// What the Pack Editor checks or publishes: the teacher's draft, and for a new Pack Version the pack's
+// current version it is built from.
+export interface PackEditorDraft extends NewPackDraft {
+  base?: CurriculumPackDetail;
+}
+
+// The pack a draft becomes. A new version keeps its base's id (and drops response-only fields such as
+// isSystemPack). For a new pack, every pack id is read first (archived ones too, fresh, not from the
+// cache) so the new id is unique, as Check pack and Publish both need.
+async function draftPackInput({ base, ...draft }: PackEditorDraft): Promise<CurriculumPackInput> {
+  if (base)
+    return packVersionInput(draft, base);
   const library = await listPacks({ includeArchived: true });
   return newPackInput(draft, library.map(pack => pack.id));
 }
@@ -95,18 +104,19 @@ async function draftPackInput(draft: NewPackDraft): Promise<CurriculumPackInput>
 // the Account Token. Nothing is saved, so no pack screen refreshes. `mutate(draft)`; `data` holds
 // `{ valid, errors, warnings }`, `error` a refusal.
 export function useCheckPack() {
-  return useMutation<PackValidation, ApiHttpError, NewPackDraft>({
+  return useMutation<PackValidation, ApiHttpError, PackEditorDraft>({
     // The calls `mutate(draft)` makes.
     mutationFn: async draft => validatePack(await draftPackInput(draft)),
   });
 }
 
-// Publish a new pack from the Pack Editor: build the pack from the draft (with a unique id) and
+// Publish from the Pack Editor: build the pack from the draft (a new pack with a unique id, or a new
+// Pack Version of `draft.base` under its id) and
 // POST /api/v1/packs with the Account Token; then every pack screen refreshes. `mutate(draft)`;
 // `data.packId` is the new pack's id, `data.warnings` what the validator noted.
 export function usePublishPack() {
   const refreshPacks = useRefreshPacks();
-  return useMutation<PackRegistered, ApiHttpError, NewPackDraft>({
+  return useMutation<PackRegistered, ApiHttpError, PackEditorDraft>({
     // The calls `mutate(draft)` makes.
     mutationFn: async draft => registerPack(await draftPackInput(draft)),
     // Runs once the pack is registered: refetch the lists and the pack's detail.

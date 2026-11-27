@@ -646,3 +646,219 @@ describe("pack Editor Check pack and publish refusals (react-pack-editor 03)", (
     expect(registerRequests(requests)).toHaveLength(1);
   });
 });
+
+// Thyroid basics v1.1.0 with ten cards (the fixture's three plus seven more), enough to publish.
+const MORE_THYROID_CARDS = [
+  "T3",
+  "Iodine",
+  "Thyroglobulin",
+  "Goitre",
+  "TRH",
+  "Hypothalamus",
+  "Pituitary",
+].map(label => ({
+  id: label.toLowerCase(),
+  verbatimLabel: label,
+  displayLabel: label,
+  aliases: [],
+  domainId: "disorders",
+  summary: `About ${label}.`,
+}));
+
+function thyroidDetail(overrides: Record<string, unknown> = {}) {
+  const base = packDetail();
+  return packDetail({
+    cards: [
+      ...base.cards,
+      ...MORE_THYROID_CARDS,
+    ],
+    ...overrides,
+  });
+}
+
+const THYROID_WORDS = [
+  "TSH",
+  "T4",
+  "Graves disease",
+  ...MORE_THYROID_CARDS.map(card => card.displayLabel),
+];
+
+// A fake API whose Thyroid basics pack (archived or not) moves to the version a register sends.
+function versionApi(detail = thyroidDetail()) {
+  let current = detail;
+  let listed = { ...thyroidPack, cardCount: 10 };
+  return installFakeFetch({
+    "GET /api/v1/accounts/me": me,
+    "GET /api/v1/packs": async () => packListReply([systemPack, listed]),
+    "GET /api/v1/packs/thyroid-basics": async () => packDetailReply(current),
+    "POST /api/v1/packs": async (request) => {
+      const body = request.body as typeof current;
+      current = { ...body, isSystemPack: false };
+      listed = {
+        ...listed,
+        version: body.version,
+        isArchived: false,
+        cardCount: body.cards.length,
+      };
+      return registered(request);
+    },
+  });
+}
+
+describe("pack Editor: Edit → save as new version (react-pack-editor 04)", () => {
+  it("opens from Pack Detail prefilled with the pack's name and words, the heading naming the next minor version", async () => {
+    versionApi();
+    signInTeacher();
+    const user = userEvent.setup();
+    const { router } = renderApp("/packs/thyroid-basics");
+
+    await user.click(await screen.findByRole("link", { name: "Edit → save as new version" }));
+
+    expect(router.state.location.pathname).toBe("/packs/thyroid-basics/new-version");
+    expect(await screen.findByRole("heading", { name: "Edit “Thyroid basics” → save as v1.2.0" })).toBeTruthy();
+    expect(chips()).toEqual(THYROID_WORDS);
+    expect((screen.getByLabelText("Pack name") as HTMLInputElement).value).toBe("Thyroid basics");
+  });
+
+  it("publishes the same id at v1.2.0, keeping domains, rubric, assessment, survey and kept cards, with one new unique card and no isSystemPack", async () => {
+    const base = thyroidDetail();
+    const requests = versionApi(base);
+    signInTeacher();
+    const user = userEvent.setup();
+    renderApp("/packs/thyroid-basics/new-version");
+
+    await user.click(await screen.findByRole("button", { name: "Remove T4" }));
+    await pasteWords(user, "Graves");
+    await user.click(screen.getByRole("button", { name: "Publish" }));
+
+    await waitFor(() => expect(registerRequests(requests)).toHaveLength(1));
+    const register = registerRequests(requests)[0]!;
+    expect(register.headers.authorization).toBe("Bearer account.header.signature");
+    const body = register.body as Record<string, any>;
+    expect(body).not.toHaveProperty("isSystemPack");
+    expect(Object.keys(body).sort()).toEqual([
+      "adjudicationRubric",
+      "assessmentInstrument",
+      "boardConfig",
+      "cards",
+      "description",
+      "domains",
+      "id",
+      "perceptionSurvey",
+      "title",
+      "version",
+    ]);
+    expect(body.id).toBe("thyroid-basics");
+    expect(body.version).toBe("1.2.0");
+    expect(body.title).toBe("Thyroid basics");
+    expect(body.description).toBe(base.description);
+    expect(body.domains).toEqual(base.domains);
+    expect(body.adjudicationRubric).toEqual(base.adjudicationRubric);
+    expect(body.assessmentInstrument).toEqual(base.assessmentInstrument);
+    expect(body.perceptionSurvey).toEqual(base.perceptionSurvey);
+    // Ten words: nine kept cards, unchanged, and "Graves" as a new card in the first domain.
+    expect(body.cards).toHaveLength(10);
+    expect(body.cards.slice(0, 9)).toEqual(base.cards.filter(card => card.id !== "t4"));
+    expect(body.cards[9]).toEqual({
+      id: "graves-2",
+      verbatimLabel: "Graves",
+      displayLabel: "Graves",
+      aliases: [],
+      domainId: "physiology",
+      summary: "Graves",
+    });
+    expect(new Set(body.cards.map((card: { id: string }) => card.id)).size).toBe(10);
+    // The 5 × 6 board shrinks to fit ten words (never below 3); the chain rules are kept.
+    expect(body.boardConfig).toEqual({
+      rows: 3,
+      cols: 3,
+      minChainLength: 3,
+      adjacencyRule: "chebyshev-8",
+    });
+  });
+
+  it("replaces the title and description only when given", async () => {
+    const requests = versionApi();
+    signInTeacher();
+    const user = userEvent.setup();
+    renderApp("/packs/thyroid-basics/new-version");
+
+    const name = await screen.findByLabelText("Pack name");
+    await user.clear(name);
+    await user.type(name, "Thyroid essentials");
+    await user.type(screen.getByLabelText(/Learner level/), "Clinical years");
+    await user.click(screen.getByRole("button", { name: "Publish" }));
+
+    await waitFor(() => expect(registerRequests(requests)).toHaveLength(1));
+    const body = registerRequests(requests)[0]!.body as Record<string, any>;
+    expect(body.id).toBe("thyroid-basics");
+    expect(body.title).toBe("Thyroid essentials");
+    expect(body.description).toBe("Clinical years");
+  });
+
+  it("after a 201 refetches the list and the detail before landing on Pack Detail at v1.2.0, and the library lists v1.2.0", async () => {
+    const requests = versionApi(thyroidDetail());
+    signInTeacher();
+    const user = userEvent.setup();
+    const { router } = renderApp("/packs/thyroid-basics");
+    // Where the teacher was when each request was sent.
+    const sentFrom = new Map<RecordedRequest, string>();
+    let seen = 0;
+    const fetchSpy = vi.mocked(fetch);
+    fetchSpy.mockImplementation((original => async (...args: Parameters<typeof fetch>) => {
+      const reply = original(...args);
+      for (; seen < requests.length; seen++)
+        sentFrom.set(requests[seen]!, router.state.location.pathname);
+      return reply;
+    })(fetchSpy.getMockImplementation()!));
+    await user.click(await screen.findByRole("link", { name: "Edit → save as new version" }));
+    await screen.findByRole("heading", { name: "Edit “Thyroid basics” → save as v1.2.0" });
+
+    await user.click(screen.getByRole("button", { name: "Publish" }));
+
+    await waitFor(() => expect(router.state.location.pathname).toBe("/packs/thyroid-basics"));
+    expect(screen.getByText("v1.2.0")).toBeTruthy();
+    expect(screen.queryByText("v1.1.0")).toBeNull();
+    // The list and detail queries were invalidated: both were read again while still in the editor.
+    const afterPublish = requests.slice(requests.indexOf(registerRequests(requests)[0]!) + 1);
+    const refetchedInEditor = afterPublish
+      .filter(r => r.method === "GET" && sentFrom.get(r) === "/packs/thyroid-basics/new-version")
+      .map(r => r.path);
+    expect(refetchedInEditor).toEqual(expect.arrayContaining(["/api/v1/packs", "/api/v1/packs/thyroid-basics"]));
+
+    await user.click(screen.getByRole("link", { name: "Back to the Pack Library" }));
+    const item = await screen.findByRole("listitem", { name: "Thyroid basics" });
+    expect(await within(item).findByText(/v1\.2\.0/)).toBeTruthy();
+  });
+
+  it("reloading the new-version route reads the pack again and gives the same prefill", async () => {
+    const requests = versionApi();
+    signInTeacher();
+    renderApp("/packs/thyroid-basics/new-version");
+
+    expect(await screen.findByRole("heading", { name: "Edit “Thyroid basics” → save as v1.2.0" })).toBeTruthy();
+    expect(chips()).toEqual(THYROID_WORDS);
+    expect((screen.getByLabelText("Pack name") as HTMLInputElement).value).toBe("Thyroid basics");
+    expect(requests.some(r => r.method === "GET" && r.path === "/api/v1/packs/thyroid-basics")).toBe(true);
+  });
+
+  it("names v1.0.0 when the pack's version is not MAJOR.MINOR.PATCH", async () => {
+    versionApi(thyroidDetail({ version: "2024-draft" }));
+    signInTeacher();
+    renderApp("/packs/thyroid-basics/new-version");
+
+    expect(await screen.findByRole("heading", { name: "Edit “Thyroid basics” → save as v1.0.0" })).toBeTruthy();
+  });
+
+  it("a System Pack's detail page has no save-as-new-version action", async () => {
+    installFakeFetch({
+      "GET /api/v1/accounts/me": me,
+      "GET /api/v1/packs/diabe-teach": packDetailReply(packDetail({ id: "diabe-teach", title: "Diabe-teach", isSystemPack: true })),
+    });
+    signInTeacher();
+    renderApp("/packs/diabe-teach");
+
+    expect(await screen.findByRole("heading", { name: "Diabe-teach" })).toBeTruthy();
+    expect(screen.queryByRole("link", { name: /save as new version/ })).toBeNull();
+  });
+});
