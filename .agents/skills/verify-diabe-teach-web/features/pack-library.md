@@ -15,7 +15,7 @@ A signed-in teacher opens `/packs` and sees the shared library's Curriculum Pack
 
 ## How to get to it (user POV)
 
-- Sign in at `http://localhost:5173/login`, then go to `http://localhost:5173/packs`. There is no link to `/packs` from `/setup` or the TopBar yet, so type the URL.
+- Sign in at `http://localhost:5173/login`, then go to `http://localhost:5173/packs`. Or click `Packs` in the TopBar of any teacher screen.
 - Pack Detail opens from a pack's title link on `/packs`, or directly at `/packs/<packId>`.
 
 ## Driving it with Claude in Chrome

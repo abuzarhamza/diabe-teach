@@ -166,3 +166,44 @@ export async function unarchivePack(packId: string): Promise<PackUnarchived> {
     },
   });
 }
+
+// docs/api/openapi.yaml CurriculumPackInput: a pack's content as registered (a new pack, or a new Pack
+// Version under an existing id).
+export interface CurriculumPackInput {
+  id: string;
+  title: string;
+  version: string;
+  description: string;
+  boardConfig: BoardConfig;
+  domains: SemanticDomain[];
+  cards: KeywordCard[];
+  adjudicationRubric: AdjudicationRubric;
+  assessmentInstrument: { questions: PublicAssessmentQuestion[] } | null;
+  perceptionSurvey: { items: PerceptionSurveyItem[] } | null;
+}
+
+// docs/api/openapi.yaml PackValidationIssue.
+export interface PackValidationIssue {
+  path: string;
+  code: string;
+  message: string;
+}
+
+// docs/api/openapi.yaml registerCurriculumPack 201 body.
+export interface PackRegistered {
+  packId: string;
+  version: string;
+  warnings: PackValidationIssue[];
+}
+
+// POST /api/v1/packs (201) with the Account Token. An existing id and version is refused with 409
+// PACK_ALREADY_EXISTS; a new version of a System Pack with 403 PACK_IS_SYSTEM_PACK.
+export async function registerPack(input: CurriculumPackInput): Promise<PackRegistered> {
+  return apiRequest<PackRegistered>("POST", "/api/v1/packs", {
+    body: input,
+    auth: {
+      kind: "account",
+      token: accountToken(),
+    },
+  });
+}

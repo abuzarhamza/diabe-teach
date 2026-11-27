@@ -86,7 +86,10 @@ export function PackLibraryPage() {
   return (
     <div className="wrap">
       <section className="panel" aria-labelledby="pack-library-heading">
-        <h2 id="pack-library-heading">Pack Library</h2>
+        <div className="row between">
+          <h2 id="pack-library-heading">Pack Library</h2>
+          <Link className="btn sm primary" to="/packs/new">New pack</Link>
+        </div>
         <label className="archtoggle">
           <input type="checkbox" checked={showArchived} onChange={event => setShowArchived(event.target.checked)} />
           {" "}

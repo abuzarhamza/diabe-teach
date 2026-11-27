@@ -4,6 +4,7 @@ Put **pure UI domain rules and calculations** here (per [ADR-0008](../../../docs
 - Board path adjacency (`chain-path.ts`)
 - Phase countdown and grace-period math (`phase-timer.ts`)
 - Game Session phase-to-view mapping (`session-phase.ts`)
+- Pack Editor rules: word cleaning, board size, pack and card ids, the new-pack body (`pack-editor.ts`)
 
 ## Boundary Rules (Enforced by `npm run lint:boundaries`)
 - **Pure TypeScript only.**

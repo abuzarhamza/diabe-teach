@@ -1,7 +1,9 @@
 import type { ApiHttpError } from "../../api/http-client.ts";
-import type { CurriculumPackDetail, CurriculumPackListItem, PackArchived, PackUnarchived } from "../../api/packs-api.ts";
+import type { CurriculumPackDetail, CurriculumPackListItem, PackArchived, PackRegistered, PackUnarchived } from "../../api/packs-api.ts";
+import type { NewPackDraft } from "../../domain/pack-editor.ts";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { archivePack, getPackById, listPacks, unarchivePack } from "../../api/packs-api.ts";
+import { archivePack, getPackById, listPacks, registerPack, unarchivePack } from "../../api/packs-api.ts";
+import { newPackInput } from "../../domain/pack-editor.ts";
 
 // The only packs file that uses TanStack Query. Screens call these hooks by what they do;
 // each returns TanStack's result object (`data`, `error`, `isPending`, `mutate`, ...).
@@ -65,6 +67,22 @@ export function useUnarchivePack() {
     // The call `mutate(packId)` makes.
     mutationFn: unarchivePack,
     // Runs once the pack is unarchived: refetch the lists.
+    onSuccess: refreshPacks,
+  });
+}
+
+// Publish a new pack from the Pack Editor: read every pack id (archived ones too, so the new id is
+// unique), build the pack from the draft, and POST /api/v1/packs with the Account Token; then every pack
+// screen refreshes. `mutate(draft)`; `data.packId` is the new pack's id.
+export function usePublishPack() {
+  const refreshPacks = useRefreshPacks();
+  return useMutation<PackRegistered, ApiHttpError, NewPackDraft>({
+    // The calls `mutate(draft)` makes.
+    mutationFn: async (draft) => {
+      const library = await listPacks({ includeArchived: true });
+      return registerPack(newPackInput(draft, library.map(pack => pack.id)));
+    },
+    // Runs once the pack is registered: refetch the lists and the pack's detail.
     onSuccess: refreshPacks,
   });
 }
