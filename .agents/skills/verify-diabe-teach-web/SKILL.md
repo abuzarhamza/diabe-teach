@@ -1,6 +1,6 @@
 ---
 name: verify-diabe-teach-web
-description: "Launch, health-check and drive the diabe-teach React web app (web/, Vite on localhost:5173 proxying to the dev:prototype API on :8888) in a real Chrome browser the way a teacher or learner does, and capture redacted screenshots, page-state and console evidence in .verification/. Use to prove a web/ change works in the running app (not just in jsdom screen tests): teacher sign in and its refusals, create account, the signed-in panel and TopBar Sign out, the signed-out redirect to /login, and learners joining by room code into the Lobby."
+description: "Launch, health-check and drive the diabe-teach React web app (web/, Vite on localhost:5173 proxying to the dev:prototype API on :8888) in a real Chrome browser the way a teacher or learner does, and capture redacted screenshots, page-state and console evidence in .verification/. Use to prove a web/ change works in the running app (not just in jsdom screen tests): teacher sign in and its refusals, create account, the signed-in panel and TopBar Sign out, the signed-out redirect to /login, learners joining by room code into the Lobby, and the Pack Library and Pack Detail."
 ---
 
 # Verify the diabe-teach web app
@@ -11,6 +11,7 @@ description: "Launch, health-check and drive the diabe-teach React web app (web/
 |---|---|---|
 | `/login` | teacher and learner | form `Teacher sign in` (Email, Password, `Sign in`, `Create account`), or the signed-in panel; below it, form `Join a game` (Room code, Your name, `Join`) |
 | `/setup` | teacher only (guard `requireTeacher`) | TopBar ("Signed in as …", `Sign out`) and the Game setup placeholder |
+| `/packs`, `/packs/:packId` | teacher only (same guard) | Pack Library (Show archived, Archive/Unarchive, Start Game with Pack) and read-only Pack Detail |
 | `/sessions/:sessionId` | whoever holds a seat in this tab | Session Shell: polls the session every 2 s, shows the Lobby during `pretest` |
 | anything else | | redirects to `/login` |
 

@@ -128,3 +128,22 @@ dl.facts dt{color:var(--muted)} dl.facts dd{margin:0;font-weight:700}
 
 /* Learner Quick Join (claudPoc/concept-chain/participant.html join form) */
 .code-input{font-family:var(--font-mono);letter-spacing:.12em;text-transform:uppercase}
+
+/* Pack Library and Pack Detail (the pack panel of claudPoc/concept-chain/setup.html) */
+a.btn{display:inline-block;text-decoration:none;color:inherit}
+.packs{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:8px;list-style:none;margin:0;padding:0}
+.pack{display:flex;gap:8px;align-items:center;border:1px solid var(--line);border-radius:8px;padding:8px 10px;background:var(--surface)}
+.pack .nm{font-weight:700;display:block}
+.pack .nm a{color:inherit}
+.pack .nm a:hover{color:var(--accent)}
+.pack .by,.cards-list .by{display:block;font-size:12px;color:var(--muted)}
+.tag{background:var(--sunk);border-radius:999px;padding:1px 8px;font-size:12px;font-weight:700;margin-left:6px;color:var(--muted)}
+.tag.good{color:var(--good)} .tag.bad{color:var(--bad)}
+.packitem{display:flex;flex-direction:column;gap:4px}
+.packitem .pack{flex:1}
+.packitem .acts{display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap}
+.packitem.archived .pack{opacity:.7;border-style:dashed}
+.archtoggle{display:inline-flex;gap:6px;align-items:center;font-size:14px;align-self:flex-start}
+.card-group h4{margin:12px 0 6px}
+.cards-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px;list-style:none;margin:0;padding:0}
+.cards-list li{display:flex;flex-direction:column;gap:2px;border:1px solid var(--line);border-radius:8px;padding:8px 10px;background:var(--surface);font-size:14px}

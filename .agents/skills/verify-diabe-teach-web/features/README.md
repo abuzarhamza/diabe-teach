@@ -49,3 +49,4 @@ Keep implementation details out of the map. Name only user paths, stable handles
 | [Signed-in panel, TopBar and Sign out](./signed-in-panel-and-sign-out.md): panel at `/login`, TopBar on `/setup`, Sign out from each, second-tab sync | not yet run |
 | [Signed-out redirect to /login](./signed-out-redirect.md): signed out, expired, not accepted | not yet run |
 | [Learner joins the Lobby](./learner-join-lobby.md): join refusals, join, live roster across two tabs | 2026-11-27 at `0f7f61a`, run `proof-web-learner-lobby` (all bullets except `join-local-refusals` and `join-no-seat`) |
+| [Pack Library and Pack Detail](./pack-library.md): signed-out redirect, list, archive, show archived, unarchive, detail sections, System Pack, Start Game with Pack | 2026-11-27 on `ba77446` + this change, run `proof-web-pack-library` (all bullets) |
