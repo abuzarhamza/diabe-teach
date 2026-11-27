@@ -1,10 +1,11 @@
 import type { ReactNode } from "react";
 import type { CurriculumPackDetail, KeywordCard } from "../../api/packs-api.ts";
 import { useId } from "react";
-import { Link, useParams } from "react-router";
-import { boardSummary, packRefusalSentence } from "../../domain/pack-library.ts";
+import { Link, useLocation, useParams } from "react-router";
+import { boardSummary, packRefusalSentence, publishWarningsFrom } from "../../domain/pack-library.ts";
 import { ErrorBanner } from "../shared/ErrorBanner.tsx";
 import { usePack } from "./pack-hooks.ts";
+import { PackIssueList } from "./PackIssueList.tsx";
 
 interface PackSectionProps {
   title: string;
@@ -165,13 +166,21 @@ function PackContent({ pack }: PackContentProps) {
   );
 }
 
-// Pack Detail (/packs/:packId): everything in one Curriculum Pack, read-only.
+// Pack Detail (/packs/:packId): everything in one Curriculum Pack, read-only. Arriving from the Pack
+// Editor's Publish, it also lists the validator's warnings (handed over in the location state).
 export function PackDetailPage() {
   const { packId = "" } = useParams();
   const pack = usePack(packId);
+  const publishWarnings = publishWarningsFrom(useLocation().state);
 
   return (
     <div className="wrap">
+      {publishWarnings.length > 0 && (
+        <PackSection title="Published with warnings">
+          <p className="note">Warnings never block publishing; the pack is in the library.</p>
+          <PackIssueList label="Warnings" issues={publishWarnings} tone="warn" />
+        </PackSection>
+      )}
       {pack.isPending && <p className="note">Loading the pack…</p>}
       {pack.data && <PackContent pack={pack.data} />}
       {pack.error && (

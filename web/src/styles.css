@@ -166,3 +166,9 @@ a.btn{display:inline-block;text-decoration:none;color:inherit}
 .count{font-size:14px;font-weight:700}
 .err{color:var(--bad);font-size:13px;font-weight:700;margin:0}
 header.top nav a{font-weight:700;color:var(--accent)}
+/* Check pack results and publish warnings (react-pack-editor 03): errors and warnings in separate lists. */
+.check-results{margin-top:12px}
+.check-results .ok{color:var(--good);font-size:14px;font-weight:700;margin:0}
+.issues h4{margin:10px 0 4px}
+.issues ul{margin:0;padding-left:20px;font-size:14px;overflow-wrap:anywhere}
+.issues.err li::marker{color:var(--bad)} .issues.warn li::marker{color:var(--warn)}

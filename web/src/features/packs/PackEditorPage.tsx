@@ -11,9 +11,10 @@ import {
   wordFileProblem,
   wordsAddedNote,
 } from "../../domain/pack-editor.ts";
-import { packRefusalSentence } from "../../domain/pack-library.ts";
+import { packCheckSummary, packRefusalIssues, packRefusalSentence } from "../../domain/pack-library.ts";
 import { ErrorBanner } from "../shared/ErrorBanner.tsx";
-import { useFetchPack, usePackList, usePublishPack } from "./pack-hooks.ts";
+import { useCheckPack, useFetchPack, usePackList, usePublishPack } from "./pack-hooks.ts";
+import { PackIssueList } from "./PackIssueList.tsx";
 
 // The prototype's learner level suggestions (setup.html, datalist "levels").
 const LEVEL_SUGGESTIONS = [
@@ -32,10 +33,12 @@ function plural(count: number, word: string): string {
 }
 
 // The Pack Editor (/packs/new): a new Curriculum Pack from pasted, uploaded or copied words (look from the "New pack" panel
-// of claudPoc/concept-chain/setup.html). Publish registers it and opens its Pack Detail.
+// of claudPoc/concept-chain/setup.html). Check pack dry-runs the server's validator; Publish registers the pack
+// and opens its Pack Detail, handing it the validator's warnings.
 export function PackEditorPage() {
   const navigate = useNavigate();
   const publish = usePublishPack();
+  const check = useCheckPack();
   const library = usePackList(false);
   const fetchPack = useFetchPack();
   const [fromId, setFromId] = useState("");
@@ -53,6 +56,11 @@ export function PackEditorPage() {
   // The pack "Copy its words" reads: the one picked, else the first in the library.
   const fromPackId = fromId || packs[0]?.id || "";
 
+  // An edit makes the last Check pack result stale, so it is dropped.
+  function edited() {
+    check.reset();
+  }
+
   function focusField(field: PackEditorField) {
     (field === "words"
       ? pasteRef
@@ -65,6 +73,7 @@ export function PackEditorPage() {
     setWords(result.words);
     setAddedNote(wordsAddedNote(result, source));
     setProblem(null);
+    edited();
     return result;
   }
 
@@ -116,6 +125,7 @@ export function PackEditorPage() {
     (buttons[index + 1] ?? buttons[index - 1] ?? pasteRef.current)?.focus();
     const rest = words.filter((_, i) => i !== index);
     setWords(rest);
+    edited();
     if (!rest.length)
       setAddedNote("");
   }
@@ -124,21 +134,39 @@ export function PackEditorPage() {
     setWords([]);
     setAddedNote("");
     setProblem(null);
+    edited();
+  }
+
+  // The client's checks (word count, name, word length), run before any request; a problem moves focus.
+  function draftReady(): boolean {
+    const found = newPackProblem({ name, words });
+    setProblem(found);
+    if (found)
+      focusField(found.field);
+    return !found;
+  }
+
+  function handleCheck() {
+    if (draftReady())
+      check.mutate({ name, level, objective, words });
   }
 
   function handlePublish() {
-    const found = newPackProblem({ name, words });
-    setProblem(found);
-    if (found) {
-      focusField(found.field);
+    if (!draftReady())
       return;
-    }
     publish.mutate({ name, level, objective, words }, {
-      onSuccess: result => navigate(`/packs/${encodeURIComponent(result.packId)}`),
+      // The warnings ride along in the location state, for Pack Detail to show.
+      onSuccess: result => navigate(`/packs/${encodeURIComponent(result.packId)}`, {
+        state: { publishWarnings: result.warnings },
+      }),
     });
   }
 
-  const refusal = publish.error ?? fetchPack.error;
+  // Check pack and Publish wait for each other, so a double click sends one request.
+  const busy = check.isPending || publish.isPending;
+  const refusal = publish.error ?? check.error ?? fetchPack.error;
+  // A 422 refusal's issues, else the last Check pack result.
+  const issues = (publish.error && packRefusalIssues(publish.error)) ?? check.data ?? null;
 
   return (
     <div className="wrap">
@@ -213,7 +241,10 @@ export function PackEditorPage() {
               maxLength={80}
               autoComplete="off"
               value={name}
-              onChange={event => setName(event.target.value)}
+              onChange={(event) => {
+                setName(event.target.value);
+                edited();
+              }}
             />
           </div>
           <div className="field">
@@ -229,7 +260,10 @@ export function PackEditorPage() {
               maxLength={60}
               placeholder="e.g. Year 2 medicine"
               value={level}
-              onChange={event => setLevel(event.target.value)}
+              onChange={(event) => {
+                setLevel(event.target.value);
+                edited();
+              }}
             />
             <datalist id="pack-levels">
               {LEVEL_SUGGESTIONS.map(suggestion => <option key={suggestion} value={suggestion} />)}
@@ -246,12 +280,16 @@ export function PackEditorPage() {
               maxLength={300}
               placeholder="e.g. Explain how insulin resistance leads to type 2 diabetes complications"
               value={objective}
-              onChange={event => setObjective(event.target.value)}
+              onChange={(event) => {
+                setObjective(event.target.value);
+                edited();
+              }}
             />
           </div>
           {problem && <p className="err" role="alert">{problem.sentence}</p>}
           <div className="row">
-            <button className="btn primary" type="button" disabled={publish.isPending} onClick={handlePublish}>Publish</button>
+            <button className="btn" type="button" disabled={busy} onClick={handleCheck}>Check pack</button>
+            <button className="btn primary" type="button" disabled={busy} onClick={handlePublish}>Publish</button>
             <Link className="btn" to="/packs">Cancel</Link>
           </div>
         </div>
@@ -260,7 +298,28 @@ export function PackEditorPage() {
             ? packRefusalSentence(refusal)
             : null}
           error={refusal}
+          alert
         />
+        {issues && (
+          <section className="check-results" aria-labelledby="pack-check-heading">
+            <h3 id="pack-check-heading">Pack check</h3>
+            {/* A Check pack result says whether it can be published; a 422 refusal already said so above. */}
+            {check.data === issues && (
+              <p
+                className={issues.errors.length
+                  ? "err"
+                  : "ok"}
+                role={issues.errors.length
+                  ? "alert"
+                  : "status"}
+              >
+                {packCheckSummary(issues)}
+              </p>
+            )}
+            <PackIssueList label="Errors" issues={issues.errors} tone="err" />
+            <PackIssueList label="Warnings" issues={issues.warnings} tone="warn" />
+          </section>
+        )}
       </section>
     </div>
   );

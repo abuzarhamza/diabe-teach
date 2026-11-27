@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { installFakeFetch } from "../../support/fake-fetch.ts";
 import {
+  ACCOUNT_KEY,
   instructorAccountView,
   packDetail,
   packDetailReply,
@@ -392,5 +393,256 @@ describe("pack Editor word list tools (react-pack-editor 02)", () => {
     expect((await screen.findByRole("alert")).textContent)
       .toBe(`Keep each word to 60 characters or fewer (“${long.slice(0, 30)}…”).`);
     expect(registerRequests(requests)).toHaveLength(0);
+  });
+});
+
+const VALIDATE = "POST /api/v1/packs/validate";
+
+function validateRequests(requests: RecordedRequest[]) {
+  return requests.filter(r => r.method === "POST" && r.path === "/api/v1/packs/validate");
+}
+
+const missingSurvey = {
+  path: "perceptionSurvey",
+  code: "OPTIONAL_FIELD_MISSING",
+  message: "Perception survey is not provided. Post-session surveys will not be available.",
+};
+const duplicateCard = {
+  path: "cards[3].id",
+  code: "DUPLICATE_ID",
+  message: "Card id \"liver\" is used more than once.",
+};
+const badRows = {
+  path: "boardConfig.rows",
+  code: "INVALID_VALUE",
+  message: "Board rows must be between 3 and 7.",
+};
+
+// A teacher with a ready pack: ten pasted words and a name.
+async function fillPack(user: ReturnType<typeof userEvent.setup>) {
+  await pasteWords(user, TEN_WORDS);
+  await user.type(screen.getByLabelText("Pack name"), "Diabetes basics");
+}
+
+function issueList(name: "Errors" | "Warnings"): string[] {
+  return within(screen.getByRole("list", { name })).getAllByRole("listitem").map(item => item.textContent ?? "");
+}
+
+function refusal(status: number, code: string, message: string, details: Record<string, unknown> | null = null): FakeAnswer {
+  return {
+    status,
+    body: { code, message, details },
+  };
+}
+
+describe("pack Editor Check pack and publish refusals (react-pack-editor 03)", () => {
+  it("check pack lists errors and warnings apart, each naming its part and path, and registers nothing", async () => {
+    const requests = fakeApi({
+      extra: {
+        [VALIDATE]: {
+          status: 200,
+          body: {
+            valid: false,
+            errors: [duplicateCard, badRows],
+            warnings: [missingSurvey],
+          },
+        },
+      },
+    });
+    signInTeacher();
+    const user = userEvent.setup();
+    renderApp("/packs/new");
+
+    await fillPack(user);
+    await user.click(screen.getByRole("button", { name: "Check pack" }));
+
+    expect((await screen.findByRole("alert")).textContent).toBe("2 errors to fix before publishing.");
+    expect(issueList("Errors")).toEqual([
+      "Keyword Card 4 (cards[3].id): Card id \"liver\" is used more than once.",
+      "Board (boardConfig.rows): Board rows must be between 3 and 7.",
+    ]);
+    expect(issueList("Warnings")).toEqual([
+      "Perception survey (perceptionSurvey): Perception survey is not provided. Post-session surveys will not be available.",
+    ]);
+    const check = validateRequests(requests)[0]!;
+    expect(check.headers.authorization).toBe("Bearer account.header.signature");
+    expect((check.body as { id: string; cards: unknown[] }).id).toBe("diabetes-basics");
+    expect((check.body as { cards: unknown[] }).cards).toHaveLength(10);
+    expect(registerRequests(requests)).toHaveLength(0);
+  });
+
+  it("check pack with only warnings keeps Publish enabled; publishing succeeds and the warnings show on the detail page", async () => {
+    const requests = fakeApi({
+      register: async request => ({
+        ...registered(request),
+        body: {
+          ...registered(request).body,
+          warnings: [missingSurvey],
+        },
+      }),
+      extra: {
+        [VALIDATE]: {
+          status: 200,
+          body: {
+            valid: true,
+            errors: [],
+            warnings: [missingSurvey],
+          },
+        },
+        "GET /api/v1/packs/diabetes-basics": packDetailReply(packDetail({ id: "diabetes-basics", title: "Diabetes basics", version: "1.0.0" })),
+      },
+    });
+    signInTeacher();
+    const user = userEvent.setup();
+    const { router } = renderApp("/packs/new");
+
+    await fillPack(user);
+    await user.click(screen.getByRole("button", { name: "Check pack" }));
+
+    expect((await screen.findByText("No errors: the pack can be published."))).toBeTruthy();
+    expect(screen.queryByRole("list", { name: "Errors" })).toBeNull();
+    expect(issueList("Warnings")).toHaveLength(1);
+    const publish = screen.getByRole("button", { name: "Publish" }) as HTMLButtonElement;
+    expect(publish.disabled).toBe(false);
+
+    await user.click(publish);
+    await waitFor(() => expect(router.state.location.pathname).toBe("/packs/diabetes-basics"));
+    expect(registerRequests(requests)).toHaveLength(1);
+    const published = await screen.findByRole("region", { name: "Published with warnings" });
+    expect(within(published).getByRole("listitem").textContent).toContain("perceptionSurvey");
+  });
+
+  it.each([
+    {
+      reply: refusal(409, "PACK_ALREADY_EXISTS", "Pack diabetes-basics@1.0.0 already exists."),
+      sentence: "Someone released that version of this pack first. Reload the page and try again.",
+    },
+    {
+      reply: refusal(403, "PACK_IS_SYSTEM_PACK", "System pack."),
+      sentence: "Built-in System Packs can't be archived or given new versions.",
+    },
+    {
+      reply: refusal(400, "INVALID_REQUEST_BODY", "Invalid body.", { field: "cards[0].aliases", reason: "must be array" }),
+      sentence: "The server refused Keyword Card 1 (cards[0].aliases): must be array.",
+    },
+    {
+      reply: refusal(422, "PACK_VALIDATION_FAILED", "Failed.", {
+        errors: [badRows],
+        warnings: [missingSurvey],
+      }),
+      sentence: "The server refused the pack: 1 error to fix, listed below.",
+    },
+    {
+      reply: "network-error" as const,
+      sentence: "Can't reach the API. Start it with `npm run dev:local`.",
+    },
+  ])("publish refused with $sentence keeps the teacher on the editor with the words", async ({ reply, sentence }) => {
+    const requests = fakeApi({ register: reply });
+    signInTeacher();
+    const user = userEvent.setup();
+    const { router } = renderApp("/packs/new");
+
+    await fillPack(user);
+    await user.click(screen.getByRole("button", { name: "Publish" }));
+
+    expect((await screen.findByRole("alert")).textContent).toContain(sentence);
+    expect(router.state.location.pathname).toBe("/packs/new");
+    expect(chips()).toHaveLength(10);
+    expect(registerRequests(requests)).toHaveLength(1);
+  });
+
+  it("lists a 422 refusal's errors and warnings apart", async () => {
+    fakeApi({
+      register: refusal(422, "PACK_VALIDATION_FAILED", "Failed.", {
+        errors: [badRows],
+        warnings: [missingSurvey],
+      }),
+    });
+    signInTeacher();
+    const user = userEvent.setup();
+    renderApp("/packs/new");
+
+    await fillPack(user);
+    await user.click(screen.getByRole("button", { name: "Publish" }));
+
+    await screen.findByRole("alert");
+    expect(issueList("Errors")).toEqual(["Board (boardConfig.rows): Board rows must be between 3 and 7."]);
+    expect(issueList("Warnings")).toHaveLength(1);
+  });
+
+  it("a 401 on Publish clears the Account Token and sends the teacher to /login with the reason", async () => {
+    fakeApi({
+      register: refusal(401, "UNAUTHORIZED_TOKEN", "Token expired."),
+    });
+    signInTeacher();
+    const user = userEvent.setup();
+    const { router } = renderApp("/packs/new");
+
+    await fillPack(user);
+    await user.click(screen.getByRole("button", { name: "Publish" }));
+
+    await waitFor(() => expect(router.state.location.pathname).toBe("/login"));
+    expect((await screen.findByRole("alert")).textContent)
+      .toBe("Your sign-in was not accepted (expired or signed out elsewhere). Sign in again.");
+    expect(localStorage.getItem(ACCOUNT_KEY)).toBeNull();
+  });
+
+  it("disables Check pack and Publish while a check is running, so a double click sends one request", async () => {
+    let answer: (reply: { status: number; body: unknown }) => void = () => {};
+    const requests = fakeApi({
+      extra: {
+        [VALIDATE]: () => new Promise((resolve) => {
+          answer = resolve;
+        }),
+      },
+    });
+    signInTeacher();
+    const user = userEvent.setup();
+    renderApp("/packs/new");
+
+    await fillPack(user);
+    const check = screen.getByRole("button", { name: "Check pack" }) as HTMLButtonElement;
+    const publish = screen.getByRole("button", { name: "Publish" }) as HTMLButtonElement;
+    await user.dblClick(check);
+
+    await waitFor(() => expect(validateRequests(requests)).toHaveLength(1));
+    expect(check.disabled).toBe(true);
+    expect(publish.disabled).toBe(true);
+    await user.click(publish);
+    expect(registerRequests(requests)).toHaveLength(0);
+
+    answer({
+      status: 200,
+      body: { valid: true, errors: [], warnings: [] },
+    });
+    await waitFor(() => expect(check.disabled).toBe(false));
+    expect(publish.disabled).toBe(false);
+    expect(validateRequests(requests)).toHaveLength(1);
+  });
+
+  it("disables both buttons while a publish is running", async () => {
+    let answer: (reply: { status: number; body: unknown }) => void = () => {};
+    const requests = fakeApi({
+      register: () => new Promise((resolve) => {
+        answer = resolve;
+      }),
+    });
+    signInTeacher();
+    const user = userEvent.setup();
+    renderApp("/packs/new");
+
+    await fillPack(user);
+    const publish = screen.getByRole("button", { name: "Publish" }) as HTMLButtonElement;
+    await user.dblClick(publish);
+
+    await waitFor(() => expect(registerRequests(requests)).toHaveLength(1));
+    expect(publish.disabled).toBe(true);
+    expect((screen.getByRole("button", { name: "Check pack" }) as HTMLButtonElement).disabled).toBe(true);
+    answer({
+      status: 409,
+      body: { code: "PACK_ALREADY_EXISTS", message: "exists", details: null },
+    });
+    await screen.findByRole("alert");
+    expect(registerRequests(requests)).toHaveLength(1);
   });
 });

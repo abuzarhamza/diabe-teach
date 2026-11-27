@@ -207,3 +207,23 @@ export async function registerPack(input: CurriculumPackInput): Promise<PackRegi
     },
   });
 }
+
+// docs/api/openapi.yaml validateCurriculumPack 200 body: `valid` is true when `errors` is empty;
+// warnings never make a pack invalid.
+export interface PackValidation {
+  valid: boolean;
+  errors: PackValidationIssue[];
+  warnings: PackValidationIssue[];
+}
+
+// POST /api/v1/packs/validate (200) with the Account Token: a dry run that saves nothing. A body that
+// fails the CurriculumPackInput schema is refused with 400 INVALID_REQUEST_BODY (details.field, reason).
+export async function validatePack(input: CurriculumPackInput): Promise<PackValidation> {
+  return apiRequest<PackValidation>("POST", "/api/v1/packs/validate", {
+    body: input,
+    auth: {
+      kind: "account",
+      token: accountToken(),
+    },
+  });
+}

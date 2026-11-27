@@ -19,6 +19,9 @@ export interface ApiRefusal {
 
 export const EMPTY_CREDENTIALS_SENTENCE = "Enter your email and password.";
 
+// The sentence for a request that never reached the API (NETWORK_ERROR), on every screen.
+export const NETWORK_ERROR_SENTENCE = "Can't reach the API. Start it with `npm run dev:local`.";
+
 // The API's sign-up rules (docs/api/openapi.yaml, /api/v1/accounts/sign-up), checked before anything is sent.
 export const MIN_PASSWORD_LENGTH = 10;
 // The same shape the server checks (src/domain/instructor-account/account-email.ts).
@@ -67,7 +70,7 @@ export function loginErrorView(error: ApiRefusal): LoginErrorView {
         : { sentence: error.message, focusField: null };
     }
     case "NETWORK_ERROR":
-      return { sentence: "Can't reach the API. Start it with `npm run dev:local`.", focusField: null };
+      return { sentence: NETWORK_ERROR_SENTENCE, focusField: null };
     default:
       return { sentence: error.message, focusField: null };
   }

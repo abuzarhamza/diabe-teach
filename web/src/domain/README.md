@@ -5,6 +5,7 @@ Put **pure UI domain rules and calculations** here (per [ADR-0008](../../../docs
 - Phase countdown and grace-period math (`phase-timer.ts`)
 - Game Session phase-to-view mapping (`session-phase.ts`)
 - Pack Editor rules: word cleaning, board size, pack and card ids, the new-pack body (`pack-editor.ts`)
+- Pack wording: byline, board summary, pack refusal sentences (409/403/422/400/network), validator issues named by the part of the pack they concern (`pack-library.ts`)
 
 ## Boundary Rules (Enforced by `npm run lint:boundaries`)
 - **Pure TypeScript only.**
