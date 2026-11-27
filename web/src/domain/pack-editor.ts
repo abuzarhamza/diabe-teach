@@ -7,6 +7,10 @@
 export const MIN_PACK_WORDS = 9;
 const MIN_BOARD_SIZE = 3;
 const MAX_NEW_PACK_BOARD_SIZE = 7;
+// The longest word a card may carry.
+export const MAX_WORD_LENGTH = 60;
+// The largest word file the editor reads (the prototype's limit).
+const MAX_WORD_FILE_BYTES = 1024 * 1024;
 
 export interface CleanedWords {
   words: string[];
@@ -41,6 +45,69 @@ export function cleanWords(input: string | readonly string[]): CleanedWords {
     words.push(word);
   }
   return { words, empty, duplicates };
+}
+
+// The word list after adding more words (pasted text, a file's text, or a pack's card labels):
+// how many were added, and how many repeats (of each other or of the list) and blanks were dropped.
+export interface WordsAdded extends CleanedWords {
+  added: number;
+}
+
+export function addWords(current: readonly string[], input: string | readonly string[]): WordsAdded {
+  const incoming = cleanWords(input);
+  const merged = cleanWords([
+    ...current,
+    ...incoming.words,
+  ]);
+  return {
+    words: merged.words,
+    added: merged.words.length - current.length,
+    empty: incoming.empty,
+    duplicates: incoming.duplicates + merged.duplicates,
+  };
+}
+
+function plural(count: number, one: string, many = `${one}s`): string {
+  return `${count} ${count === 1
+    ? one
+    : many}`;
+}
+
+// "Added 4 words. Dropped 1 duplicate and 1 blank entry."; with a source (a file or a pack name),
+// "From words.csv: added 4 words. …".
+export function wordsAddedNote({ added, duplicates, empty }: WordsAdded, source?: string): string {
+  const dropped = [
+    duplicates && plural(duplicates, "duplicate"),
+    empty && plural(empty, "blank entry", "blank entries"),
+  ].filter(Boolean);
+  const sentence = `added ${plural(added, "word")}.${dropped.length
+    ? ` Dropped ${dropped.join(" and ")}.`
+    : ""}`;
+  return source
+    ? `From ${source}: ${sentence}`
+    : sentence.charAt(0).toUpperCase() + sentence.slice(1);
+}
+
+// How many more words a pack needs, or which board the list allows.
+export function wordCountNote(wordCount: number): string {
+  if (wordCount < MIN_PACK_WORDS)
+    return `Add at least ${MIN_PACK_WORDS - wordCount} more to publish (a pack needs ${MIN_PACK_WORDS}, for a 3 × 3 board).`;
+  const size = newPackBoardSize(wordCount);
+  return `${plural(wordCount, "word")}: enough for a ${size} × ${size} board.`;
+}
+
+// The words of an existing pack: each card's display label, or its verbatim label.
+export function packWords(pack: { cards: readonly { displayLabel: string; verbatimLabel: string }[] }): string[] {
+  return pack.cards.map(card => card.displayLabel || card.verbatimLabel).filter(Boolean);
+}
+
+// Why a chosen file can't be read as a word list (not .txt/.csv, or over 1 MB), or null.
+export function wordFileProblem({ name, size }: { name: string; size: number }): string | null {
+  if (!/\.(?:txt|csv)$/i.test(name))
+    return `“${name}” isn't a .txt or .csv file.`;
+  if (size > MAX_WORD_FILE_BYTES)
+    return `“${name}” is over 1 MB. Use a shorter list.`;
+  return null;
 }
 
 // The board side for a new pack of `wordCount` words: floor(sqrt(n)), clamped to 3..7.
@@ -97,7 +164,8 @@ export interface PackEditorProblem {
   field: PackEditorField;
 }
 
-// The local check before anything is sent: a name and at least 9 distinct words.
+// The local check before anything is sent: at least 9 distinct words, a name, and no word over 60
+// characters.
 export function newPackProblem({ name, words }: Pick<NewPackDraft, "name" | "words">): PackEditorProblem | null {
   if (words.length < MIN_PACK_WORDS) {
     return {
@@ -107,6 +175,13 @@ export function newPackProblem({ name, words }: Pick<NewPackDraft, "name" | "wor
   }
   if (!normalisedName(name))
     return { sentence: "Give the pack a name.", field: "name" };
+  const long = words.find(word => word.length > MAX_WORD_LENGTH);
+  if (long) {
+    return {
+      sentence: `Keep each word to ${MAX_WORD_LENGTH} characters or fewer (“${long.slice(0, 30)}…”).`,
+      field: "words",
+    };
+  }
   return null;
 }
 

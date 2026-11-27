@@ -154,8 +154,15 @@ a.btn{display:inline-block;text-decoration:none;color:inherit}
 .editor .row{gap:8px;flex-wrap:wrap;align-items:center}
 .opt{font-weight:400;color:var(--muted)}
 .kwchips{display:flex;flex-wrap:wrap;gap:4px;max-height:220px;overflow:auto;padding:6px;background:var(--sunk);border-radius:8px;min-height:44px;align-content:flex-start;list-style:none;margin:0}
-.kwchips .chip{display:inline-flex;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:1px 9px;font-size:13px;max-width:100%}
+.editor .row select{flex:1;min-width:180px;width:auto}
+.kwchips .chip{display:inline-flex;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:1px 2px 1px 9px;font-size:13px;max-width:100%}
 .kwchips .chip span{overflow-wrap:anywhere}
+.kwchips .chip button{border:0;background:transparent;padding:2px 7px;border-radius:999px;line-height:1;font-size:13px;cursor:pointer;color:inherit}
+.kwchips .chip button:hover{background:var(--sunk)}
+.editor label.btn{display:inline-block;cursor:pointer}
+.editor .visually-hidden:focus-visible+label.btn{outline:2px solid var(--accent);outline-offset:2px}
+.editor .warn{color:var(--warn);font-size:14px;margin:0}
+.editor .ok{color:var(--good);font-size:14px;margin:0}
 .count{font-size:14px;font-weight:700}
 .err{color:var(--bad);font-size:13px;font-weight:700;margin:0}
 header.top nav a{font-weight:700;color:var(--accent)}

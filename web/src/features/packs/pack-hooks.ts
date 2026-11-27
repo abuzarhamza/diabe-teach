@@ -42,6 +42,19 @@ export function usePack(packId: string) {
   });
 }
 
+// Read a pack's content on demand (the Pack Editor's "Copy its words"), through the same cache as
+// Pack Detail. `mutate(packId)`; `data` is the pack, `error` a refusal for the screen.
+export function useFetchPack() {
+  const queryClient = useQueryClient();
+  return useMutation<CurriculumPackDetail, ApiHttpError, string>({
+    // The call `mutate(packId)` makes: the cached pack if it is fresh, else GET /api/v1/packs/{packId}.
+    mutationFn: packId => queryClient.fetchQuery({
+      queryKey: packKeys.detail(packId),
+      queryFn: () => getPackById(packId),
+    }),
+  });
+}
+
 // Refetch every pack screen's data once a pack has changed.
 function useRefreshPacks() {
   const queryClient = useQueryClient();

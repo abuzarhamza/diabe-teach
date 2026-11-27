@@ -66,7 +66,8 @@ async function pasteWords(user: ReturnType<typeof userEvent.setup>, text: string
 
 function chips(): string[] {
   const list = screen.getByRole("list", { name: "Words in the new pack" });
-  return within(list).queryAllByRole("listitem").map(item => item.textContent ?? "");
+  // Each chip is the word, then its "Remove <word>" button.
+  return within(list).queryAllByRole("listitem").map(item => item.querySelector("span")?.textContent ?? "");
 }
 
 function registerRequests(requests: RecordedRequest[]) {
@@ -261,6 +262,135 @@ describe("pack Editor at /packs/new (react-pack-editor 01)", () => {
 
     expect((await screen.findByRole("alert")).textContent).toBe("Sign in to continue.");
     expect(router.state.location.pathname).toBe("/login");
+    expect(registerRequests(requests)).toHaveLength(0);
+  });
+});
+
+function addedNote(): string {
+  return screen.getByRole("status", { name: "Words added" }).textContent ?? "";
+}
+
+// The note on how many words are needed or what board the list allows: the word list's description.
+function sizeNote(): string {
+  const list = screen.getByRole("list", { name: "Words in the new pack" });
+  return document.getElementById(list.getAttribute("aria-describedby") ?? "")?.textContent ?? "";
+}
+
+describe("pack Editor word list tools (react-pack-editor 02)", () => {
+  it("uploads a .csv in the browser: quoted values are unquoted, a repeated word is dropped, and the note says so", async () => {
+    const requests = fakeApi();
+    signInTeacher();
+    const user = userEvent.setup();
+    renderApp("/packs/new");
+
+    const csv = new File(["\"Insulin\",\"Beta cell\"\nGlucagon,insulin\n\n\"Liver\"\n"], "words.csv", { type: "text/csv" });
+    await user.upload(await screen.findByLabelText("Upload .txt or .csv…"), csv);
+
+    await waitFor(() => expect(chips()).toEqual([
+      "Insulin",
+      "Beta cell",
+      "Glucagon",
+      "Liver",
+    ]));
+    expect(screen.getByText("4 words")).toBeTruthy();
+    expect(addedNote()).toBe("From words.csv: added 4 words. Dropped 1 duplicate and 1 blank entry.");
+    expect(requests.filter(r => r.method !== "GET")).toHaveLength(0);
+  });
+
+  it("refuses a file that is not .txt or .csv with a sentence", async () => {
+    fakeApi();
+    signInTeacher();
+    const user = userEvent.setup({ applyAccept: false });
+    renderApp("/packs/new");
+
+    await user.upload(await screen.findByLabelText("Upload .txt or .csv…"), new File(["x"], "words.pdf", { type: "application/pdf" }));
+
+    expect((await screen.findByRole("alert")).textContent).toBe("“words.pdf” isn't a .txt or .csv file.");
+    expect(chips()).toEqual([]);
+  });
+
+  it("copy its words adds the chosen pack's card labels, skipping words already in the list", async () => {
+    const requests = fakeApi({
+      extra: {
+        "GET /api/v1/packs/thyroid-basics": packDetailReply(packDetail()),
+      },
+    });
+    signInTeacher();
+    const user = userEvent.setup();
+    renderApp("/packs/new");
+
+    await pasteWords(user, "tsh, Insulin");
+    await user.selectOptions(await screen.findByLabelText("Start from an existing pack"), await screen.findByRole("option", { name: "Thyroid basics" }));
+    await user.click(screen.getByRole("button", { name: "Copy its words" }));
+
+    await waitFor(() => expect(chips()).toEqual([
+      "tsh",
+      "Insulin",
+      "T4",
+      "Graves disease",
+    ]));
+    expect(addedNote()).toBe("From Thyroid basics: added 2 words. Dropped 1 duplicate.");
+    expect(requests.some(r => r.method === "GET" && r.path === "/api/v1/packs/thyroid-basics")).toBe(true);
+    expect((screen.getByLabelText("Pack name") as HTMLInputElement).value).toBe("Thyroid basics (my copy)");
+  });
+
+  it("remove <word> and Clear all update the chips and the count", async () => {
+    fakeApi();
+    signInTeacher();
+    const user = userEvent.setup();
+    renderApp("/packs/new");
+
+    await pasteWords(user, "Insulin, Glucagon, Liver");
+    await user.click(screen.getByRole("button", { name: "Remove Glucagon" }));
+    expect(chips()).toEqual(["Insulin", "Liver"]);
+    expect(screen.getByText("2 words")).toBeTruthy();
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Remove Liver" }));
+
+    await user.click(screen.getByRole("button", { name: "Clear all" }));
+    expect(chips()).toEqual([]);
+    expect(screen.getByText("0 words")).toBeTruthy();
+  });
+
+  it("says how many more words are needed below 9, and names the board size the list allows", async () => {
+    fakeApi();
+    signInTeacher();
+    const user = userEvent.setup();
+    renderApp("/packs/new");
+
+    await pasteWords(user, "A1, A2, A3, A4, A5");
+    expect(sizeNote()).toBe("Add at least 4 more to publish (a pack needs 9, for a 3 × 3 board).");
+
+    await pasteWords(user, Array.from({ length: 11 }, (_, i) => `B${i + 1}`).join("\n"));
+    expect(sizeNote()).toBe("16 words: enough for a 4 × 4 board.");
+  });
+
+  it("announces the added/dropped note politely, and every chip has a remove button", async () => {
+    fakeApi();
+    signInTeacher();
+    const user = userEvent.setup();
+    renderApp("/packs/new");
+
+    await pasteWords(user, "Insulin\n\ninsulin\nLiver");
+    const note = screen.getByRole("status", { name: "Words added" });
+    expect(note.getAttribute("aria-live")).toBe("polite");
+    expect(note.textContent).toBe("Added 2 words. Dropped 1 duplicate and 1 blank entry.");
+    const list = screen.getByRole("list", { name: "Words in the new pack" });
+    expect(within(list).getAllByRole("button").map(b => b.getAttribute("aria-label"))).toEqual(["Remove Insulin", "Remove Liver"]);
+  });
+
+  it("refuses a word longer than 60 characters with a sentence, sending nothing", async () => {
+    const requests = fakeApi();
+    signInTeacher();
+    const user = userEvent.setup();
+    renderApp("/packs/new");
+
+    const long = `Glucose${"x".repeat(60)}`;
+    await pasteWords(user, `${TEN_WORDS}\n${long}`);
+    await user.type(screen.getByLabelText("Pack name"), "Long words");
+    await user.click(screen.getByRole("button", { name: "Publish" }));
+
+    expect((await screen.findByRole("alert")).textContent)
+      .toBe(`Keep each word to 60 characters or fewer (“${long.slice(0, 30)}…”).`);
     expect(registerRequests(requests)).toHaveLength(0);
   });
 });

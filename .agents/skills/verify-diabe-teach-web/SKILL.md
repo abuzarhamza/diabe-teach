@@ -12,7 +12,7 @@ description: "Launch, health-check and drive the diabe-teach React web app (web/
 | `/login` | teacher and learner | form `Teacher sign in` (Email, Password, `Sign in`, `Create account`), or the signed-in panel; below it, form `Join a game` (Room code, Your name, `Join`) |
 | `/setup` | teacher only (guard `requireTeacher`) | TopBar (`Packs` link, "Signed in as …", `Sign out`) and the Game setup placeholder |
 | `/packs`, `/packs/:packId` | teacher only (same guard) | Pack Library (New pack, Show archived, Archive/Unarchive, Start Game with Pack) and read-only Pack Detail |
-| `/packs/new` | teacher only (same guard) | Pack Editor: paste words, name, level, objective, Publish, Cancel |
+| `/packs/new` | teacher only (same guard) | Pack Editor: paste, upload a .txt/.csv or copy a pack's words; chips with Remove, Clear all, word notes; name, level, objective, Publish, Cancel |
 | `/sessions/:sessionId` | whoever holds a seat in this tab | Session Shell: polls the session every 2 s, shows the Lobby during `pretest` |
 | anything else | | redirects to `/login` |
 
