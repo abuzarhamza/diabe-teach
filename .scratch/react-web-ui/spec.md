@@ -118,6 +118,7 @@ Build the **Vite + React + TypeScript Single-Page Application (SPA)** in `web/` 
 Not decided here. Each blocks part of a slice until the user answers.
 
 - **(a) System Packs in the Pack Library (issue 03).** `CurriculumPackListItem` has no flag that marks a System Pack, so the library cannot hide the archive control for System Packs. Options: add a flag (for example `isSystemPack`) to the pack list in the API, or show **Archive** on every pack and explain the server's 403 `PACK_IS_SYSTEM_PACK` when it comes back.
+  **Decided by the user on 2026-11-27: add the flag.** A backend prefactor (`.scratch/react-packs/issues/00-system-pack-flag.md`) adds `isSystemPack` to the pack list and pack detail; the web hides Archive and "save as new version" for System Packs.
 - **(b) `study-rct` mode (issue 05).** `SessionMode` is `solo`, `classroom` or `study-rct`. Does Game Setup offer `study-rct`, or is it out of scope for this UI?
 - **(c) Solo Practice from `/login` (issue 13).** `createSession` needs a `packId` (the contract's default is `diabe-teach`). How does a signed-out learner pick a pack: a fixed default pack, a pack picker on `/login` (the pack list needs only the API key), or Solo Practice from `/setup` only?
 
