@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Reference 0003 · What each module of web/ does</title>
+  <link rel="stylesheet" href="../assets/tufte-course.css" />
+</head>
+<body>
+  <main class="tufte-page">
+    <header class="lesson-header">
+      <div class="eyebrow">Reference Sheet 0003 · Diabe-Teach React web app</div>
+      <h1>What each module of <code>web/</code> does</h1>
+      <p class="subtitle">Every library and every source file, with why it is here. As of commit <code>dcbf8eb</code> (2026-11-25).</p>
+      <nav class="nav-bar">
+        <a href="../lessons/0002-navigate-the-react-web-app.html">Lesson 0002</a>
+        <a href="../lessons/0003-why-tanstack-query.html">Lesson 0003 (TanStack Query)</a>
+        <a href="../lessons/0004-convert-useeffect-to-a-named-hook.html">Lesson 0004 (named hooks)</a>
+        <a href="0002-react-web-app-map.html">Reference 0002 (map)</a>
+        <a href="../web/README.md">web/README.md</a>
+      </nav>
+    </header>
+
+    <h2>Libraries that ship to the browser</h2>
+    <p>From <code>web/package.json</code> → <code>dependencies</code>.</p>
+    <table class="ref-table">
+      <tr><th>Package</th><th>What it does</th><th>Why we use it</th><th>Used in</th></tr>
+      <tr><td><code>react</code></td><td>Components, JSX, hooks (<code>useState</code>, <code>useRef</code>, <code>useSyncExternalStore</code>)</td><td>The UI library (ADR-0008). <code>useEffect</code> is banned by lint.</td><td>every <code>features/</code> file</td></tr>
+      <tr><td><code>react-dom</code></td><td>Puts React components into the page (<code>createRoot</code>)</td><td>React's browser renderer</td><td><code>main.tsx</code></td></tr>
+      <tr><td><code>react-router</code> v7</td><td>URLs → screens; <code>loader</code> runs before a screen; <code>redirect</code>, <code>Navigate</code>, <code>Link</code>, <code>useNavigate</code></td><td>A single-page app needs client routing; loaders give a clean teacher guard without effects (<a href="https://reactrouter.com/start/data/data-loading">docs</a>)</td><td><code>main.tsx</code>, <code>routes.tsx</code>, <code>require-teacher.ts</code>, <code>TeacherRoute.tsx</code>, <code>LoginPage.tsx</code></td></tr>
+      <tr><td><code>@tanstack/react-query</code></td><td>Fetches, caches and refreshes <strong>server state</strong>: <code>useQuery</code> (read), <code>useMutation</code> (write), <code>QueryClient</code> (cache)</td><td>Replaces <code>useEffect</code> + <code>useState</code> fetching: loading/error flags, retries, late answers, polling (<code>refetchInterval: 2000</code>) — see <a href="../lessons/0003-why-tanstack-query.html">lesson 0003</a></td><td><code>features/accounts/account-hooks.ts</code> only (plus <code>main.tsx</code>, <code>App.tsx</code>); lint refuses it elsewhere</td></tr>
+    </table>
+
+    <h2>Tools for building, checking and testing</h2>
+    <p>From <code>web/package.json</code> → <code>devDependencies</code>, plus three tools at the repo root.</p>
+    <table class="ref-table">
+      <tr><th>Package</th><th>What it does</th><th>Why we use it</th></tr>
+      <tr><td><code>vite</code> + <code>@vitejs/plugin-react</code></td><td>Dev server with hot reload; builds <code>web/dist/</code>; proxies <code>/api</code> to port 8888</td><td>The bundler chosen in ADR-0008 (replaces the course's Parcel)</td></tr>
+      <tr><td><code>typescript</code>, <code>@types/react</code>, <code>@types/react-dom</code>, <code>@types/jsdom</code></td><td>Type-checks <code>.ts</code>/<code>.tsx</code> (<code>npm run typecheck:web</code>)</td><td>Catches wrong shapes (e.g. an <code>ApiHttpError</code> field) before the browser does</td></tr>
+      <tr><td><code>eslint</code> + <code>@antfu/eslint-config</code></td><td>Lints style and correctness (<code>npm run lint:web</code>)</td><td>Holds the <code>useEffect</code> ban (<code>web/eslint.config.js</code>)</td></tr>
+      <tr><td><code>@eslint-react/eslint-plugin</code>, <code>eslint-plugin-react-hooks</code>, <code>eslint-plugin-react-refresh</code></td><td>React-specific lint rules (hook rules, fast-refresh safety)</td><td>Loaded by the antfu config's <code>react: true</code></td></tr>
+      <tr><td><code>@testing-library/react</code>, <code>@testing-library/dom</code></td><td>Renders the app in tests; finds elements by label and role</td><td>Tests that “resemble the way your software is used” (<a href="https://testing-library.com/docs/guiding-principles">guiding principles</a>)</td></tr>
+      <tr><td><code>@testing-library/user-event</code></td><td>Types and clicks like a real user</td><td>Drives the Login screen in screen tests</td></tr>
+      <tr><td><code>jsdom</code></td><td>A browser (DOM, <code>localStorage</code>, <code>sessionStorage</code>) inside Node</td><td>Runs screen tests without a real browser</td></tr>
+      <tr><td><code>vitest</code> <em>(root)</em></td><td>Test runner; project <code>web</code> runs <code>web/tests</code> in jsdom</td><td>Same runner as the API (Jest-like API)</td></tr>
+      <tr><td><code>dependency-cruiser</code> <em>(root)</em></td><td>Checks which folder may import which (<code>npm run lint:boundaries</code>)</td><td>Enforces the three layers (rules <code>web-domain-stays-pure</code>, <code>web-api-no-react-or-features</code>)</td></tr>
+    </table>
+
+    <h2>The app's own modules</h2>
+    <table class="ref-table">
+      <tr><th>File (<code>web/src/</code>)</th><th>Layer</th><th>What it does</th><th>Used by</th></tr>
+      <tr><td><code>main.tsx</code></td><td>shell</td><td>Creates the browser router and the <code>QueryClient</code>; renders <code>App</code></td><td><code>index.html</code></td></tr>
+      <tr><td><code>App.tsx</code></td><td>shell</td><td><code>QueryClientProvider</code> + <code>RouterProvider</code></td><td><code>main.tsx</code>, tests</td></tr>
+      <tr><td><code>routes.tsx</code></td><td>shell</td><td>The route table: <code>/login</code>, teacher-only <code>/setup</code>, everything else → <code>/login</code></td><td><code>main.tsx</code>, tests</td></tr>
+      <tr><td><code>domain/login-errors.ts</code></td><td>domain</td><td>Pure rules: error → <code>{ sentence, focusField }</code>; sign-in and sign-up pre-checks; <code>MIN_PASSWORD_LENGTH</code></td><td><code>LoginPage.tsx</code></td></tr>
+      <tr><td><code>api/http-client.ts</code></td><td>api</td><td><code>apiRequest</code>: the only <code>fetch</code>; headers; <code>[API]</code> log; <code>ApiHttpError</code>; a 401 on an Account Token clears it</td><td>every <code>*-api.ts</code></td></tr>
+      <tr><td><code>api/accounts-api.ts</code></td><td>api</td><td><code>signInInstructor</code>, <code>signUpInstructor</code> (save the token), <code>getCurrentAccount</code> (<code>/me</code>)</td><td><code>account-hooks.ts</code></td></tr>
+      <tr><td><code>api/account-token-store.ts</code></td><td>api</td><td>Account Token in <code>localStorage</code>: save, clear, read, expiry, subscribe (tabs + expiry timer)</td><td><code>http-client.ts</code>, <code>accounts-api.ts</code>, <code>use-signed-in-account.ts</code>, <code>require-teacher.ts</code></td></tr>
+      <tr><td><code>api/login-reason-store.ts</code></td><td>api</td><td>One-time “why you were sent to login” sentence in <code>sessionStorage</code>; <code>markSignedOutOnPurpose</code> leaves an empty one so a deliberate Sign out shows no warning</td><td><code>http-client.ts</code>, <code>require-teacher.ts</code>, <code>LoginPage.tsx</code>, <code>TopBar.tsx</code></td></tr>
+      <tr><td><code>features/accounts/LoginPage.tsx</code></td><td>features</td><td>The <code>/login</code> screen: form, signed-in panel, Sign out, errors with focus</td><td><code>routes.tsx</code></td></tr>
+      <tr><td><code>features/accounts/account-hooks.ts</code></td><td>features</td><td>The only TanStack Query file for accounts: <code>useSignIn</code>, <code>useCreateAccount</code> (writes), <code>useCurrentAccount</code> (reads <code>/me</code>)</td><td><code>LoginPage.tsx</code>, <code>TeacherRoute.tsx</code></td></tr>
+      <tr><td><code>features/accounts/use-signed-in-account.ts</code></td><td>features</td><td>Hook: the signed-in teacher or <code>null</code>, via <code>useSyncExternalStore</code></td><td><code>LoginPage.tsx</code>, <code>TeacherRoute.tsx</code></td></tr>
+      <tr><td><code>features/shared/require-teacher.ts</code></td><td>features</td><td>Router loader: no valid token → set reason → <code>redirect("/login")</code></td><td><code>routes.tsx</code></td></tr>
+      <tr><td><code>features/shared/TeacherRoute.tsx</code></td><td>features</td><td>Guard element: confirms with <code>useCurrentAccount</code> (<code>/me</code>); re-checks when the token disappears</td><td><code>routes.tsx</code></td></tr>
+      <tr><td><code>features/shared/TopBar.tsx</code></td><td>features</td><td>Top of every teacher screen: “Signed in as …” and Sign out</td><td><code>TeacherRoute.tsx</code></td></tr>
+      <tr><td><code>features/shared/ErrorBanner.tsx</code></td><td>features</td><td>Shows a refusal as one sentence (+ code in dev) in an <code>aria-live</code> region</td><td><code>LoginPage.tsx</code>, <code>TeacherRoute.tsx</code></td></tr>
+      <tr><td><code>features/game-session/GameSetupPage.tsx</code></td><td>features</td><td>Placeholder for Game Setup</td><td><code>routes.tsx</code></td></tr>
+      <tr><td><code>styles.css</code></td><td>—</td><td>The prototype's design system (<code>claudPoc/concept-chain/shared.css</code>)</td><td><code>main.tsx</code></td></tr>
+      <tr><td><code>vite-env.d.ts</code></td><td>—</td><td>Types for <code>import.meta.env.VITE_API_KEY</code></td><td><code>http-client.ts</code></td></tr>
+    </table>
+
+    <h2>Test support (<code>web/tests/support/</code>)</h2>
+    <table class="ref-table">
+      <tr><th>File</th><th>What it does</th></tr>
+      <tr><td><code>render-app.tsx</code></td><td><code>renderApp(path)</code>: the real routes and a fresh <code>QueryClient</code> (<code>retry: false</code>) in a memory router</td></tr>
+      <tr><td><code>fake-fetch.ts</code></td><td><code>installFakeFetch({ "METHOD /path": reply })</code>: answers with contract-shaped JSON and records requests</td></tr>
+      <tr><td><code>jsdom-environment.ts</code></td><td>A custom Vitest environment, because <code>jsdom</code> is installed only in <code>web/</code></td></tr>
+      <tr><td><code>setup.ts</code></td><td>After each test: unmount and clear <code>localStorage</code> / <code>sessionStorage</code></td></tr>
+    </table>
+  </main>
+</body>
+</html>

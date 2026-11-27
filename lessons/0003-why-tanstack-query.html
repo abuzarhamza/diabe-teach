@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lesson 0003 · Why TanStack Query?</title>
+  <link rel="stylesheet" href="../assets/tufte-course.css" />
+</head>
+<body>
+  <main class="tufte-page">
+    <header class="lesson-header">
+      <div class="eyebrow">Lesson 0003 · Diabe-Teach React web app</div>
+      <h1>Why TanStack Query?</h1>
+      <p class="subtitle">
+        One win for today: for any piece of data on a screen, you can say whether it is server state, and pick the right tool for it.
+      </p>
+      <nav class="nav-bar">
+        <a href="0002-navigate-the-react-web-app.html">← Lesson 0002 (navigate web/)</a>
+        <a href="../reference/0003-web-modules-and-libraries.html">Reference: what each module does</a>
+        <a href="0004-convert-useeffect-to-a-named-hook.html">Next: Lesson 0004 (named hooks) →</a>
+        <a href="../reference/0002-react-web-app-map.html">Reference: web app map</a>
+        <a href="../docs/adr/0008-simple-three-layer-ddd-react-vite-frontend.md">ADR-0008</a>
+      </nav>
+    </header>
+
+    <section>
+      <h2>The problem: server state is not like <code>useState</code></h2>
+      <p>
+        In Namaste React you kept everything in <code>useState</code>: the search text and the restaurant list alike.
+        The TanStack Query team splits these into two kinds. <strong>Client state</strong> belongs to the browser: the text in a field, which tab is open.
+        <strong>Server state</strong> is different. Their overview lists four properties
+        (<a href="https://tanstack.com/query/latest/docs/framework/react/overview">TanStack Query, Overview</a>):
+      </p>
+      <ol>
+        <li>It “is persisted remotely in a location you may not control or own”.</li>
+        <li>It “requires asynchronous APIs for fetching and updating”.</li>
+        <li>It “implies shared ownership and can be changed by other people without your knowledge”.</li>
+        <li>It “can potentially become ‘out of date’ in your applications if you're not careful”.</li>
+      </ol>
+      <p>
+        Now think of our game. A Game Session lives in MongoDB. The instructor and 25 learners change it at the same time.
+        Every learner's screen must follow the phase within about 2 seconds. That is property 3 and 4 at full strength.
+        ADR-0008 therefore says: session state is polled with <code>useQuery({ …, refetchInterval: 2000 })</code>, and <code>useEffect</code> is banned (Layer Rules 3 and 4).
+      </p>
+    </section>
+
+    <section>
+      <h2>Same job, two ways</h2>
+      <p>
+        <code>TeacherRoute</code> must confirm the teacher with <code>GET /api/v1/accounts/me</code>.
+        First is how the course would write it. Second is the real code, written in <code>TeacherRoute.tsx</code> when this lesson was made; since commit <code>5efbd2c</code> it lives in <code>useCurrentAccount</code> in <code>web/src/features/accounts/account-hooks.ts</code> (<a href="0004-convert-useeffect-to-a-named-hook.html">lesson 0004</a>).
+      </p>
+      <h3>Course style: <code>useEffect</code> + <code>useState</code> (not allowed here)</h3>
+      <pre><code>const [data, setData] = useState(null);
+const [error, setError] = useState(null);
+const [loading, setLoading] = useState(false);
+
+useEffect(() =&gt; {
+  if (!account) return;
+  let cancelled = false;              // 1. ignore a late answer after the teacher changes
+  setLoading(true);
+  async function load(attempt = 0) {
+    try {
+      const me = await getCurrentAccount();
+      if (!cancelled) setData(me);
+    } catch (e) {
+      if (e.status !== 401 &amp;&amp; attempt &lt; 3) return load(attempt + 1);  // 2. retry by hand
+      if (!cancelled) setError(e);
+    } finally {
+      if (!cancelled) setLoading(false);
+    }
+  }
+  load();
+  return () =&gt; { cancelled = true; };  // 3. cleanup
+}, [account?.accountId]);              // 4. get the dependency list right
+// 5. no cache: a second component that needs /me sends a second request
+// 6. polling every 2 s would need setInterval + clearInterval on top</code></pre>
+      <h3>This app: <code>useQuery</code></h3>
+      <pre><code>const confirmation = useQuery&lt;InstructorAccountView, ApiHttpError&gt;({
+  queryKey: ["accounts", "me", account?.accountId],   // cache entry; a new teacher → a new key
+  queryFn: getCurrentAccount,                          // from web/src/api/ — the only fetch layer
+  enabled: account !== null,                           // do not ask while signed out
+  retry: (failureCount, error) =&gt; error.status !== 401 &amp;&amp; failureCount &lt; MAX_RETRIES,
+});
+// confirmation.data · confirmation.error · confirmation.isPending — all derived, no setState</code></pre>
+      <p>
+        Every numbered comment in the first version is something you could get wrong. In the second, the library owns it: late answers, retries,
+        cleanup, the key, the cache and the request de-duplication. Polling is one option: <code>refetchInterval: 2000</code>
+        (<a href="https://tanstack.com/query/latest/docs/framework/react/reference/useQuery">useQuery reference</a>).
+      </p>
+    </section>
+
+    <section>
+      <h2>The three pieces this app uses</h2>
+      <div class="pipeline-list">
+        <article class="step-card layer-features">
+          <div class="step-header"><span class="step-badge">QueryClient + QueryClientProvider</span><span class="step-file">main.tsx · App.tsx</span></div>
+          <p>The <code>QueryClient</code> holds the cache. <code>main.tsx</code> creates one for the browser. <code>App.tsx</code> provides it to every screen.
+          Each test makes a fresh client with <code>retry: false</code> (<code>web/tests/support/render-app.tsx</code>), so tests do not share a cache and fail fast.</p>
+        </article>
+        <article class="step-card layer-features">
+          <div class="step-header"><span class="step-badge">useQuery: read</span><span class="step-file">TeacherRoute.tsx → getCurrentAccount</span></div>
+          <p>For data you <em>read</em> from the server. You give a <code>queryKey</code> (the cache address, unique to the data,
+          <a href="https://tanstack.com/query/latest/docs/framework/react/guides/query-keys">Query Keys</a>) and a <code>queryFn</code> from <code>api/</code>.
+          You get <code>data</code>, <code>error</code> and <code>isPending</code>. Planned: the Session Shell polls the Game Session with <code>refetchInterval: 2000</code>.</p>
+        </article>
+        <article class="step-card layer-features">
+          <div class="step-header"><span class="step-badge">useMutation: write</span><span class="step-file">LoginPage.tsx → signIn, signUp</span></div>
+          <p>For actions that <em>change</em> something, started by an event handler: <code>signIn.mutate(credentials)</code>.
+          <code>isPending</code> disables the buttons. <code>error</code> feeds <code>loginErrorView</code>. <code>onSuccess</code> navigates
+          (<a href="https://tanstack.com/query/latest/docs/framework/react/guides/mutations">Mutations</a>).</p>
+        </article>
+      </div>
+      <p>
+        <strong>Note:</strong> the Account Token is <em>not</em> in TanStack Query. It is not server state: the browser owns it in <code>localStorage</code>.
+        So the app reads it with <code>useSyncExternalStore</code> (<code>useSignedInAccount</code>). The rule of thumb:
+      </p>
+      <table class="ref-table">
+        <tr><th>Kind of data</th><th>Example here</th><th>Tool</th></tr>
+        <tr><td>Server state, read</td><td>the signed-in account (<code>/me</code>), packs, Game Session</td><td><code>useQuery</code></td></tr>
+        <tr><td>Server state, write</td><td>sign in, create account, submit a chain</td><td>event handler + <code>useMutation</code></td></tr>
+        <tr><td>Browser storage</td><td>Account Token, the one-time login reason</td><td>store in <code>api/</code> + <code>useSyncExternalStore</code></td></tr>
+        <tr><td>Client state of one screen</td><td>a local refusal before sending</td><td><code>useState</code></td></tr>
+        <tr><td>Derived value</td><td>the sentence for an error</td><td>pure function in <code>domain/</code>, during render</td></tr>
+      </table>
+      <p>
+        Does it replace Redux? For most apps, the TanStack team says the client state left over after moving async code into the library
+        “is usually very tiny” (<a href="https://tanstack.com/query/latest/docs/framework/react/guides/does-this-replace-client-state">Does this replace client state?</a>).
+        That is why this app has no Redux store.
+      </p>
+    </section>
+
+    <section>
+      <h2>Practice: pick the tool</h2>
+      <p>Answer from memory. Then check the table.</p>
+      <div class="quiz-container" id="tool-quiz"></div>
+    </section>
+
+    <section>
+      <h2>Practice: predict, then check in code</h2>
+      <ol>
+        <li>Open <code>web/src/features/shared/TeacherRoute.tsx</code>. Cover the <code>retry</code> line.</li>
+        <li>Predict: if <code>/me</code> answers <code>500</code>, how many requests go out in total? If it answers <code>401</code>?</li>
+        <li>Uncover the line and check. (The default without this line is in <a href="https://tanstack.com/query/latest/docs/framework/react/guides/important-defaults">Important Defaults</a>.)</li>
+        <li>Explain to yourself why a <code>401</code> must not retry. Hint: what does <code>http-client.ts</code> do to the token on a 401?</li>
+      </ol>
+    </section>
+
+    <section class="callout-box">
+      <h3>Primary source</h3>
+      <p>
+        Read the <a href="https://tanstack.com/query/latest/docs/framework/react/overview">TanStack Query Overview</a> (10 minutes), then
+        <a href="https://tanstack.com/query/latest/docs/framework/react/guides/important-defaults">Important Defaults</a>. The defaults explain most “why did it fetch again?” surprises.
+      </p>
+      <h3>Ask your teacher</h3>
+      <p>
+        Unclear? Ask the agent. Good next questions: “Why is <code>accountId</code> in the query key?” or
+        “How will the pack list refresh after Archive?” (answer to look up: <code>invalidateQueries</code>).
+      </p>
+    </section>
+  </main>
+
+  <script src="../assets/quiz-widget.js"></script>
+  <script>
+    const TOOL = {
+      query: "<code>useQuery</code>",
+      mutation: "<code>useMutation</code>",
+      external: "<code>useSyncExternalStore</code>",
+      pure: "a <code>domain/</code> function",
+    };
+    initRetrievalQuiz("tool-quiz", [
+      {
+        prompt: "Every learner's screen must show the Game Session phase within 2 seconds.",
+        options: [TOOL.mutation, TOOL.query, TOOL.pure, TOOL.external],
+        correctIndex: 1,
+        explanation: "server state, read, changed by others: useQuery with refetchInterval: 2000.",
+        hint: "Who changes the phase, and where does it live?",
+      },
+      {
+        prompt: "A learner clicks Submit on a Concept Chain.",
+        options: [TOOL.query, TOOL.external, TOOL.mutation, TOOL.pure],
+        correctIndex: 2,
+        explanation: "a write started by an event handler: useMutation, then invalidate or refetch the reads.",
+        hint: "Is this reading data, or changing it?",
+      },
+      {
+        prompt: "The Login screen must show “Signed in as …” when another tab signs in.",
+        options: [TOOL.external, TOOL.query, TOOL.mutation, TOOL.pure],
+        correctIndex: 0,
+        explanation: "the token is browser storage, not server state: useSyncExternalStore (useSignedInAccount).",
+        hint: "Does the server own this value, or the browser?",
+      },
+      {
+        prompt: "Turn an ACCOUNT_TEMPORARILY_LOCKED error into a sentence with a time.",
+        options: [TOOL.query, TOOL.mutation, TOOL.external, TOOL.pure],
+        correctIndex: 3,
+        explanation: "a value derived from other values: loginErrorView in domain/, called during render.",
+        hint: "Does this need the network or storage at all?",
+      },
+      {
+        prompt: "In this app, why does <code>retry</code> on <code>/me</code> stop at a 401?",
+        options: [
+          "the token is already cleared",
+          "the server is not running",
+          "TanStack never retries any errors",
+          "the cache already holds data",
+        ],
+        correctIndex: 0,
+        explanation: "http-client.ts clears the Account Token on a 401, so a retry cannot succeed; the guard sends the teacher to /login.",
+        hint: "Look at what apiRequest does when status is 401 and auth.kind is \"account\".",
+      },
+    ]);
+  </script>
+</body>
+</html>

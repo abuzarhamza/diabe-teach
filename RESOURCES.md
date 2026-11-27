@@ -13,7 +13,33 @@
 - [Documentation: MongoDB Node.js Driver Connection Pooling in Serverless](https://www.mongodb.com/docs/drivers/node/current/fundamentals/connection/)
   Official MongoDB guide on reusing `MongoClient` promises across warm AWS Lambda / Netlify Function containers. Use for: `src/adapters/outbound/mongo-client-singleton.ts`.
 
+## Knowledge: React web app (`web/`)
+
+- [Article: You Might Not Need an Effect (react.dev)](https://react.dev/learn/you-might-not-need-an-effect)
+  Official React guide on replacing effects with render-time derivation, event handlers and keys. Use for: why `web/src` bans `useEffect` (ADR-0008). **Primary source for lesson 0002.**
+- [Reference: `useSyncExternalStore` (react.dev)](https://react.dev/reference/react/useSyncExternalStore)
+  Official reference for subscribing to an external store. Use for: `useSignedInAccount` reading the Account Token store.
+- [Documentation: TanStack Query, Overview](https://tanstack.com/query/latest/docs/framework/react/overview) and [Mutations](https://tanstack.com/query/latest/docs/framework/react/guides/mutations)
+  Official docs for `useQuery` (server reads, polling) and `useMutation` (writes from event handlers). **Primary source for lesson 0003.**
+- [Documentation: TanStack Query, Important Defaults](https://tanstack.com/query/latest/docs/framework/react/guides/important-defaults) and [Does this replace client state?](https://tanstack.com/query/latest/docs/framework/react/guides/does-this-replace-client-state)
+  Official: cached data is stale by default; failed queries retry; the client state left after moving async code to TanStack Query "is usually very tiny". Use for: why the app has no Redux, and for "why did it fetch again?" questions.
+- [Article: Reusing Logic with Custom Hooks (react.dev)](https://react.dev/learn/reusing-logic-with-custom-hooks)
+  Official guide to custom hooks. Use for: `account-hooks.ts` (`useSignIn`, `useCurrentAccount`). **Primary source for lesson 0004.**
+- [Documentation: TanStack Query, Dependent Queries](https://tanstack.com/query/latest/docs/framework/react/guides/dependent-queries)
+  Official guide to `enabled`. Use for: `useCurrentAccount` asking only while signed in.
+- [Documentation: React Router, Data Loading](https://reactrouter.com/start/data/data-loading) and [`redirect`](https://reactrouter.com/api/utils/redirect)
+  Official docs for route `loader` functions. Use for: the `requireTeacher` guard in `web/src/features/shared/`.
+- [Documentation: Testing Library, Guiding Principles](https://testing-library.com/docs/guiding-principles) and [Queries](https://testing-library.com/docs/queries/about)
+  "The more your tests resemble the way your software is used, the more confidence they can give you." Use for: the web screen tests.
+- [Documentation: Vite, Env Variables and Modes](https://vite.dev/guide/env-and-mode) and [Server Options (proxy)](https://vite.dev/config/server-options)
+  Official: `VITE_*` variables are exposed in client code. Use for: the `/api` dev proxy and why the API key must not be a `VITE_` variable.
+
 ## Wisdom (Communities)
+
+- [Reactiflux](https://www.reactiflux.com/)
+  Large React practitioner chat community (Discord). Use for: real-world review of React patterns such as effect-free data flow.
+- [r/reactjs](https://www.reddit.com/r/reactjs/)
+  Busy React subreddit with a weekly beginner thread.
 
 - [Netlify Support Forums — Serverless Functions Category](https://answers.netlify.com/c/support/functions/)
   Active practitioner forum with Netlify engineers debugging real-world `netlify.toml`, `included_files`, and cold-start behavior.

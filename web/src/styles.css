@@ -36,7 +36,7 @@ header.top{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-
 .btn[disabled]{opacity:.45;cursor:not-allowed}
 .btn.sm{padding:5px 10px;font-size:13px}
 a.btn{display:inline-block;text-decoration:none;color:inherit}
-input[type=text],input[type=email],input[type=number],select,textarea{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:8px 10px;min-width:0;width:100%}
+input[type=text],input[type=email],input[type=password],input[type=number],select,textarea{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:8px 10px;min-width:0;width:100%}
 textarea{resize:vertical;min-height:64px}
 
 .bar{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px;display:flex;flex-wrap:wrap;gap:12px 20px;align-items:center;justify-content:space-between}
@@ -58,7 +58,8 @@ textarea{resize:vertical;min-height:64px}
 .row.between{justify-content:space-between}
 .note,.empty{font-size:13px;color:var(--muted)}
 .toast{min-height:20px;font-size:14px;font-weight:700}
-.toast.err{color:var(--bad)} .toast.ok{color:var(--good)}
+.toast.err{color:var(--bad)} .toast.ok{color:var(--good)} .toast.warn{color:var(--warn)}
+.toast-code{margin-left:8px;font-family:var(--font-mono);font-size:12px;font-weight:400;color:var(--muted)}
 
 .board-shell{position:relative;width:100%;max-width:min(100%,720px);aspect-ratio:1;margin:0 auto}
 .board{position:absolute;inset:0;display:grid;gap:5px;padding:5px;background:var(--sunk);border-radius:12px;border:1px solid var(--line)}
@@ -95,3 +96,35 @@ table.lb{width:100%;border-collapse:collapse;font-size:14px;font-variant-numeric
 .lb td.n,.lb th.n{text-align:right}
 .lb tr.me td{font-weight:700;background:var(--sunk)}
 .visually-hidden{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+/* Teacher login (claudPoc/concept-chain/login.html) */
+.login{max-width:440px;width:100%;margin:8vh auto 0}
+.field{display:flex;flex-direction:column;gap:4px}
+.field label{font-size:12px;font-weight:700;color:var(--muted)}
+.foot{font-size:13px;color:var(--muted)}
+.foot a{color:var(--accent)}
+
+/* Lobby (claudPoc/concept-chain/lobby.html page styles) */
+.hero{display:grid;grid-template-columns:auto 1fr auto;gap:16px 20px;align-items:center;padding:20px}
+@media (max-width:640px){.hero{grid-template-columns:auto 1fr}.hero .room{grid-column:1/-1;align-items:flex-start}}
+.hero h2{font-family:var(--font-display);font-weight:800;font-size:clamp(22px,3.4vw,30px);margin:0;letter-spacing:-.02em}
+.hero p{margin:4px 0 0}
+.avatar{width:44px;height:44px;border-radius:50%;display:grid;place-items:center;font-weight:700;color:#fff;flex:none;font-size:17px}
+.avatar.big{width:64px;height:64px;font-size:26px}
+.wait{display:inline-flex;align-items:center;gap:8px;font-weight:700;color:var(--accent)}
+.pulse{width:10px;height:10px;border-radius:50%;background:var(--accent);animation:pulse 1.4s ease-in-out infinite}
+@keyframes pulse{50%{opacity:.25;transform:scale(.7)}}
+@media (prefers-reduced-motion:reduce){.pulse{animation:none}}
+.grid2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;align-items:start}
+@media (max-width:820px){.grid2{grid-template-columns:minmax(0,1fr)}}
+.people{display:flex;flex-wrap:wrap;gap:10px;list-style:none;margin:0;padding:0}
+.people li{display:flex;align-items:center;gap:8px;background:var(--sunk);border-radius:999px;padding:4px 12px 4px 4px;font-size:14px}
+.people li .avatar{width:28px;height:28px;font-size:12px}
+.people li.me{outline:2px solid var(--accent)}
+.people li.left{opacity:.55}
+.people li.waiting{background:none}
+dl.facts{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;margin:0;font-size:14px}
+dl.facts dt{color:var(--muted)} dl.facts dd{margin:0;font-weight:700}
+
+/* Learner Quick Join (claudPoc/concept-chain/participant.html join form) */
+.code-input{font-family:var(--font-mono);letter-spacing:.12em;text-transform:uppercase}

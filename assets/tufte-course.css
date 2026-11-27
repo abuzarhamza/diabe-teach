@@ -364,3 +364,40 @@ table.ref-table th {
     break-inside: avoid;
   }
 }
+
+/* Path Hunt (assets/path-hunt.js): free-recall "where does it live?" tasks */
+.hunt-task { margin: 0 0 1.4rem; }
+.hunt-row { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; margin-top: 0.4rem; }
+.hunt-input {
+  flex: 1 1 18rem;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace;
+  font-size: 0.9rem;
+  padding: 0.45rem 0.6rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+  background: var(--bg-paper);
+}
+.hunt-input.correct { border-color: var(--accent-green); }
+.hunt-input.incorrect { border-color: var(--accent-crimson); }
+
+/* Layer colours for the React web app lessons: features (screens), api (fetch/storage), domain (pure rules) */
+.step-card.layer-features { border-left-color: var(--accent-navy); }
+.step-card.layer-api { border-left-color: var(--accent-amber); }
+.step-card.layer-domain { border-left-color: var(--accent-green); }
+.layer-api .step-badge { background: var(--accent-amber); }
+.layer-domain .step-badge { background: var(--accent-green); }
+
+@media print {
+  .hunt-row, .quiz-options { display: none; }
+}
+
+/* Conversion Stepper (assets/conversion-stepper.js): old code → new code, one block at a time */
+.stepper-panes { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+@media (max-width: 760px) { .stepper-panes { grid-template-columns: 1fr; } }
+.stepper-panes h3 { margin-top: 0; }
+.stepper-old, .stepper-new { min-height: 12rem; white-space: pre; }
+.stepper-line { display: inline; }
+.stepper-line.active { background: color-mix(in srgb, var(--accent-amber) 22%, transparent); }
+.stepper-line.replaced { text-decoration: line-through; color: var(--ink-muted); }
+.stepper-no { color: var(--ink-muted); user-select: none; }
+.stepper-new { border-left-color: var(--accent-green); }
