@@ -1,6 +1,7 @@
 import type {
   EnvYamlAuthConfig,
   EnvYamlConfig,
+  EnvYamlLoggingConfig,
   EnvYamlMongoConfig,
   ResolvedEnvConfig,
 } from "./env-yaml-config-loader.types.js";
@@ -52,11 +53,31 @@ export class EnvYamlConfigLoader {
         };
       }
 
+      if (parsed.logging && typeof parsed.logging === "object") {
+        const logging = parsed.logging as Record<string, unknown>;
+        (result as { logging: EnvYamlLoggingConfig }).logging = {
+          level: typeof logging.level === "string"
+            ? logging.level
+            : undefined,
+          pretty: EnvYamlConfigLoader.#toBoolean(logging.pretty),
+        };
+      }
+
       return result;
     }
     catch {
       return {};
     }
+  }
+
+  static #toBoolean(value: unknown): boolean | undefined {
+    if (typeof value === "boolean") {
+      return value;
+    }
+    if (value === "true" || value === "false") {
+      return value === "true";
+    }
+    return undefined;
   }
 
   public static loadFromFile(filePath: string): EnvYamlConfig {
@@ -80,6 +101,8 @@ export class EnvYamlConfigLoader {
       capabilityTokenSecret: config.auth?.capability_token_secret,
       accountTokenSecret: config.auth?.account_token_secret,
       apiKey: config.auth?.api_key,
+      logLevel: config.logging?.level,
+      logPretty: config.logging?.pretty,
     };
   }
 }

@@ -4,7 +4,9 @@
 
 **Blocked by:** 04-pretest-handler
 
-**Status:** ready-for-agent
+**Status:** resolved
+
+Resolved 2026-11-20: done in `3e37faf` (route `POST /api/v1/sessions/{sessionId}/assessments/{stage}`, `netlify/functions/submit-assessment.ts`; tests `tests/functions/submit-assessment.test.ts`, `assessment-journey.feature`).
 
 - [ ] Add grading logic: compare answers to `pack.assessmentInstrument.questions[].correctIndex`
 - [ ] Compute `AssessmentStageSummary` for both pretest and posttest

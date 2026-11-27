@@ -1,4 +1,5 @@
 import type { CurriculumPackProps } from "../../domain/curriculum-pack/curriculum-pack.types.js";
+import type { LoggerPort } from "./logger.port.js";
 
 export interface ValidationError {
   readonly path: string;
@@ -26,5 +27,5 @@ export interface ValidateCurriculumPackResult {
 }
 
 export interface ValidateCurriculumPackUseCasePort {
-  execute: (input: ValidateCurriculumPackInput) => Promise<ValidateCurriculumPackResult>;
+  execute: (input: ValidateCurriculumPackInput, logger?: LoggerPort) => Promise<ValidateCurriculumPackResult>;
 }

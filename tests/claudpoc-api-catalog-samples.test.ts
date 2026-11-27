@@ -90,13 +90,7 @@ function demoState(phase = "round-2:peer-adjudication") {
         keywordIds: ["insulin", "hba1c"],
         labels: ["Insulin", "HbA1c"],
         narrativeExplanation: "Insulin lowers HbA1c.",
-        stepRationales: [
-          {
-            fromCoord: { row: 0, col: 0 },
-            toCoord: { row: 1, col: 1 },
-            rationale: "Lower glucose over months.",
-          },
-        ],
+        stepRationales: ["Lower glucose over months."],
         status: "approved",
         verdict: null,
         peerVotes: [],
@@ -230,6 +224,13 @@ describe("claudPoc Concept Chain live API samples", () => {
       currentPhase: "round-2:peer-adjudication",
       phaseEndsAt: "2026-11-17T10:04:00.000Z",
       participantCount: 2,
+    });
+    const shownBoard = sampleOf("getGameSessionState")(state).response?.body.state as { activeBoard: { rows: number; cells: { row: number; col: number; card: { id: string; displayLabel: string } }[][] } };
+    expect(shownBoard.activeBoard.rows).toBe(board.rows);
+    expect(shownBoard.activeBoard.cells[1]?.[1]).toMatchObject({
+      row: 1,
+      col: 1,
+      card: { id: "hba1c", displayLabel: "HbA1c" },
     });
     expect(sampleOf("transitionSessionPhase")(state).response?.body.state).toMatchObject({ currentPhase: "round-2:round-summary", activeRoundNumber: 2, phaseEndsAt: null });
     const standings = sampleOf("getRoundStandings")(state);

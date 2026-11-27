@@ -1,5 +1,6 @@
 import type { ClockPort } from "./clock.port.js";
 import type { CurriculumPackRepositoryPort } from "./curriculum-pack-repository.port.js";
+import type { LoggerPort } from "./logger.port.js";
 
 export interface UnarchiveCurriculumPackInput {
   readonly packId: string;
@@ -21,5 +22,5 @@ export interface UnarchiveCurriculumPackDependencies {
 }
 
 export interface UnarchiveCurriculumPackUseCasePort {
-  execute: (input: UnarchiveCurriculumPackInput) => Promise<UnarchiveCurriculumPackResult>;
+  execute: (input: UnarchiveCurriculumPackInput, logger?: LoggerPort) => Promise<UnarchiveCurriculumPackResult>;
 }

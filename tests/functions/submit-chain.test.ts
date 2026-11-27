@@ -1,10 +1,13 @@
 import type { APIGatewayProxyEvent } from "aws-lambda";
+import type { BoardConfig } from "../../src/domain/curriculum-pack/curriculum-pack.types.js";
 import { describe, expect, it } from "vitest";
 import { createSubmitChainHandler } from "../../netlify/functions/sessions/submit-chain.js";
 import { createTransitionPhaseHandler } from "../../netlify/functions/sessions/transition-phase.js";
 import { FakeCapabilityTokenAdapter } from "../../src/adapters/outbound/fake-capability-token-adapter.js";
 import { InMemoryCurriculumPackRepository } from "../../src/adapters/outbound/in-memory-curriculum-pack-repository.js";
 import { InMemoryGameSessionRepository } from "../../src/adapters/outbound/in-memory-game-session-repository.js";
+import { CurriculumPack } from "../../src/domain/curriculum-pack/curriculum-pack.js";
+import { DIABE_TEACH_PACK } from "../../src/domain/curriculum-pack/diabe-teach-pack.js";
 import { GameSession } from "../../src/domain/game-session/game-session.js";
 
 function makeEvent(
@@ -57,6 +60,7 @@ describe("post /api/v1/sessions/{sessionId}/rounds/{n}/chains", () => {
     });
 
     const handler = createSubmitChainHandler({
+      packRepo: new InMemoryCurriculumPackRepository(),
       sessionRepo,
       tokenVerifier: tokenAdapter,
     });
@@ -103,6 +107,7 @@ describe("post /api/v1/sessions/{sessionId}/rounds/{n}/chains", () => {
     });
 
     const handler = createSubmitChainHandler({
+      packRepo: new InMemoryCurriculumPackRepository(),
       sessionRepo,
       tokenVerifier: tokenAdapter,
     });
@@ -143,9 +148,9 @@ describe("post /api/v1/sessions/{sessionId}/rounds/{n}/chains", () => {
     });
 
     const handler = createSubmitChainHandler({
+      packRepo: new InMemoryCurriculumPackRepository(),
       sessionRepo,
       tokenVerifier: tokenAdapter,
-      minChainLength: 4,
     });
 
     const event = makeEvent(
@@ -182,6 +187,7 @@ describe("post /api/v1/sessions/{sessionId}/rounds/{n}/chains", () => {
     });
 
     const handler = createSubmitChainHandler({
+      packRepo: new InMemoryCurriculumPackRepository(),
       sessionRepo,
       tokenVerifier: tokenAdapter,
     });
@@ -222,6 +228,7 @@ describe("post /api/v1/sessions/{sessionId}/rounds/{n}/chains", () => {
     });
 
     const handler = createSubmitChainHandler({
+      packRepo: new InMemoryCurriculumPackRepository(),
       sessionRepo,
       tokenVerifier: tokenAdapter,
     });
@@ -283,7 +290,11 @@ describe("post /api/v1/sessions/{sessionId}/rounds/{n}/chains for a round that i
       sessionId: session.sessionId.value,
       participantId: participant.participantId,
     });
-    const handler = createSubmitChainHandler({ sessionRepo, tokenVerifier: tokenAdapter });
+    const handler = createSubmitChainHandler({
+      packRepo: new InMemoryCurriculumPackRepository(),
+      sessionRepo,
+      tokenVerifier: tokenAdapter,
+    });
     const submitTo = async (roundNumber: number) => handler(
       makeEvent(session.sessionId.value, roundNumber, validChain, {
         authorization: `Bearer ${token}`,
@@ -358,7 +369,11 @@ describe("repeat Concept Chains from the same participant", () => {
     const sessionId = session.sessionId.value;
     const sessionRepo = new InMemoryGameSessionRepository([session]);
     const tokenAdapter = new FakeCapabilityTokenAdapter();
-    const handler = createSubmitChainHandler({ sessionRepo, tokenVerifier: tokenAdapter });
+    const handler = createSubmitChainHandler({
+      packRepo: new InMemoryCurriculumPackRepository(),
+      sessionRepo,
+      tokenVerifier: tokenAdapter,
+    });
     const aliceToken = await tokenAdapter.signToken({ role: "participant", sessionId, participantId: alice.participantId });
     const bobToken = await tokenAdapter.signToken({ role: "participant", sessionId, participantId: bob.participantId });
 
@@ -439,5 +454,106 @@ describe("repeat Concept Chains from the same participant", () => {
     expect(inRound1.statusCode).toBe(201);
     expect(inRound2.statusCode).toBe(201);
     expect((await storedChains()).map(chain => chain.roundNumber)).toEqual([1, 2]);
+  });
+});
+
+describe("minimum chain length from the Curriculum Pack", () => {
+  const STRAIGHT_LINE = [
+    { row: 0, col: 0 },
+    { row: 0, col: 1 },
+    { row: 0, col: 2 },
+    { row: 0, col: 3 },
+  ];
+
+  /** A version of the default pack with its own id, version and board config. */
+  const packVersion = (version: string, boardConfig: BoardConfig) => CurriculumPack.create({
+    ...DIABE_TEACH_PACK,
+    id: "chain-length-pack",
+    version,
+    boardConfig,
+    isSystemPack: false,
+  });
+
+  /** A session pinned to `pinnedVersion` of the stored pack versions, in Round 1 Chain-Mapping. */
+  async function setUp(storedVersions: readonly CurriculumPack[], pinnedVersion: string) {
+    const session = GameSession.create({
+      packId: "chain-length-pack",
+      packVersion: pinnedVersion,
+      mode: "classroom",
+      adjudicationMode: "peer-instructor",
+      timerConfig: { roundMappingSec: null },
+    });
+    session.transitionTo("trial-orientation", new Date());
+    session.transitionTo("round-1:chain-mapping", new Date());
+    const alice = session.addParticipant("Alice");
+    const sessionId = session.sessionId.value;
+    const sessionRepo = new InMemoryGameSessionRepository([session]);
+    const tokenAdapter = new FakeCapabilityTokenAdapter();
+    const handler = createSubmitChainHandler({
+      packRepo: new InMemoryCurriculumPackRepository(storedVersions),
+      sessionRepo,
+      tokenVerifier: tokenAdapter,
+    });
+    const token = await tokenAdapter.signToken({ role: "participant", sessionId, participantId: alice.participantId });
+
+    const submitCells = async (cellCount: number) => {
+      const response = await handler(makeEvent(sessionId, 1, {
+        path: STRAIGHT_LINE.slice(0, cellCount),
+        keywordIds: [],
+        narrativeExplanation: `A ${cellCount}-cell chain`,
+      }, { authorization: `Bearer ${token}` }), {} as any);
+      return {
+        statusCode: response.statusCode as number,
+        body: JSON.parse(response.body),
+      };
+    };
+    const storedChains = async () => (await sessionRepo.findById(session.sessionId))?.chains ?? [];
+
+    return { submitCells, storedChains };
+  }
+
+  it("accepts 3 cells and refuses 2 when the pinned Pack Version sets a minimum of 3", async () => {
+    // A later version raises the minimum, but the session plays the version it pinned.
+    const { submitCells, storedChains } = await setUp([
+      packVersion("1.0.0", {
+        rows: 7,
+        cols: 7,
+        minChainLength: 3,
+        adjacencyRule: "chebyshev-8",
+      }),
+      packVersion("2.0.0", {
+        rows: 7,
+        cols: 7,
+        minChainLength: 5,
+        adjacencyRule: "chebyshev-8",
+      }),
+    ], "1.0.0");
+
+    const twoCells = await submitCells(2);
+    expect(twoCells.statusCode).toBe(422);
+    expect(twoCells.body.code).toBe("CHAIN_TOPOLOGY_INVALID");
+    expect(twoCells.body.message).toContain("at least 3 cells");
+    expect(await storedChains()).toHaveLength(0);
+
+    const threeCells = await submitCells(3);
+    expect(threeCells.statusCode).toBe(201);
+    expect(threeCells.body.chain.chainLength).toBe(3);
+  });
+
+  it("refuses 3 cells and accepts 4 when the pack sets no minimum", async () => {
+    const noMinimum = { rows: 7, cols: 7, adjacencyRule: "chebyshev-8" } as unknown as BoardConfig;
+    const { submitCells, storedChains } = await setUp([
+      packVersion("1.0.0", noMinimum),
+    ], "1.0.0");
+
+    const threeCells = await submitCells(3);
+    expect(threeCells.statusCode).toBe(422);
+    expect(threeCells.body.code).toBe("CHAIN_TOPOLOGY_INVALID");
+    expect(threeCells.body.message).toContain("at least 4 cells");
+    expect(await storedChains()).toHaveLength(0);
+
+    const fourCells = await submitCells(4);
+    expect(fourCells.statusCode).toBe(201);
+    expect(fourCells.body.chain.chainLength).toBe(4);
   });
 });

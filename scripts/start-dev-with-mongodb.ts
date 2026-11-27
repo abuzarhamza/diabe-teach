@@ -8,6 +8,10 @@
  * (`GET /api/v1/packs`) answers with a non-404 status. Wait for that line
  * before running `npm run test:bdd`.
  *
+ * Everything Netlify Dev and the functions print is also written to
+ * `.netlify/dev-local.log` (emptied at each start), which
+ * `npm run test:bdd` points at when a feature fails or hangs.
+ *
  * Netlify Dev runs in its own process group; SIGINT/SIGTERM to this script
  * stops the whole group (SIGTERM, then SIGKILL after a grace period) and the
  * in-memory MongoDB. `npm run dev:local:stop` does the same from outside.
@@ -16,6 +20,8 @@
  *   npx tsx scripts/start-dev-with-mongodb.ts
  *   # or via npm script:
  *   npm run dev:local
+ *   LOG_PRETTY=false npm run dev:local   # raw JSON lines instead of pino-pretty
+ *   LOG_LEVEL=silent npm run dev:local   # quiet server logs during BDD runs
  *
  * `--no-api-key` (`npm run dev:prototype`) starts the same server with the
  * x-api-key check turned off, so the Concept Chain prototype pages at
@@ -25,7 +31,7 @@
 
 import type { ChildProcess } from "node:child_process";
 import { spawn } from "node:child_process";
-import { readdirSync } from "node:fs";
+import { createWriteStream, mkdirSync, readdirSync } from "node:fs";
 import { basename, extname } from "node:path";
 import process from "node:process";
 import { setTimeout as delay } from "node:timers/promises";
@@ -43,6 +49,7 @@ const READY_PROBE_PATH = "/api/v1/packs";
 const READY_TIMEOUT_MS = 180_000;
 const STOP_GRACE_MS = 5_000;
 const FUNCTIONS_DIR = "netlify/functions";
+const LOG_FILE = ".netlify/dev-local.log";
 const NO_API_KEY = process.argv.includes("--no-api-key");
 const PROTOTYPE_URL = `${DEV_URL}/claudPoc/concept-chain/login.html`;
 // eslint-disable-next-line no-control-regex
@@ -52,6 +59,14 @@ let mongod: MongoMemoryServer | null = null;
 let netlifyProcess: ChildProcess | null = null;
 let shuttingDown = false;
 const loadedFunctions = new Set<string>();
+mkdirSync(".netlify", { recursive: true });
+const logFile = createWriteStream(LOG_FILE, { flags: "w" });
+
+/** Prints a line to the console and to the log file. */
+function say(line: string, target: NodeJS.WriteStream = process.stdout): void {
+  target.write(`${line}\n`);
+  logFile.write(`${line}\n`);
+}
 
 function isShuttingDown(): boolean {
   return shuttingDown;
@@ -75,7 +90,7 @@ async function startMongoDB(): Promise<string> {
   });
 
   const uri = mongod.getUri();
-  console.log(`✅ MongoDB started at: ${uri}`);
+  say(`✅ MongoDB started at: ${uri}`);
 
   // Seed the curriculum pack
   await seedCurriculumPack(uri);
@@ -127,6 +142,7 @@ function forwardOutput(stream: NodeJS.ReadableStream | null, target: NodeJS.Writ
   let pending = "";
   stream?.on("data", (chunk: Buffer) => {
     target.write(chunk);
+    logFile.write(chunk);
     pending += chunk.toString("utf8");
     const lines = pending.split("\n");
     pending = lines.pop() ?? "";
@@ -194,7 +210,8 @@ async function waitUntilReady(): Promise<void> {
     if (allLoaded) {
       const status = await probeStatus();
       if (status !== null && status !== 404) {
-        console.log(`DEV READY ${DEV_URL}`);
+        say(`DEV LOG ${LOG_FILE}`);
+        say(`DEV READY ${DEV_URL}`);
         if (NO_API_KEY) {
           console.log(`PROTOTYPE ${PROTOTYPE_URL} (x-api-key check off)`);
         }
@@ -205,7 +222,7 @@ async function waitUntilReady(): Promise<void> {
   }
   if (!isShuttingDown()) {
     const missing = [...expected].filter(name => !loadedFunctions.has(name));
-    console.error(`DEV NOT READY after ${READY_TIMEOUT_MS / 1000}s (functions not loaded: ${missing.join(", ") || "none"}; ${READY_PROBE_PATH} still 404 or unreachable)`);
+    say(`DEV NOT READY after ${READY_TIMEOUT_MS / 1000}s (functions not loaded: ${missing.join(", ") || "none"}; ${READY_PROBE_PATH} still 404 or unreachable)`, process.stderr);
   }
 }
 

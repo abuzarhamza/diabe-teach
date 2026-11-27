@@ -6,10 +6,12 @@ import type {
   JoinGameSessionResult,
   JoinGameSessionUseCasePort,
 } from "../ports/join-game-session.port.js";
+import type { LoggerPort } from "../ports/logger.port.js";
 import { RoomCodeNotFoundError } from "../../domain/errors/domain-errors.js";
 import { RoomCode } from "../../domain/game-session/room-code.js";
 import { PublicSessionStateProjector } from "../dtos/public-session-state-projector.js";
 import { GameSessionUpdateRetrier } from "../services/game-session-update-retrier.js";
+import { SilentLogger } from "../services/silent-logger.js";
 
 export class JoinGameSessionUseCase implements JoinGameSessionUseCasePort {
   readonly #sessionRepo: GameSessionRepositoryPort;
@@ -18,12 +20,13 @@ export class JoinGameSessionUseCase implements JoinGameSessionUseCasePort {
 
   public constructor(deps: JoinGameSessionDependencies) {
     this.#sessionRepo = deps.sessionRepo;
-    this.#sessionUpdates = new GameSessionUpdateRetrier(deps.sessionRepo);
+    this.#sessionUpdates = new GameSessionUpdateRetrier(deps.sessionRepo, deps.writeConflictBackoff);
     this.#tokenSigner = deps.tokenSigner;
   }
 
   public async execute(
     command: JoinGameSessionCommand,
+    logger: LoggerPort = new SilentLogger(),
   ): Promise<JoinGameSessionResult> {
     const roomCode = RoomCode.from(command.roomCode);
     const found = await this.#sessionRepo.findByRoomCode(roomCode);
@@ -38,6 +41,11 @@ export class JoinGameSessionUseCase implements JoinGameSessionUseCasePort {
         session,
         participant: session.addParticipant(command.displayName ?? "Anonymous"),
       }),
+      { logger },
+    );
+    logger.info(
+      { sessionId: session.sessionId.value, participantId: participant.participantId },
+      "learner joined",
     );
 
     const participantToken = await this.#tokenSigner.signToken({

@@ -1,21 +1,25 @@
 import type { APIGatewayProxyEvent, APIGatewayProxyResult } from "aws-lambda";
 import type { CapabilityTokenPort, VerifiedCapability } from "../../../src/application/ports/capability-token.port.js";
 import type { ClockPort } from "../../../src/application/ports/clock.port.js";
+import type { CurriculumPackRepositoryPort } from "../../../src/application/ports/curriculum-pack-repository.port.js";
 import type { GameSessionRepositoryPort } from "../../../src/application/ports/game-session-repository.port.js";
 import type { SubmitConceptChainCommand } from "../../../src/application/ports/submit-concept-chain.port.js";
+import type { WriteConflictBackoffPort } from "../../../src/application/ports/write-conflict-backoff.port.js";
 import { readOptionalJsonObjectBody } from "../../../src/adapters/inbound/http/json-object-body.js";
 import { createApiHandler } from "../../../src/adapters/inbound/http/middy/api-handler.js";
+import { requestLoggerOf } from "../../../src/adapters/inbound/http/request-logger.js";
 import { AppRuntime } from "../../../src/app-runtime.js";
 import { SubmitConceptChainUseCase } from "../../../src/application/use-cases/submit-concept-chain.use-case.js";
 import { ForbiddenRoleError, UnauthorizedTokenError } from "../../../src/domain/errors/domain-errors.js";
 
 export interface SubmitChainHandlerDependencies {
   readonly sessionRepo: GameSessionRepositoryPort;
+  readonly packRepo: CurriculumPackRepositoryPort;
   readonly tokenVerifier: CapabilityTokenPort;
   readonly clock?: ClockPort;
-  readonly minChainLength?: number;
   readonly apiKey?: string;
   readonly requireApiKey?: boolean;
+  readonly writeConflictBackoff?: WriteConflictBackoffPort;
 }
 
 export function createSubmitChainHandler(
@@ -24,16 +28,19 @@ export function createSubmitChainHandler(
   const prodDeps = AppRuntime.getProductionDependencies();
   const deps: SubmitChainHandlerDependencies = dependencies ?? {
     sessionRepo: prodDeps.sessionRepo!,
+    packRepo: prodDeps.packRepo,
     tokenVerifier: prodDeps.tokenVerifier!,
     apiKey: prodDeps.apiKey,
     requireApiKey: prodDeps.requireApiKey,
+    writeConflictBackoff: prodDeps.writeConflictBackoff,
   };
   const clock = deps.clock ?? prodDeps.clock!;
 
   const useCase = new SubmitConceptChainUseCase({
     sessionRepo: deps.sessionRepo,
+    writeConflictBackoff: deps.writeConflictBackoff,
+    packRepo: deps.packRepo,
     clock,
-    minChainLength: deps.minChainLength,
   });
 
   const rawHandler = async (
@@ -67,7 +74,7 @@ export function createSubmitChainHandler(
       keywordIds: body.keywordIds ?? [],
       narrativeExplanation: body.narrativeExplanation ?? "",
       stepRationales: body.stepRationales,
-    });
+    }, requestLoggerOf(event));
 
     return {
       statusCode: 201,

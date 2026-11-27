@@ -1,6 +1,7 @@
 import type { GameSession } from "../../domain/game-session/game-session.js";
 import type { LikertRating } from "../../domain/game-session/game-session.types.js";
 import type { GameSessionRepositoryPort } from "../ports/game-session-repository.port.js";
+import type { LoggerPort } from "../ports/logger.port.js";
 import type {
   SubmitPerceptionSurveyCommand,
   SubmitPerceptionSurveyDependencies,
@@ -18,6 +19,7 @@ import {
 import { SessionId } from "../../domain/game-session/session-id.js";
 import { GameSessionUpdateRetrier } from "../services/game-session-update-retrier.js";
 import { SessionPackLoader } from "../services/session-pack-loader.js";
+import { SilentLogger } from "../services/silent-logger.js";
 
 const MAX_COMMENT_WORDS = 1000;
 const VALID_LIKERT_VALUES = new Set<LikertRating>([1, 2, 3, 4, 5]);
@@ -30,12 +32,13 @@ export class SubmitPerceptionSurveyUseCase implements SubmitPerceptionSurveyUseC
 
   public constructor(deps: SubmitPerceptionSurveyDependencies) {
     this.#sessionRepo = deps.sessionRepo;
-    this.#sessionUpdates = new GameSessionUpdateRetrier(deps.sessionRepo);
+    this.#sessionUpdates = new GameSessionUpdateRetrier(deps.sessionRepo, deps.writeConflictBackoff);
     this.#packs = new SessionPackLoader(deps.packRepo);
   }
 
   public async execute(
     command: SubmitPerceptionSurveyCommand,
+    logger: LoggerPort = new SilentLogger(),
   ): Promise<SurveySubmissionReceipt> {
     // Validate participant role (only participants can submit, not instructors)
     if (command.verifiedCapability.role !== "participant") {
@@ -56,11 +59,15 @@ export class SubmitPerceptionSurveyUseCase implements SubmitPerceptionSurveyUseC
       throw new SessionNotFoundError(command.sessionId);
     }
 
+    // A learner who left is refused before any phase check (the domain
+    // enforces it again on submit).
+    loaded.assertParticipantHasNotLeft(participantId);
+
     // Validate phase is feedback-survey
     this.#validatePhase(loaded);
 
     // Load curriculum pack for valid item IDs
-    const pack = await this.#packs.load(loaded);
+    const pack = await this.#packs.load(loaded, logger);
 
     // Validate all response values are valid Likert ratings (1-5)
     this.#validateResponseValues(command.responses);
@@ -92,7 +99,9 @@ export class SubmitPerceptionSurveyUseCase implements SubmitPerceptionSurveyUseC
         this.#validatePhase(session);
         return session.submitSurvey(participantId, responsesMap, command.comments);
       },
+      { logger },
     );
+    logger.info({ sessionId: command.sessionId, participantId }, "survey submitted");
 
     // Return receipt
     return {

@@ -61,6 +61,15 @@ export async function getSession(sessionId: string, token: string) {
   return toApiGatewayResult(res);
 }
 
+export async function getSessionAnalytics(sessionId: string, token: string) {
+  const res = await request(BASE_URL)
+    .get(`/api/v1/sessions/${sessionId}/analytics`)
+    .set("x-api-key", API_KEY)
+    .set("Authorization", `Bearer ${token}`);
+
+  return toApiGatewayResult(res);
+}
+
 export async function transitionPhase(
   sessionId: string,
   token: string,
@@ -80,13 +89,46 @@ export async function transitionPhase(
   return toApiGatewayResult(res);
 }
 
+export async function extendPhase(
+  sessionId: string,
+  token: string,
+  body: { seconds?: number } = {},
+) {
+  const res = await request(BASE_URL)
+    .post(`/api/v1/sessions/${sessionId}/phase/extend`)
+    .set("Content-Type", "application/json")
+    .set("x-api-key", API_KEY)
+    .set("Authorization", `Bearer ${token}`)
+    .send(body);
+
+  return toApiGatewayResult(res);
+}
+
+export async function endSession(sessionId: string, token: string) {
+  const res = await request(BASE_URL)
+    .post(`/api/v1/sessions/${sessionId}/end`)
+    .set("x-api-key", API_KEY)
+    .set("Authorization", `Bearer ${token}`);
+
+  return toApiGatewayResult(res);
+}
+
+export async function leaveSession(sessionId: string, token: string) {
+  const res = await request(BASE_URL)
+    .post(`/api/v1/sessions/${sessionId}/leave`)
+    .set("x-api-key", API_KEY)
+    .set("Authorization", `Bearer ${token}`);
+
+  return toApiGatewayResult(res);
+}
+
 export async function submitChain(
   sessionId: string,
   roundNumber: number,
   token: string,
   body: {
     path: Array<{ row: number; col: number }>;
-    keywordIds: string[];
+    keywordIds?: string[];
     narrativeExplanation: string;
     stepRationales?: string[];
   },
@@ -202,6 +244,50 @@ export async function signInInstructor(body: { email?: string; password?: string
     .set("Content-Type", "application/json")
     .set("x-api-key", API_KEY)
     .send(body);
+
+  return toApiGatewayResult(res);
+}
+
+/** GET /api/v1/accounts/me with an optional bearer token. */
+export async function getCurrentAccount(token?: string) {
+  const req = request(BASE_URL)
+    .get("/api/v1/accounts/me")
+    .set("x-api-key", API_KEY);
+  if (token) {
+    req.set("Authorization", `Bearer ${token}`);
+  }
+  const res = await req;
+
+  return toApiGatewayResult(res);
+}
+
+/** POST /api/v1/packs/validate with an optional bearer token. */
+export async function validatePack(body: Record<string, unknown>, token?: string) {
+  const req = request(BASE_URL)
+    .post("/api/v1/packs/validate")
+    .set("Content-Type", "application/json")
+    .set("x-api-key", API_KEY);
+  if (token) {
+    req.set("Authorization", `Bearer ${token}`);
+  }
+  const res = await req.send(body);
+
+  return toApiGatewayResult(res);
+}
+
+/** POST /api/v1/packs with a raw JSON string of `byteLength` UTF-8 bytes. */
+export async function postOversizedPackPayload(byteLength: number, token?: string) {
+  const shell = "{\"padding\":\"\"}";
+  const paddingLength = Math.max(0, byteLength - shell.length);
+  const rawBody = `{"padding":"${"a".repeat(paddingLength)}"}`;
+  const req = request(BASE_URL)
+    .post("/api/v1/packs")
+    .set("Content-Type", "application/json")
+    .set("x-api-key", API_KEY);
+  if (token) {
+    req.set("Authorization", `Bearer ${token}`);
+  }
+  const res = await req.send(rawBody);
 
   return toApiGatewayResult(res);
 }

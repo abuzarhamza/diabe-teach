@@ -1,12 +1,18 @@
 import type { GridCoord } from "../../domain/game-session/concept-chain.js";
 import type { VerifiedCapability } from "./capability-token.port.js";
 import type { ClockPort } from "./clock.port.js";
+import type { CurriculumPackRepositoryPort } from "./curriculum-pack-repository.port.js";
 import type { GameSessionRepositoryPort } from "./game-session-repository.port.js";
+import type { LoggerPort } from "./logger.port.js";
+import type { WriteConflictBackoffPort } from "./write-conflict-backoff.port.js";
 
 export interface SubmitConceptChainDependencies {
   readonly sessionRepo: GameSessionRepositoryPort;
+  /** Supplies the minimum chain length, from the session's pinned Pack Version. */
+  readonly packRepo: CurriculumPackRepositoryPort;
   readonly clock: ClockPort;
-  readonly minChainLength?: number;
+  /** Waits between write-conflict retries; without one the retrier retries at once. */
+  readonly writeConflictBackoff?: WriteConflictBackoffPort;
 }
 
 export interface SubmitConceptChainCommand {
@@ -14,6 +20,10 @@ export interface SubmitConceptChainCommand {
   readonly roundNumber: 1 | 2;
   readonly verifiedCapability: VerifiedCapability;
   readonly path: readonly GridCoord[];
+  /**
+   * Keyword ids claimed by the client. Ignored when the round has a dealt
+   * board (the ids come from the board); kept only for legacy sessions.
+   */
   readonly keywordIds: readonly string[];
   readonly narrativeExplanation: string;
   readonly stepRationales?: readonly string[];
@@ -36,5 +46,5 @@ export interface SubmitConceptChainResult {
 }
 
 export interface SubmitConceptChainUseCasePort {
-  execute: (command: SubmitConceptChainCommand) => Promise<SubmitConceptChainResult>;
+  execute: (command: SubmitConceptChainCommand, logger?: LoggerPort) => Promise<SubmitConceptChainResult>;
 }

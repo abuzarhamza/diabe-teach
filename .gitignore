@@ -10,3 +10,7 @@ coverage/
 
 # Example configs are tracked; real .env* files stay ignored.
 !.env*.example
+
+# Stryker mutation testing output
+reports/
+.stryker-tmp/

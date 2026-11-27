@@ -8,10 +8,12 @@ import type {
 } from "../ports/create-game-session.port.js";
 import type { CurriculumPackRepositoryPort } from "../ports/curriculum-pack-repository.port.js";
 import type { GameSessionRepositoryPort } from "../ports/game-session-repository.port.js";
+import type { LoggerPort } from "../ports/logger.port.js";
 import { PackId } from "../../domain/curriculum-pack/pack-id.js";
 import { PackCannotFillBoardError, PackNotFoundError, UnauthorizedTokenError } from "../../domain/errors/domain-errors.js";
 import { GameSession } from "../../domain/game-session/game-session.js";
 import { PublicSessionStateProjector } from "../dtos/public-session-state-projector.js";
+import { SilentLogger } from "../services/silent-logger.js";
 
 export class CreateGameSessionUseCase implements CreateGameSessionUseCasePort {
   readonly #packRepo: CurriculumPackRepositoryPort;
@@ -28,6 +30,7 @@ export class CreateGameSessionUseCase implements CreateGameSessionUseCasePort {
 
   public async execute(
     command: CreateGameSessionCommand,
+    logger: LoggerPort = new SilentLogger(),
   ): Promise<CreateGameSessionResult> {
     const isSolo = command.mode === "solo";
     const ownerAccountId = isSolo
@@ -80,6 +83,15 @@ export class CreateGameSessionUseCase implements CreateGameSessionUseCasePort {
     }
 
     await this.#sessionRepo.create(session);
+    logger.info(
+      {
+        sessionId: session.sessionId.value,
+        mode: command.mode,
+        packId: pack.id.value,
+        packVersion: pack.version,
+      },
+      "session created",
+    );
 
     const instructorToken = await this.#tokenSigner.signToken({
       role: "instructor",

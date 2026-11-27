@@ -1,0 +1,12 @@
+meta {
+  name: 02 - Instructor Accounts
+  seq: 2
+}
+
+docs {
+  # Instructor Accounts & Account Tokens
+
+  Manages persistent **Instructor Accounts** (identified by a normalized email and an Argon2id password hash, per ADR-0007).
+
+  Signing up or signing in issues a 12-hour **Account Token** (`kind: "account"`), which is automatically saved into `{{accountToken}}` and `{{accountId}}` for use on Curriculum Pack management routes and Classroom Game creation.
+}

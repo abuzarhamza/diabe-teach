@@ -2,8 +2,10 @@ import type { APIGatewayProxyEvent, APIGatewayProxyResult } from "aws-lambda";
 import type { CapabilityTokenSignerPort } from "../../../src/application/ports/capability-token.port.js";
 import type { GameSessionRepositoryPort } from "../../../src/application/ports/game-session-repository.port.js";
 import type { JoinGameSessionCommand } from "../../../src/application/ports/join-game-session.port.js";
+import type { WriteConflictBackoffPort } from "../../../src/application/ports/write-conflict-backoff.port.js";
 import { readOptionalJsonObjectBody } from "../../../src/adapters/inbound/http/json-object-body.js";
 import { createApiHandler } from "../../../src/adapters/inbound/http/middy/api-handler.js";
+import { requestLoggerOf } from "../../../src/adapters/inbound/http/request-logger.js";
 import { AppRuntime } from "../../../src/app-runtime.js";
 import { JoinGameSessionUseCase } from "../../../src/application/use-cases/join-game-session.use-case.js";
 
@@ -13,22 +15,25 @@ export interface JoinSessionHandlerDependencies {
   readonly tokenVerifier?: unknown;
   readonly apiKey?: string;
   readonly requireApiKey?: boolean;
+  readonly writeConflictBackoff?: WriteConflictBackoffPort;
 }
 
 export function createJoinSessionHandler(
   dependencies?: JoinSessionHandlerDependencies,
 ) {
   const prodDeps = AppRuntime.getProductionDependencies();
-  const deps = dependencies ?? {
+  const deps: JoinSessionHandlerDependencies = dependencies ?? {
     sessionRepo: prodDeps.sessionRepo!,
     tokenSigner: prodDeps.tokenSigner!,
     tokenVerifier: prodDeps.tokenVerifier,
     apiKey: prodDeps.apiKey,
     requireApiKey: prodDeps.requireApiKey,
+    writeConflictBackoff: prodDeps.writeConflictBackoff,
   };
 
   const useCase = new JoinGameSessionUseCase({
     sessionRepo: deps.sessionRepo,
+    writeConflictBackoff: deps.writeConflictBackoff,
     tokenSigner: deps.tokenSigner,
   });
 
@@ -37,7 +42,7 @@ export function createJoinSessionHandler(
   ): Promise<APIGatewayProxyResult> => {
     const body = readOptionalJsonObjectBody(event.body) as unknown as JoinGameSessionCommand;
 
-    const result = await useCase.execute(body);
+    const result = await useCase.execute(body, requestLoggerOf(event));
 
     return {
       statusCode: 200,

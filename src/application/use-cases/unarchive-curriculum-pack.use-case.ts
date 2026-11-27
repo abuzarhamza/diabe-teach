@@ -1,5 +1,6 @@
 import type { ClockPort } from "../ports/clock.port.js";
 import type { CurriculumPackRepositoryPort } from "../ports/curriculum-pack-repository.port.js";
+import type { LoggerPort } from "../ports/logger.port.js";
 import type {
   UnarchiveCurriculumPackDependencies,
   UnarchiveCurriculumPackInput,
@@ -11,6 +12,7 @@ import {
   PackNotArchivedError,
   PackNotFoundError,
 } from "../../domain/errors/domain-errors.js";
+import { SilentLogger } from "../services/silent-logger.js";
 
 export class UnarchiveCurriculumPackUseCase
 implements UnarchiveCurriculumPackUseCasePort {
@@ -26,6 +28,7 @@ implements UnarchiveCurriculumPackUseCasePort {
 
   public async execute(
     input: UnarchiveCurriculumPackInput,
+    logger: LoggerPort = new SilentLogger(),
   ): Promise<UnarchiveCurriculumPackResult> {
     const packId = PackId.create(input.packId);
     const pack = await this.#packRepo.findById(packId);
@@ -42,6 +45,7 @@ implements UnarchiveCurriculumPackUseCasePort {
     const unarchivedPack = pack.unarchive(unarchivedAt, input.accountId);
 
     await this.#packRepo.update(unarchivedPack);
+    logger.info({ packId: unarchivedPack.id.value, accountId: input.accountId }, "pack unarchived");
 
     return {
       packId: unarchivedPack.id.value,

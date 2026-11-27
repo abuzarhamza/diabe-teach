@@ -41,6 +41,47 @@ export class InvalidPhaseTransitionError extends DomainError {
   }
 }
 
+export class SessionAlreadyCompletedError extends DomainError {
+  public readonly code = "SESSION_ALREADY_COMPLETED" as const;
+
+  public constructor(sessionId: string) {
+    super(`Session '${sessionId}' is already completed.`, { sessionId });
+  }
+}
+
+export class ParticipantHasLeftError extends DomainError {
+  public readonly code = "PARTICIPANT_HAS_LEFT" as const;
+
+  public constructor(participantId: string) {
+    super(
+      `Participant '${participantId}' has left the session and can no longer submit.`,
+      { participantId },
+    );
+  }
+}
+
+export class PhaseHasNoTimerError extends DomainError {
+  public readonly code = "PHASE_HAS_NO_TIMER" as const;
+
+  public constructor(phase: string) {
+    super(
+      `Phase '${phase}' is instructor-driven and has no timer to extend.`,
+      { phase },
+    );
+  }
+}
+
+export class InvalidPhaseExtensionError extends DomainError {
+  public readonly code = "INVALID_REQUEST_BODY" as const;
+
+  public constructor(seconds: unknown) {
+    super(
+      "Invalid 'seconds': a phase extension must be a whole number of seconds from 1 to 600.",
+      { field: "seconds", value: seconds },
+    );
+  }
+}
+
 export class SessionNotFoundError extends DomainError {
   public readonly code = "SESSION_NOT_FOUND" as const;
 
@@ -410,6 +451,21 @@ export class AccountTemporarilyLockedError extends DomainError {
       {
         lockedUntil: lockedUntil.toISOString(),
       },
+    );
+  }
+}
+
+/**
+ * A request body larger than the API accepts (`maxBytes`, counted in bytes of
+ * the raw body). Refused before the body is parsed.
+ */
+export class PayloadTooLargeError extends DomainError {
+  public readonly code = "PAYLOAD_TOO_LARGE" as const;
+
+  public constructor(maxBytes: number) {
+    super(
+      `The request body is too large. The limit is ${maxBytes} bytes.`,
+      { maxBytes },
     );
   }
 }

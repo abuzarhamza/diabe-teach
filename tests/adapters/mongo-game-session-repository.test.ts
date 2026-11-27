@@ -1,14 +1,24 @@
 import type { LikertRating } from "../../src/domain/game-session/game-session.types.js";
 import mongoose from "mongoose";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { gameSessionSchema } from "../../src/adapters/outbound/game-session.schema.js";
 import { MongoCurriculumPackRepository } from "../../src/adapters/outbound/mongo-curriculum-pack-repository.js";
 import { MongoGameSessionRepository } from "../../src/adapters/outbound/mongo-game-session-repository.js";
 import { SessionPackLoader } from "../../src/application/services/session-pack-loader.js";
 import { CurriculumPack } from "../../src/domain/curriculum-pack/curriculum-pack.js";
 import { DIABE_TEACH_PACK } from "../../src/domain/curriculum-pack/diabe-teach-pack.js";
 import { GameSession } from "../../src/domain/game-session/game-session.js";
+import { PHASE_ORDER } from "../../src/domain/game-session/game-session.types.js";
 import { SessionId } from "../../src/domain/game-session/session-id.js";
 import { startMongoTestServer, stopMongoTestServer } from "../integration/support/mongo-test-server.js";
+
+describe("game session schema", () => {
+  it("allows exactly the domain's phases, in PHASE_ORDER", () => {
+    const currentPhase = gameSessionSchema.path("currentPhase") as unknown as { enumValues: readonly string[] };
+
+    expect(currentPhase.enumValues).toEqual(PHASE_ORDER);
+  });
+});
 
 describe("mongoGameSessionRepository timer config persistence", () => {
   const mongoDbName = "timer-config-round-trip";

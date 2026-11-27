@@ -2,6 +2,7 @@ import type { AccountTokenSignerPort } from "./account-token.port.js";
 import type { ClockPort } from "./clock.port.js";
 import type { IdGeneratorPort } from "./id-generator.port.js";
 import type { InstructorAccountRepositoryPort } from "./instructor-account-repository.port.js";
+import type { LoggerPort } from "./logger.port.js";
 import type { PasswordHasherPort } from "./password-hasher.port.js";
 
 export interface SignUpInstructorCommand {
@@ -25,5 +26,5 @@ export interface SignUpInstructorDependencies {
 }
 
 export interface SignUpInstructorUseCasePort {
-  execute: (command: SignUpInstructorCommand) => Promise<SignUpInstructorResult>;
+  execute: (command: SignUpInstructorCommand, logger?: LoggerPort) => Promise<SignUpInstructorResult>;
 }

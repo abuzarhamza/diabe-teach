@@ -74,6 +74,30 @@ module.exports = {
       },
     },
     {
+      name: "web-domain-stays-pure",
+      comment:
+        "UI Domain (web/src/domain) must remain 100% pure TypeScript and cannot import from web/src/api, web/src/features, or React (ADR-0008).",
+      severity: "error",
+      from: {
+        path: "^web/src/domain/",
+      },
+      to: {
+        path: "(^web/src/(api|features)/|node_modules/(react|react-dom|react-router|@tanstack))",
+      },
+    },
+    {
+      name: "web-api-no-react-or-features",
+      comment:
+        "UI API & Token Boundary (web/src/api) cannot import from web/src/features or React (ADR-0008).",
+      severity: "error",
+      from: {
+        path: "^web/src/api/",
+      },
+      to: {
+        path: "(^web/src/features/|node_modules/(react|react-dom))",
+      },
+    },
+    {
       name: "no-circular",
       comment: "Circular dependencies are forbidden across all rings.",
       severity: "error",

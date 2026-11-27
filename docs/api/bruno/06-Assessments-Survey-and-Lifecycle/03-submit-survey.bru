@@ -1,0 +1,85 @@
+meta {
+  name: Submit Perception Survey
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/api/v1/sessions/{{sessionId}}/survey
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{participantToken}}
+}
+
+body:json {
+  {
+    "responses": {
+      "survey-q1": 5,
+      "survey-q2": 4,
+      "survey-q3": 5,
+      "survey-q4": 4,
+      "survey-q5": 5,
+      "survey-q6": 4,
+      "survey-q7": 5,
+      "survey-q8": 4,
+      "survey-q9": 5
+    },
+    "comments": "Building Concept Chains across metabolic and clinical domains helped clarify the pathophysiology."
+  }
+}
+
+script:pre-request {
+  const baseUrl = bru.getEnvVar("baseUrl");
+  const apiKey = bru.getEnvVar("apiKey");
+  const sessionId = bru.getEnvVar("sessionId");
+  const instructorToken = bru.getEnvVar("instructorToken");
+  if (sessionId && instructorToken) {
+    for (let i = 0; i < 11; i++) {
+      const stateRes = await bru.sendRequest({
+        url: `${baseUrl}/api/v1/sessions/${sessionId}`,
+        method: "GET",
+        headers: { "x-api-key": apiKey, Authorization: `Bearer ${instructorToken}` }
+      });
+      if (stateRes.data && stateRes.data.phase === "feedback-survey") {
+        break;
+      }
+      await bru.sendRequest({
+        url: `${baseUrl}/api/v1/sessions/${sessionId}/phase`,
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-api-key": apiKey, Authorization: `Bearer ${instructorToken}` },
+        data: { action: "advance" }
+      });
+    }
+  }
+}
+
+tests {
+  test("records the learner's perception survey responses", function() {
+    expect(res.status).to.equal(201);
+    expect(res.body.recordedItemCount).to.equal(9);
+  });
+}
+
+docs {
+  # POST /api/v1/sessions/:sessionId/survey (`submitPerceptionSurvey`)
+
+  Submits a learner's post-game Likert perception survey (`1..5` ratings across all 9 survey items plus optional free-text `comments` up to 1,000 words) during the `feedback-survey` phase.
+
+  ## Authentication
+  - **`BearerAuth` (`role: "participant"`)**: `Authorization: Bearer {{participantToken}}`
+
+  ## Responses & Error Codes (`ApiErrorCode`)
+  - **`201 Created`**: `{ sessionId, submittedAt, recordedItemCount }`
+  - **`400 INVALID_REQUEST_BODY`**: Missing `responses` or Likert rating outside `1..5` (`details.field: "responses.<itemId>"`).
+  - **`401 UNAUTHORIZED_TOKEN`**: Missing or invalid Capability Token.
+  - **`403 FORBIDDEN_ROLE`**: Caller is an `instructor` or holds a token for another session.
+  - **`403 PARTICIPANT_HAS_LEFT`**: Learner has left the Game Session.
+  - **`404 SESSION_NOT_FOUND`**: Unknown `sessionId`.
+  - **`409 SURVEY_ALREADY_SUBMITTED`**: Learner already submitted the perception survey in this session.
+  - **`409 PHASE_CLOSED_FOR_SUBMISSIONS`**: Session is not in the `feedback-survey` phase.
+  - **`413 PAYLOAD_TOO_LARGE`**: Request body exceeds 256 KB.
+  - **`422 SURVEY_COMMENTS_TOO_LONG`**: Free-text `comments` exceed 1,000 words.
+}

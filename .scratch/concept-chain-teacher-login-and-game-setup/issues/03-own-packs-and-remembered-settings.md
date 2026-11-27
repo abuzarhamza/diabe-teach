@@ -4,7 +4,9 @@
 
 **Blocked by:** 02
 
-**Status:** ready-for-agent
+**Status:** resolved
+
+Resolved 2026-11-20: done in `fe90fcd` (`claudPoc/concept-chain/login.html`, `setup.html`), later wired to the real API in `93dbb3f`; see the Comments below.
 
 - [x] Paste, file upload (.txt/.csv) and "start from existing pack" all fill the keyword list
 - [x] Dedupe and empty-removal with a visible count; board-size shortfall warning

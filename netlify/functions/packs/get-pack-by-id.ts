@@ -5,8 +5,11 @@ import { AppRuntime } from "../../../src/app-runtime.js";
 import { GetCurriculumPackByIdUseCase } from "../../../src/application/use-cases/get-curriculum-pack-by-id.use-case.js";
 import { PackNotFoundError } from "../../../src/domain/errors/domain-errors.js";
 
+/** Reading a pack needs no account lookup, so the account repository is not required. */
+export type GetPackByIdHandlerDependencies = Omit<ProductionDependencies, "accountRepo">;
+
 export function createGetPackByIdHandler(
-  dependencies?: ProductionDependencies,
+  dependencies?: GetPackByIdHandlerDependencies,
 ) {
   const deps = dependencies ?? AppRuntime.getProductionDependencies();
   const useCase = new GetCurriculumPackByIdUseCase(deps);

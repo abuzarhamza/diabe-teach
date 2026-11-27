@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { createListPacksHandler } from "../../netlify/functions/packs/list-packs.js";
 import { FakeCapabilityTokenAdapter } from "../../src/adapters/outbound/fake-capability-token-adapter.js";
 import { InMemoryCurriculumPackRepository } from "../../src/adapters/outbound/in-memory-curriculum-pack-repository.js";
+import { InMemoryInstructorAccountRepository } from "../../src/adapters/outbound/in-memory-instructor-account-repository.js";
 import { DIABE_TEACH_PACK } from "../../src/domain/curriculum-pack/diabe-teach-pack.js";
 
 function makeEvent(
@@ -29,6 +30,7 @@ describe("get /api/v1/packs", () => {
   it("returns 200 with list of curriculum pack summaries", async () => {
     const handler = createListPacksHandler({
       packRepo: new InMemoryCurriculumPackRepository([DIABE_TEACH_PACK]),
+      accountRepo: new InMemoryInstructorAccountRepository(),
       tokenVerifier: new FakeCapabilityTokenAdapter(),
       apiKey: undefined,
       requireApiKey: false,
@@ -66,6 +68,7 @@ describe("get /api/v1/packs", () => {
   it("returns empty array when no packs exist", async () => {
     const handler = createListPacksHandler({
       packRepo: new InMemoryCurriculumPackRepository([]),
+      accountRepo: new InMemoryInstructorAccountRepository(),
       tokenVerifier: new FakeCapabilityTokenAdapter(),
       apiKey: undefined,
       requireApiKey: false,
@@ -82,6 +85,7 @@ describe("get /api/v1/packs", () => {
   it("returns 401 when API key is required but not provided", async () => {
     const handler = createListPacksHandler({
       packRepo: new InMemoryCurriculumPackRepository([DIABE_TEACH_PACK]),
+      accountRepo: new InMemoryInstructorAccountRepository(),
       tokenVerifier: new FakeCapabilityTokenAdapter(),
       apiKey: "secret-key",
       requireApiKey: true,
@@ -96,6 +100,7 @@ describe("get /api/v1/packs", () => {
   it("returns 200 when valid API key is provided", async () => {
     const handler = createListPacksHandler({
       packRepo: new InMemoryCurriculumPackRepository([DIABE_TEACH_PACK]),
+      accountRepo: new InMemoryInstructorAccountRepository(),
       tokenVerifier: new FakeCapabilityTokenAdapter(),
       apiKey: "secret-key",
       requireApiKey: true,

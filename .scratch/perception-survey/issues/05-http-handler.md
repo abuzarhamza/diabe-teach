@@ -4,7 +4,9 @@
 
 **Blocked by:** 04-use-case
 
-**Status:** ready-for-agent
+**Status:** resolved
+
+Resolved 2026-11-20: done in `3e37faf` and `f52ba83` (route `POST /api/v1/sessions/{sessionId}/survey`, `netlify/functions/submit-survey.ts`; tests `tests/functions/submit-survey.test.ts`, `survey-journey.feature`).
 
 - [ ] Create `netlify/functions/sessions/submit-survey.ts` with `createSubmitSurveyHandler()` factory
 - [ ] Use middy middleware pipeline: `authMiddleware`, `domainErrorMiddleware`

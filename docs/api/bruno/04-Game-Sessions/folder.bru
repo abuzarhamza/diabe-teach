@@ -1,0 +1,13 @@
+meta {
+  name: 04 - Game Sessions
+  seq: 4
+}
+
+docs {
+  # Game Sessions & Phase Controls
+
+  Creates a **Game Session** (Solo Practice, Classroom Game, or Study RCT), joins a learner via the 6-character `roomCode`, reads session state (`activeBoard`, `participants`, `phaseEndsAt`), transitions phases, and extends timed phases.
+
+  - `POST /api/v1/sessions` in `classroom` or `study-rct` mode requires a teacher's **Account Token** (`{{accountToken}}`) and issues the session-scoped `{{instructorToken}}` (**Capability Token**).
+  - `POST /api/v1/sessions/join` issues the learner's session-scoped `{{participantToken}}` (**Capability Token**).
+}

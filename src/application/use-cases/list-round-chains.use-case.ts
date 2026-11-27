@@ -6,8 +6,10 @@ import type {
   ListRoundChainsResult,
   ListRoundChainsUseCasePort,
 } from "../ports/list-round-chains.port.js";
+import type { LoggerPort } from "../ports/logger.port.js";
 import { SessionNotFoundError } from "../../domain/errors/domain-errors.js";
 import { SessionId } from "../../domain/game-session/session-id.js";
+import { SilentLogger } from "../services/silent-logger.js";
 
 /** Shown for a participant who can't be found, as standings does. */
 const UNKNOWN_DISPLAY_NAME = "Unknown";
@@ -26,6 +28,7 @@ export class ListRoundChainsUseCase implements ListRoundChainsUseCasePort {
 
   public async execute(
     query: ListRoundChainsQuery,
+    logger: LoggerPort = new SilentLogger(),
   ): Promise<ListRoundChainsResult> {
     const session = await this.#sessionRepo.findById(SessionId.from(query.sessionId));
     if (!session) {
@@ -39,6 +42,16 @@ export class ListRoundChainsUseCase implements ListRoundChainsUseCasePort {
         ? { participantId }
         : {}),
     });
+
+    logger.debug(
+      {
+        sessionId: query.sessionId,
+        roundNumber: query.roundNumber,
+        viewer: role,
+        count: visible.length,
+      },
+      "chain visibility applied",
+    );
 
     const displayNameOf = (participantId: string): string =>
       session.getParticipant(participantId)?.displayName ?? UNKNOWN_DISPLAY_NAME;

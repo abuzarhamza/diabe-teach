@@ -1,0 +1,35 @@
+meta {
+  name: List Curriculum Packs
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/v1/packs
+  body: none
+  auth: none
+}
+
+params:query {
+  ~includeArchived: true
+}
+
+tests {
+  test("lists available Curriculum Packs including diabe-teach", function() {
+    expect(res.status).to.equal(200);
+    expect(res.body.packs).to.be.an("array");
+  });
+}
+
+docs {
+  # GET /api/v1/packs (`listCurriculumPacks`)
+
+  Lists the latest **Pack Version** of each unarchived **Curriculum Pack** in the shared library (`packId`, `title`, `version`, `description`, `cardCount`, `domainCount`, `isSystemPack`, `isArchived`, `authorName`, `authorHandle`).
+
+  ## Query Parameters
+  - `includeArchived` *(optional, boolean)*: Enable `includeArchived=true` in the Params tab to also include archived Curriculum Packs.
+
+  ## Responses & Error Codes (`ApiErrorCode`)
+  - **`200 OK`**: `{ packs: CurriculumPackListItem[] }`
+  - **`401 UNAUTHORIZED_TOKEN`**: Missing or invalid `x-api-key`.
+}

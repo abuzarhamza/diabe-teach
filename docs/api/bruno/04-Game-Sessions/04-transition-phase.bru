@@ -1,0 +1,50 @@
+meta {
+  name: Transition Session Phase
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/api/v1/sessions/{{sessionId}}/phase
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{instructorToken}}
+}
+
+body:json {
+  {
+    "action": "advance"
+  }
+}
+
+tests {
+  test("advances the Game Session to the next phase", function() {
+    expect(res.status).to.equal(200);
+    expect(res.body.state.phase).to.be.a("string");
+  });
+}
+
+docs {
+  # POST /api/v1/sessions/:sessionId/phase (`transitionSessionPhase`)
+
+  Advances a **Game Session** to the next phase in the 11-phase sequence (`action: "advance"`, or `action: "jump"` with `targetPhase` set to the immediate next phase).
+
+  When transitioning into `round-1:chain-mapping` or `round-2:chain-mapping`, the server deterministically deals a shuffled board grid (`state.activeBoard`) using the optional `seed` (or a generated seed).
+
+  > **Manual Testing Tip:** Run this request **twice** from `pretest` (`pretest` → `trial-orientation` → `round-1:chain-mapping`) before running `05-Chains-and-Adjudication/01-submit-chain.bru`!
+
+  ## Authentication
+  - **`BearerAuth` (`role: "instructor"`)**: `Authorization: Bearer {{instructorToken}}`
+
+  ## Responses & Error Codes (`ApiErrorCode`)
+  - **`200 OK`**: `{ previousPhase, state }`
+  - **`400 INVALID_REQUEST_BODY`**: Missing/invalid `action`, `jump` without `targetPhase`, or empty `seed`.
+  - **`401 UNAUTHORIZED_TOKEN`**: Missing or invalid Capability Token.
+  - **`403 FORBIDDEN_ROLE`**: Caller is a `participant` or holds a token for another session.
+  - **`404 SESSION_NOT_FOUND`**: Unknown `sessionId`.
+  - **`409 INVALID_PHASE_TRANSITION`**: Attempting to skip phases, move backwards, or advance past `completed`.
+  - **`413 PAYLOAD_TOO_LARGE`**: Request body exceeds 256 KB.
+}

@@ -1,7 +1,10 @@
 import type { Context } from "@netlify/functions";
 import type { APIGatewayProxyEvent, APIGatewayProxyResult, Context as LambdaContext } from "aws-lambda";
-import type { RouteConfig } from "./lambda-to-v2-wrapper.types.js";
+import type { LoggerPort } from "../../../application/ports/logger.port.js";
+import type { RequestLogFields, RequestOutcome, RouteConfig, WrapLambdaHandlerOptions } from "./lambda-to-v2-wrapper.types.js";
+import { performance } from "node:perf_hooks";
 import { match } from "path-to-regexp";
+import { SilentLogger } from "../../../application/services/silent-logger.js";
 
 /**
  * Suffixes `netlify dev` appends when it retries a request whose function
@@ -54,19 +57,21 @@ function onlyStringParams(params: Partial<Record<string, string | string[]>>): R
  * Route parameters for a request, read from the request URL by matching it
  * against the function's own `config.path` (ADR-0005: `path-to-regexp`).
  * `context.params` is only a cross-check, and the fallback when no declared
- * path matches.
+ * path matches. A disagreement is logged at `warn` through `logger` (the
+ * request's logger, so the line carries its request id).
  */
 export function resolvePathParameters(
   pathname: string,
   config: RouteConfig,
   contextParams?: Record<string, string> | null,
+  logger: LoggerPort = new SilentLogger(),
 ): Record<string, string> | null {
   const requestPath = stripDevRetrySuffix(pathname);
   for (const routePath of routePaths(config)) {
     const matched = match(routePath, { decode: decodeURIComponent })(requestPath);
     if (matched) {
       const params = onlyStringParams(matched.params);
-      warnOnParamMismatch(pathname, requestPath, params, contextParams);
+      warnOnParamMismatch(logger, pathname, requestPath, params, contextParams);
       return params;
     }
   }
@@ -76,6 +81,7 @@ export function resolvePathParameters(
 }
 
 function warnOnParamMismatch(
+  logger: LoggerPort,
   pathname: string,
   requestPath: string,
   params: Record<string, string>,
@@ -87,7 +93,7 @@ function warnOnParamMismatch(
   }
   const differs = Object.entries(params).some(([key, value]) => contextParams[key] !== undefined && contextParams[key] !== value);
   if (differs) {
-    console.warn(`Route parameters from the URL and context.params disagree for ${pathname}; using the URL.`);
+    logger.warn({ pathname }, "route parameters from URL and context.params disagree; using the URL");
   }
 }
 
@@ -98,6 +104,7 @@ async function requestToLambdaEvent(
   request: Request,
   context: Context,
   config: RouteConfig,
+  logger: LoggerPort,
 ): Promise<APIGatewayProxyEvent> {
   const url = new URL(request.url);
   const body = request.body
@@ -112,7 +119,7 @@ async function requestToLambdaEvent(
   return {
     httpMethod: request.method,
     path: url.pathname,
-    pathParameters: resolvePathParameters(url.pathname, config, context.params),
+    pathParameters: resolvePathParameters(url.pathname, config, context.params, logger),
     queryStringParameters: Object.fromEntries(url.searchParams),
     headers,
     body,
@@ -167,13 +174,52 @@ function lambdaResultToResponse(result: APIGatewayProxyResult): Response {
 type LambdaHandler = (event: APIGatewayProxyEvent, context: LambdaContext) => Promise<APIGatewayProxyResult>;
 
 /**
+ * Writes the one `request completed` line for an invocation: `status`,
+ * `durationMs` and, on a domain refusal, `errorCode`. A 5xx is an incident
+ * and logs at `error`; a 2xx or 4xx (an expected refusal) at `info`.
+ */
+function logRequestCompleted(
+  logger: LoggerPort,
+  status: number,
+  startedAt: number,
+  outcome: RequestOutcome,
+): void {
+  const fields = {
+    status,
+    durationMs: Math.round(performance.now() - startedAt),
+    ...(outcome.errorCode === undefined
+      ? {}
+      : { errorCode: outcome.errorCode }),
+  };
+  if (status >= 500) {
+    logger.error(fields, "request completed");
+  }
+  else {
+    logger.info(fields, "request completed");
+  }
+}
+
+/**
  * Wraps a Lambda-style handler to work with Netlify v2 runtime. `config` is the
  * route file's own `export const config` (declared once); its `path` is matched
- * against the request URL to fill `event.pathParameters`.
+ * against the request URL to fill `event.pathParameters`. `options.afterInvocation`
+ * (from `AppRuntime.invocationOptions`) runs after every invocation, whether
+ * the handler answered or threw.
+ *
+ * Each invocation gets a child of `options.logger` (default `SilentLogger`)
+ * with `requestId`, `route` and `method`, handed to the handler as
+ * `event.logger`, and ends with one `request completed` line. A netlify dev
+ * `.html` retry is its own invocation, so it logs its own line.
  */
-export function wrapLambdaHandler(handler: LambdaHandler, config: RouteConfig) {
+export function wrapLambdaHandler(handler: LambdaHandler, config: RouteConfig, options: WrapLambdaHandlerOptions = {}) {
   return async (request: Request, context: Context): Promise<Response> => {
-    const event = await requestToLambdaEvent(request, context, config);
+    const startedAt = performance.now();
+    const logger = (options.logger ?? new SilentLogger()).child({
+      requestId: context.requestId,
+      route: config.path,
+      method: request.method,
+    });
+    const requestOutcome: RequestOutcome = {};
 
     // Create a minimal Lambda context
     const lambdaContext: LambdaContext = {
@@ -191,7 +237,23 @@ export function wrapLambdaHandler(handler: LambdaHandler, config: RouteConfig) {
       succeed: () => {},
     };
 
-    const result = await handler(event, lambdaContext);
-    return lambdaResultToResponse(result);
+    try {
+      let result: APIGatewayProxyResult;
+      try {
+        const lambdaEvent = await requestToLambdaEvent(request, context, config, logger);
+        const event: APIGatewayProxyEvent & RequestLogFields = { ...lambdaEvent, logger, requestOutcome };
+        result = await handler(event, lambdaContext);
+      }
+      catch (error) {
+        // The middy chain answers every error itself; this is only a backstop.
+        logRequestCompleted(logger, 500, startedAt, requestOutcome);
+        throw error;
+      }
+      logRequestCompleted(logger, result.statusCode, startedAt, requestOutcome);
+      return lambdaResultToResponse(result);
+    }
+    finally {
+      await options.afterInvocation?.();
+    }
   };
 }

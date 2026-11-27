@@ -1,6 +1,7 @@
 import type { MiddlewareObj } from "@middy/core";
 import httpJsonBodyParser from "@middy/http-json-body-parser";
 import { MalformedRequestBodyError } from "../../../../domain/errors/domain-errors.js";
+import { requestLoggerOf } from "../request-logger.js";
 
 const NOT_JSON_MESSAGE = "The request body must be valid JSON sent with Content-Type: application/json.";
 const NOT_AN_OBJECT_MESSAGE = "The request body must be a JSON object.";
@@ -34,12 +35,14 @@ export function jsonObjectBodyMiddleware(): MiddlewareObj<any, any> {
           await parser.before!(request);
         }
         catch {
+          requestLoggerOf(event).debug({ field: "body", reason: "is not valid JSON" }, "request body rejected");
           throw new MalformedRequestBodyError(NOT_JSON_MESSAGE);
         }
       }
 
       const parsed: unknown = event.body;
       if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+        requestLoggerOf(event).debug({ field: "body", reason: "is not a JSON object" }, "request body rejected");
         throw new MalformedRequestBodyError(NOT_AN_OBJECT_MESSAGE);
       }
     },

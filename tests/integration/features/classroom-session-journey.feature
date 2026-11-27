@@ -32,6 +32,15 @@ Feature: Classroom Game Session Journey
     Then the response status should be 200
     And the participant count should be 2
 
+  @participant-join @roster
+  Scenario: The teacher's session state lists the learner who joined
+    When the instructor creates a classroom session with pack "diabe-teach"
+    And participant "Alice" joins using the room code
+    And the instructor retrieves the session state
+    Then the response status should be 200
+    And the session state should list participant "Alice" who has not left
+    And the participant count should be 1
+
   @error-handling @validation
   Scenario: Invalid room code returns 404
     When someone attempts to join with invalid room code "XXXXXX"
@@ -165,8 +174,72 @@ Feature: Classroom Game Session Journey
     Then the response status should be 409
     And the response error code should be "PHASE_CLOSED_FOR_SUBMISSIONS"
 
+  @chain-submission @extend-phase
+  Scenario: Teacher extends a timed chain-mapping phase and a learner submits in the added time
+    When the instructor creates a classroom session with pack "diabe-teach" and a 1-second chain-mapping phase
+    And participant "Alice" joins using the room code
+    And the instructor advances the phase 2 times
+    Then the session phase should be "round-1:chain-mapping"
+    When the current phase's submission window has run out
+    And participant "Alice" submits a concept chain for round 1
+    Then the response status should be 409
+    And the response error code should be "PHASE_CLOSED_FOR_SUBMISSIONS"
+    When the instructor extends the phase by 60 seconds
+    Then the response status should be 200
+    And the session phase should be "round-1:chain-mapping"
+    And the current phase should end at least 60 seconds from now
+    When participant "Alice" submits a concept chain for round 1
+    Then the response status should be 201
+
+  @extend-phase @error-handling
+  Scenario: An instructor-driven phase has no timer to extend
+    When the instructor creates a classroom session with pack "diabe-teach" and an instructor-driven chain-mapping phase
+    And the instructor advances the phase 2 times
+    And the instructor extends the phase by 60 seconds
+    Then the response status should be 409
+    And the response error code should be "PHASE_HAS_NO_TIMER"
+
+  @end-session
+  Scenario: Teacher ends the session mid-round and the learner sees it completed
+    When the instructor creates a classroom session with pack "diabe-teach"
+    And participant "Alice" joins using the room code
+    And the instructor advances the phase 2 times
+    Then the session phase should be "round-1:chain-mapping"
+    When the instructor ends the session
+    Then the response status should be 200
+    And the session phase should be "completed"
+    When participant "Alice" retrieves the session state
+    Then the session phase should be "completed"
+    When participant "Alice" submits a concept chain for round 1
+    Then the response status should be 409
+    And the response error code should be "PHASE_CLOSED_FOR_SUBMISSIONS"
+    When the instructor ends the session
+    Then the response status should be 409
+    And the response error code should be "SESSION_ALREADY_COMPLETED"
+
+  @leave-session
+  Scenario: A learner leaves mid-round and their next chain submission is refused
+    When the instructor creates a classroom session with pack "diabe-teach"
+    And participants "Alice" and "Bob" join using the room code
+    And the instructor advances the phase 2 times
+    Then the session phase should be "round-1:chain-mapping"
+    When participant "Alice" leaves the session
+    Then the response status should be 200
+    And the session state should list participant "Alice" who has left
+    And the session state should list participant "Bob" who has not left
+    And the participant count should be 1
+    When participant "Alice" leaves the session
+    Then the response status should be 200
+    When participant "Alice" submits a concept chain for round 1
+    Then the response status should be 403
+    And the response error code should be "PARTICIPANT_HAS_LEFT"
+    When participant "Alice" retrieves the session state
+    Then the response status should be 200
+    When participant "Bob" submits a concept chain for round 1
+    Then the response status should be 201
+
   @board @shared-board
-  Scenario: Instructor and participant see the same server-dealt round 1 board
+  Scenario: Instructor and participant see the same server-dealt round 1 board and chains are checked against it
     When the instructor creates a classroom session with pack "diabe-teach"
     And participant "Alice" joins using the room code
     Then the session should have no active board
@@ -178,6 +251,12 @@ Feature: Classroom Game Session Journey
     Then the active board should be the noted board
     When participant "Alice" retrieves the session state
     Then the active board should be the noted board
+    When participant "Alice" submits a concept chain for round 1
+    Then the response status should be 201
+    And the submitted chain should list the noted board's cards at its path
+    When participant "Alice" submits a chain that runs off the bottom of the board
+    Then the response status should be 422
+    And the response error code should be "CHAIN_TOPOLOGY_INVALID"
 
   @session-state @instructor
   Scenario: Instructor retrieves session state
@@ -194,3 +273,121 @@ Feature: Classroom Game Session Journey
     And participant "Alice" retrieves the session state
     Then the response status should be 200
     And the session phase should be "pretest"
+
+  @adjudication @standings @error-handling
+  Scenario: Peer voting, instructor final ruling lock, and round standings
+    When the instructor creates a classroom session with pack "diabe-teach"
+    And participants "Alice" and "Bob" join using the room code
+    And the instructor advances the phase 2 times
+    Then the session phase should be "round-1:chain-mapping"
+    When participant "Alice" submits a concept chain for round 1
+    Then the response status should be 201
+    When the instructor advances the phase
+    Then the session phase should be "round-1:peer-adjudication"
+    When participant "Bob" peer-approves the last submitted chain
+    Then the response status should be 200
+    And the response should contain a chain with status "pending-review"
+    When participant "Bob" attempts to issue an instructor approval on the last submitted chain
+    Then the response status should be 403
+    And the response error code should be "FORBIDDEN_ROLE"
+    And the response should be a standard error body
+    When the instructor attempts to adjudicate non-existent chain "no-such-chain" in round 1
+    Then the response status should be 404
+    And the response error code should be "CHAIN_NOT_FOUND"
+    And the response should be a standard error body
+    When the instructor finalizes adjudication on the last chain with score 8
+    Then the response status should be 200
+    And the response should contain a chain with status "approved"
+    And the chain verdict should be locked
+    When participant "Bob" peer-approves the last submitted chain
+    Then the response status should be 409
+    And the response error code should be "ADJUDICATION_LOCKED_BY_INSTRUCTOR"
+    And the response should be a standard error body
+    When the instructor finalizes adjudication on the last chain with score 9
+    Then the response status should be 409
+    And the response error code should be "ADJUDICATION_LOCKED_BY_INSTRUCTOR"
+    And the response should be a standard error body
+    When the instructor retrieves standings for round 1
+    Then the response status should be 200
+    And the response should contain standings
+    And the standings should rank participant "Alice" at rank 1 with chain length 4
+    When participant "Alice" retrieves standings for round 1
+    Then the response status should be 200
+    And the response should contain standings
+    And the standings should rank participant "Alice" at rank 1 with chain length 4
+
+  @chain-submission @validation @topology
+  Scenario: Too-short, duplicate, and reversed concept chains are rejected while a classmate can submit the same path
+    When the instructor creates a classroom session with pack "diabe-teach"
+    And participants "Alice" and "Bob" join using the room code
+    And the instructor advances the phase 2 times
+    Then the session phase should be "round-1:chain-mapping"
+    When participant "Alice" submits a chain that is too short
+    Then the response status should be 422
+    And the response error code should be "CHAIN_TOPOLOGY_INVALID"
+    And the response should be a standard error body
+    When participant "Alice" submits a concept chain for round 1
+    Then the response status should be 201
+    When participant "Alice" submits a concept chain for round 1
+    Then the response status should be 409
+    And the response error code should be "CHAIN_ALREADY_SUBMITTED"
+    And the response should be a standard error body
+    When participant "Alice" submits the reversed concept chain for round 1
+    Then the response status should be 409
+    And the response error code should be "CHAIN_ALREADY_SUBMITTED"
+    And the response should be a standard error body
+    When participant "Bob" submits a concept chain for round 1
+    Then the response status should be 201
+
+  @phase-transition @authorization @route-params @error-handling
+  Scenario: Phase jump refusals, invalid round number, and Account Token on a session route
+    When the instructor creates a classroom session with pack "diabe-teach"
+    And the instructor jumps to phase "completed"
+    Then the response status should be 409
+    And the response error code should be "INVALID_PHASE_TRANSITION"
+    And the response should be a standard error body
+    When the instructor attempts to jump without a targetPhase
+    Then the response status should be 400
+    And the response error code should be "INVALID_REQUEST_BODY"
+    And the error should name the field "targetPhase"
+    And the response should be a standard error body
+    When the instructor lists the chains of round 3
+    Then the response status should be 400
+    And the response error code should be "INVALID_REQUEST_BODY"
+    And the response should be a standard error body
+    When the instructor lists the chains of round 1 using their Account Token
+    Then the response status should be 401
+    And the response error code should be "UNAUTHORIZED_TOKEN"
+    And the response should be a standard error body
+
+  @leave-session @authorization @error-handling
+  Scenario: A departed learner cannot submit assessments, peer votes, or surveys, and an instructor cannot leave
+    When the instructor creates a classroom session with pack "diabe-teach"
+    And participants "Alice" and "Bob" join using the room code
+    And the instructor attempts to leave the session
+    Then the response status should be 403
+    And the response error code should be "FORBIDDEN_ROLE"
+    And the response should be a standard error body
+    When participant "Alice" leaves the session
+    Then the response status should be 200
+    When participant "Alice" submits pretest answers
+    Then the response status should be 403
+    And the response error code should be "PARTICIPANT_HAS_LEFT"
+    And the response should be a standard error body
+    When the instructor advances the phase 2 times
+    Then the session phase should be "round-1:chain-mapping"
+    When participant "Bob" submits a concept chain for round 1
+    Then the response status should be 201
+    When the instructor advances the phase
+    Then the session phase should be "round-1:peer-adjudication"
+    When participant "Alice" peer-approves the last submitted chain
+    Then the response status should be 403
+    And the response error code should be "PARTICIPANT_HAS_LEFT"
+    And the response should be a standard error body
+    When the instructor advances the phase 6 times
+    Then the session phase should be "feedback-survey"
+    When participant "Alice" submits a perception survey
+    Then the response status should be 403
+    And the response error code should be "PARTICIPANT_HAS_LEFT"
+    And the response should be a standard error body
+

@@ -2,6 +2,7 @@ import type { APIGatewayProxyResult } from "aws-lambda";
 import type { AuthenticatedEvent } from "../../../src/adapters/inbound/http/middy/auth.middleware.js";
 import type { ProductionDependencies } from "../../../src/app-runtime.types.js";
 import { createApiHandler } from "../../../src/adapters/inbound/http/middy/api-handler.js";
+import { requestLoggerOf } from "../../../src/adapters/inbound/http/request-logger.js";
 import { AppRuntime } from "../../../src/app-runtime.js";
 import { RegisterCurriculumPackUseCase } from "../../../src/application/use-cases/register-curriculum-pack.use-case.js";
 import {
@@ -38,7 +39,7 @@ export function createRegisterPackHandler(
     const result = await useCase.execute({
       pack: pack as never,
       accountId: event.account.accountId,
-    });
+    }, requestLoggerOf(event));
 
     if (!result.success) {
       if (result.code === "PACK_ALREADY_EXISTS") {

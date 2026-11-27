@@ -1,0 +1,14 @@
+meta {
+  name: 03 - Curriculum Packs
+  seq: 3
+}
+
+docs {
+  # Shared Curriculum Pack Library
+
+  Discovery, dry-run validation, registration, new **Pack Version** publishing, **Pack Archive**, and unarchiving for **Curriculum Packs** (ADR-0006, ADR-0007).
+
+  - Discovery (`GET /api/v1/packs`, `GET /api/v1/packs/:packId`) requires only `x-api-key`.
+  - Write operations (`validate`, `register`, `archive`, `unarchive`) require a teacher's **Account Token** (`{{accountToken}}`).
+  - Built-in **System Packs** (`diabe-teach`) cannot be archived or overwritten (`403 PACK_IS_SYSTEM_PACK`).
+}

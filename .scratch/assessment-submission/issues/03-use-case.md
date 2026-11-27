@@ -4,7 +4,9 @@
 
 **Blocked by:** 02-assessment-attempt-domain
 
-**Status:** ready-for-agent
+**Status:** resolved
+
+Resolved 2026-11-20: done in `3e37faf` (route `POST /api/v1/sessions/{sessionId}/assessments/{stage}`, `netlify/functions/submit-assessment.ts`; tests `tests/functions/submit-assessment.test.ts`, `assessment-journey.feature`).
 
 - [ ] Create `src/application/ports/submit-assessment.port.ts` with command and result types
 - [ ] Create `SubmitAssessmentUseCase` class implementing the port

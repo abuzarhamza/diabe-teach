@@ -1,0 +1,37 @@
+meta {
+  name: Get Current Instructor Account
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/api/v1/accounts/me
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accountToken}}
+}
+
+tests {
+  test("returns the signed-in Instructor Account profile", function() {
+    expect(res.status).to.equal(200);
+    expect(res.body.accountId).to.be.a("string");
+    expect(res.body.email).to.be.a("string");
+  });
+}
+
+docs {
+  # GET /api/v1/accounts/me (`getCurrentInstructorAccount`)
+
+  Returns the **Instructor Account** (`accountId`, normalized `email`, `createdAt`) associated with the caller's **Account Token** (`AccountAuth`).
+
+  ## Authentication
+  - **`AccountAuth`**: `Authorization: Bearer {{accountToken}}`
+  - Session **Capability Tokens** (`{{instructorToken}}`, `{{participantToken}}`) are refused with `401 UNAUTHORIZED_TOKEN` (ADR-0007).
+
+  ## Responses & Error Codes (`ApiErrorCode`)
+  - **`200 OK`**: `{ accountId, email, createdAt }`
+  - **`401 UNAUTHORIZED_TOKEN`**: Missing, expired, tampered, or wrong-kind bearer token.
+}

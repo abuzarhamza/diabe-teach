@@ -806,9 +806,11 @@ export const requestBodySchemas = {
             "advance",
             "jump"
           ],
-          "default": "advance"
+          "default": "advance",
+          "description": "`advance` moves to the next phase in the Game Session order. `jump` moves to `targetPhase`, which must be that same next phase: there is no skipping ahead or going back, and any other `targetPhase` gets 409 INVALID_PHASE_TRANSITION. To finish a Game Session early, use `endGameSession` (`POST /api/v1/sessions/{sessionId}/end`), not `jump`.\n"
         },
         "targetPhase": {
+          "description": "Required with `jump` (400 INVALID_REQUEST_BODY without it) and ignored by `advance`: the phase to move to, which must be the next phase.\n",
           "type": "string",
           "enum": [
             "pretest",
@@ -828,6 +830,24 @@ export const requestBodySchemas = {
           "type": "string",
           "minLength": 1,
           "description": "Seeds the board of the round this transition enters (`round-1:chain-mapping` or `round-2:chain-mapping`), overriding the session's creation seed for Round 1. Without it, Round 1 uses the creation seed and otherwise the server generates a random seed. Ignored for transitions that enter no round.\n"
+        }
+      }
+    }
+  },
+  "extendSessionPhase": {
+    "required": true,
+    "schema": {
+      "type": "object",
+      "required": [
+        "seconds"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "seconds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 600,
+          "description": "Whole seconds to add to the current phase's deadline."
         }
       }
     }
@@ -868,7 +888,8 @@ export const requestBodySchemas = {
         },
         "keywordIds": {
           "type": "array",
-          "description": "The keyword ids of the path's cells, in path order. Stored as sent and returned on the chain; the server does not derive them from the board. Defaults to an empty list.",
+          "deprecated": true,
+          "description": "Deprecated; send only `path`. Ignored for a round with a server-dealt board: the server derives the chain's keyword ids from the board at each path cell. Accepted (not rejected) so older clients keep working. Only for a session stored before boards were dealt (no `activeBoard`) are these ids stored as sent, defaulting to an empty list.",
           "items": {
             "type": "string"
           }
@@ -1027,6 +1048,9 @@ export const apiOperationIds = [
   "getGameSessionState",
   "streamGameSessionEvents",
   "transitionSessionPhase",
+  "extendSessionPhase",
+  "endGameSession",
+  "leaveGameSession",
   "listRoundChains",
   "submitConceptChain",
   "adjudicateConceptChain",

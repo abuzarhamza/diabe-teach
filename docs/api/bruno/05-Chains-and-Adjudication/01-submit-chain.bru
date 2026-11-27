@@ -1,0 +1,96 @@
+meta {
+  name: Submit Concept Chain
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/v1/sessions/{{sessionId}}/rounds/{{roundNumber}}/chains
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{participantToken}}
+}
+
+body:json {
+  {
+    "path": [
+      { "row": 0, "col": 0 },
+      { "row": 0, "col": 1 },
+      { "row": 1, "col": 1 },
+      { "row": 1, "col": 2 }
+    ],
+    "narrativeExplanation": "Insulin resistance impairs peripheral GLUT4 glucose uptake, leading to compensatory beta-cell hypersecretion and eventual postprandial hyperglycemia.",
+    "stepRationales": [
+      "Step 1 -> 2: Receptor signaling regulates transporter translocation.",
+      "Step 2 -> 3: Reduced peripheral clearance stimulates pancreatic compensation.",
+      "Step 3 -> 4: Progressive secretory failure results in chronic hyperglycemia."
+    ]
+  }
+}
+
+script:pre-request {
+  const baseUrl = bru.getEnvVar("baseUrl");
+  const apiKey = bru.getEnvVar("apiKey");
+  const sessionId = bru.getEnvVar("sessionId");
+  const instructorToken = bru.getEnvVar("instructorToken");
+  if (sessionId && instructorToken) {
+    for (let i = 0; i < 3; i++) {
+      const stateRes = await bru.sendRequest({
+        url: `${baseUrl}/api/v1/sessions/${sessionId}`,
+        method: "GET",
+        headers: { "x-api-key": apiKey, Authorization: `Bearer ${instructorToken}` }
+      });
+      if (stateRes.data && stateRes.data.phase === "round-1:chain-mapping") {
+        break;
+      }
+      await bru.sendRequest({
+        url: `${baseUrl}/api/v1/sessions/${sessionId}/phase`,
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-api-key": apiKey, Authorization: `Bearer ${instructorToken}` },
+        data: { action: "advance" }
+      });
+    }
+  }
+}
+
+script:post-response {
+  if (res.status === 201 && res.body && res.body.chain) {
+    bru.setEnvVar("chainId", res.body.chain.chainId);
+  }
+}
+
+tests {
+  test("submits a topologically valid Concept Chain and saves chainId", function() {
+    expect(res.status).to.equal(201);
+    expect(res.body.chain.chainId).to.be.a("string");
+    expect(res.body.chain.chainLength).to.equal(4);
+  });
+}
+
+docs {
+  # POST /api/v1/sessions/:sessionId/rounds/:roundNumber/chains (`submitConceptChain`)
+
+  Submits a learner's **Concept Chain** during `round-1:chain-mapping` or `round-2:chain-mapping`.
+
+  - The server validates that `path` has at least `boardConfig.minChainLength` cells (4 for `diabe-teach`), every cell is within the board bounds (`rows x cols`), consecutive cells are Chebyshev-8 adjacent (horizontal, vertical, or diagonal), no cell is visited twice, and the learner has not already submitted the same or reversed path in this round.
+  - `keywordIds` are automatically resolved by the server from the round's dealt `activeBoard`.
+
+  ## Automatic Variable Chaining
+  On `201 Created`, `script:post-response` saves:
+  - `{{chainId}}`
+
+  ## Responses & Error Codes (`ApiErrorCode`)
+  - **`201 Created`**: `{ chain: SubmittedChain, state: PublicSessionState }`
+  - **`400 INVALID_REQUEST_BODY`**: `path` has fewer than 2 cells, negative coordinates, or empty `narrativeExplanation`.
+  - **`401 UNAUTHORIZED_TOKEN`**: Missing or invalid Capability Token.
+  - **`403 FORBIDDEN_ROLE`**: Caller is an `instructor` or holds a token for another session.
+  - **`403 PARTICIPANT_HAS_LEFT`**: Learner has left the Game Session (`POST /leave`).
+  - **`404 SESSION_NOT_FOUND`**: Unknown `sessionId`.
+  - **`409 PHASE_CLOSED_FOR_SUBMISSIONS`**: Session is not in `round-{N}:chain-mapping`, `:roundNumber` does not match the active round, or `phaseEndsAt` + 5s grace period has elapsed.
+  - **`409 CHAIN_ALREADY_SUBMITTED`**: Same learner already submitted this path (or its exact reverse) in this round.
+  - **`413 PAYLOAD_TOO_LARGE`**: Request body exceeds 256 KB.
+  - **`422 CHAIN_TOPOLOGY_INVALID`**: Path is shorter than `minChainLength`, has non-adjacent or duplicate cells, or references coordinates outside the board grid.
+}

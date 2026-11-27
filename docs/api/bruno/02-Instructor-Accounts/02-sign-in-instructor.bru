@@ -1,0 +1,51 @@
+meta {
+  name: Sign In Instructor
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/api/v1/accounts/sign-in
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "email": "{{teacherEmail}}",
+    "password": "{{teacherPassword}}"
+  }
+}
+
+script:post-response {
+  if (res.status === 200 && res.body) {
+    bru.setEnvVar("accountToken", res.body.accountToken);
+    bru.setEnvVar("accountId", res.body.accountId);
+  }
+}
+
+tests {
+  test("signs in an existing Instructor Account and issues an Account Token", function() {
+    expect(res.status).to.equal(200);
+    expect(res.body.accountToken).to.be.a("string");
+    expect(res.body.accountId).to.be.a("string");
+  });
+}
+
+docs {
+  # POST /api/v1/accounts/sign-in (`signInInstructor`)
+
+  Verifies an **Instructor Account**'s email and password and issues a fresh 12-hour **Account Token**. Five consecutive wrong-password attempts lock the account for 15 minutes (`423 ACCOUNT_TEMPORARILY_LOCKED`).
+
+  ## Automatic Variable Chaining
+  On `200 OK`, `script:post-response` saves:
+  - `{{accountToken}}`
+  - `{{accountId}}`
+
+  ## Responses & Error Codes (`ApiErrorCode`)
+  - **`200 OK`**: `{ accountId, email, accountToken, expiresAt }`
+  - **`400 INVALID_REQUEST_BODY`**: Non-object JSON body or non-string field.
+  - **`401 INVALID_CREDENTIALS`**: Unknown email, wrong password, or missing email/password field (identical generic message to prevent account enumeration).
+  - **`413 PAYLOAD_TOO_LARGE`**: Request body exceeds 256 KB.
+  - **`423 ACCOUNT_TEMPORARILY_LOCKED`**: Account locked after 5 wrong-password attempts (`details.lockedUntil`).
+}

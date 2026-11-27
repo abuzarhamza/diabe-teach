@@ -1,0 +1,157 @@
+meta {
+  name: Register Curriculum Pack
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/api/v1/packs
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accountToken}}
+}
+
+body:json {
+  {
+    "id": "{{customPackId}}",
+    "title": "Endocrine Pathophysiology Intro",
+    "version": "1.0.0",
+    "description": "A 3x3 introductory curriculum pack covering endocrine feedback loops and glucose regulation.",
+    "authorName": "Dr. S. Rahman",
+    "boardConfig": {
+      "rows": 3,
+      "cols": 3,
+      "minChainLength": 3,
+      "adjacencyRule": "chebyshev-8"
+    },
+    "domains": [
+      {
+        "id": "hormones",
+        "label": "Hormones & Signaling",
+        "description": "Endocrine hormones and receptor pathways"
+      },
+      {
+        "id": "metabolism",
+        "label": "Glucose Metabolism",
+        "description": "Hepatic and peripheral glucose uptake"
+      }
+    ],
+    "cards": [
+      {
+        "id": "card-insulin",
+        "verbatimLabel": "Insulin",
+        "displayLabel": "Insulin",
+        "aliases": [],
+        "domainId": "hormones",
+        "summary": "Anabolic peptide hormone secreted by pancreatic beta cells."
+      },
+      {
+        "id": "card-glucagon",
+        "verbatimLabel": "Glucagon",
+        "displayLabel": "Glucagon",
+        "aliases": [],
+        "domainId": "hormones",
+        "summary": "Counter-regulatory hormone secreted by pancreatic alpha cells."
+      },
+      {
+        "id": "card-beta-cell",
+        "verbatimLabel": "Pancreatic Beta Cell",
+        "displayLabel": "Beta Cell",
+        "aliases": [],
+        "domainId": "hormones",
+        "summary": "Endocrine islet cell that senses glucose and releases insulin."
+      },
+      {
+        "id": "card-glut4",
+        "verbatimLabel": "GLUT4 Transporter",
+        "displayLabel": "GLUT4",
+        "aliases": [],
+        "domainId": "metabolism",
+        "summary": "Insulin-regulated glucose transporter in skeletal muscle and adipose tissue."
+      },
+      {
+        "id": "card-glycogenolysis",
+        "verbatimLabel": "Hepatic Glycogenolysis",
+        "displayLabel": "Glycogenolysis",
+        "aliases": [],
+        "domainId": "metabolism",
+        "summary": "Breakdown of stored hepatic glycogen into glucose."
+      },
+      {
+        "id": "card-gluconeogenesis",
+        "verbatimLabel": "Hepatic Gluconeogenesis",
+        "displayLabel": "Gluconeogenesis",
+        "aliases": [],
+        "domainId": "metabolism",
+        "summary": "Synthesis of glucose from non-carbohydrate precursors in the liver."
+      },
+      {
+        "id": "card-hyperglycemia",
+        "verbatimLabel": "Hyperglycemia",
+        "displayLabel": "Hyperglycemia",
+        "aliases": [],
+        "domainId": "metabolism",
+        "summary": "Elevated blood glucose concentration due to relative or absolute insulin deficiency."
+      },
+      {
+        "id": "card-insulin-receptor",
+        "verbatimLabel": "Insulin Receptor Tyrosine Kinase",
+        "displayLabel": "Insulin Receptor",
+        "aliases": [],
+        "domainId": "hormones",
+        "summary": "Transmembrane receptor activated by insulin binding."
+      },
+      {
+        "id": "card-ampk",
+        "verbatimLabel": "AMP-Activated Protein Kinase",
+        "displayLabel": "AMPK",
+        "aliases": [],
+        "domainId": "metabolism",
+        "summary": "Cellular energy sensor that stimulates glucose uptake and fatty acid oxidation."
+      }
+    ],
+    "adjudicationRubric": {
+      "evaluatorPersona": "Academic endocrinologist evaluating mechanistic concept chains",
+      "subjectDomain": "Endocrinology and Glucose Homeostasis",
+      "chainContinuityCriteria": [
+        "Each consecutive pair of Keyword Cards must have a direct physiological or biochemical causal link."
+      ],
+      "calibrationExamples": []
+    },
+    "assessmentInstrument": null,
+    "perceptionSurvey": null
+  }
+}
+
+tests {
+  test("registers the Curriculum Pack version (201) or reports already registered (409)", function() {
+    expect([201, 409]).to.include(res.status);
+    if (res.status === 201) {
+      expect(res.body.packId).to.be.a("string");
+      expect(res.body.version).to.equal("1.0.0");
+    } else {
+      expect(res.body.code).to.equal("PACK_ALREADY_EXISTS");
+    }
+  });
+}
+
+docs {
+  # POST /api/v1/packs (`registerCurriculumPack`)
+
+  Publishes a new **Curriculum Pack** or a new immutable **Pack Version** (`id` + `version`) to the shared library, recording the signed-in teacher's `accountId` as `createdBy`.
+
+  ## Authentication
+  - **`AccountAuth`**: `Authorization: Bearer {{accountToken}}`
+
+  ## Responses & Error Codes (`ApiErrorCode`)
+  - **`201 Created`**: `{ packId, version, warnings }`
+  - **`400 INVALID_REQUEST_BODY`**: Schema violation on required pack fields.
+  - **`401 UNAUTHORIZED_TOKEN`**: Missing, invalid, or non-Account bearer token.
+  - **`403 PACK_IS_SYSTEM_PACK`**: Attempting to release a new version of a System Pack (`diabe-teach`).
+  - **`409 PACK_ALREADY_EXISTS`**: The `id@version` snapshot already exists.
+  - **`413 PAYLOAD_TOO_LARGE`**: Request body exceeds 256 KB.
+  - **`422 PACK_VALIDATION_FAILED`**: Semantic or board-capacity validation errors (`details.errors`).
+}

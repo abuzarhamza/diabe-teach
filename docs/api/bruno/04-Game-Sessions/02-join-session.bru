@@ -1,0 +1,55 @@
+meta {
+  name: Join Game Session
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/api/v1/sessions/join
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "roomCode": "{{roomCode}}",
+    "displayName": "Alice"
+  }
+}
+
+script:post-response {
+  if (res.status === 200 && res.body) {
+    bru.setEnvVar("participantId", res.body.participantId);
+    bru.setEnvVar("participantToken", res.body.participantToken);
+    if (res.body.sessionId) {
+      bru.setEnvVar("sessionId", res.body.sessionId);
+    }
+  }
+}
+
+tests {
+  test("joins the Game Session via roomCode and issues a participant Capability Token", function() {
+    expect(res.status).to.equal(200);
+    expect(res.body.participantId).to.be.a("string");
+    expect(res.body.participantToken).to.be.a("string");
+  });
+}
+
+docs {
+  # POST /api/v1/sessions/join (`joinGameSession`)
+
+  Enrolls a learner in a **Game Session** using its 6-character `roomCode` (`{{roomCode}}`) and a chosen `displayName`, returning a session-scoped participant **Capability Token** (`role: "participant"`).
+
+  ## Automatic Variable Chaining
+  On `200 OK`, `script:post-response` saves:
+  - `{{participantId}}`
+  - `{{participantToken}}`
+  - `{{sessionId}}`
+
+  ## Responses & Error Codes (`ApiErrorCode`)
+  - **`200 OK`**: `{ sessionId, participantId, participantToken, state }`
+  - **`400 INVALID_REQUEST_BODY`**: Missing or invalid `roomCode` (`details.field: "roomCode"`).
+  - **`404 ROOM_CODE_NOT_FOUND`**: No active Game Session matches `roomCode`.
+  - **`409 CONCURRENT_UPDATE_CONFLICT`**: Optimistic concurrency conflict after 3 retries.
+  - **`413 PAYLOAD_TOO_LARGE`**: Request body exceeds 256 KB.
+}

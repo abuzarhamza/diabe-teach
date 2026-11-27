@@ -4,7 +4,9 @@
 
 **Blocked by:** 01: Install Middy Packages & Implement Core Middlewares
 
-**Status:** ready-for-agent
+**Status:** wontfix (superseded by discrete-domain-functions-middy 01-03, 2026-11-20)
+
+Closed 2026-11-20: superseded by `3c5f131` (one Netlify function per route with the shared middy chain `createApiHandler`; no central `@middy/http-router` or `netlify/functions/api.ts`, and `openapi-backend` is gone).
 
 - [ ] Implement `CurriculumPackHttpHandler` with simple event-to-query transformer
 - [ ] Connect `CurriculumPackHttpHandler` to `@middy/http-router` for `GET /api/v1/packs/{packId}`

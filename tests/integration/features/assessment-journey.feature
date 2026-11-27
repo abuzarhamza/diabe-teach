@@ -32,6 +32,9 @@ Feature: Assessment Submission Journey
     And the response should contain submittedAt
     And the response should contain a metacognitive report
     And the response should contain answer key review
+    When participant "Alice" fetches their analytics report
+    Then the response status should be 200
+    And the analytics report should show their pretest and posttest results
 
   @error-handling @duplicate
   Scenario: Participant cannot submit pretest twice
@@ -85,3 +88,27 @@ Feature: Assessment Submission Journey
     When participant "Bob" submits a perception survey again
     Then the response status should be 409
     And the response error code should be "SURVEY_ALREADY_SUBMITTED"
+
+  @error-handling @validation
+  Scenario: Incomplete assessment submission is rejected with 422
+    When the instructor creates a classroom session with pack "diabe-teach"
+    And participant "Alice" joins using the room code
+    And participant "Alice" submits an incomplete pretest assessment
+    Then the response status should be 422
+    And the response error code should be "ASSESSMENT_INCOMPLETE"
+    And the response should be a standard error body
+
+  @error-handling @validation @authorization
+  Scenario: Assessment with an invalid answer choice or submitted by an instructor is rejected
+    When the instructor creates a classroom session with pack "diabe-teach"
+    And participant "Alice" joins using the room code
+    And participant "Alice" submits a pretest assessment with invalid answer choice 7 for question "dm-mcq-01"
+    Then the response status should be 400
+    And the response error code should be "INVALID_REQUEST_BODY"
+    And the error should name the field "answers.dm-mcq-01"
+    And the response should be a standard error body
+    When the instructor attempts to submit pretest answers
+    Then the response status should be 403
+    And the response error code should be "FORBIDDEN_ROLE"
+    And the response should be a standard error body
+

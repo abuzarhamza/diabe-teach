@@ -1,0 +1,150 @@
+meta {
+  name: Validate Curriculum Pack
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/api/v1/packs/validate
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accountToken}}
+}
+
+body:json {
+  {
+    "id": "{{customPackId}}",
+    "title": "Endocrine Pathophysiology Intro",
+    "version": "1.0.0",
+    "description": "A 3x3 introductory curriculum pack covering endocrine feedback loops and glucose regulation.",
+    "authorName": "Dr. S. Rahman",
+    "boardConfig": {
+      "rows": 3,
+      "cols": 3,
+      "minChainLength": 3,
+      "adjacencyRule": "chebyshev-8"
+    },
+    "domains": [
+      {
+        "id": "hormones",
+        "label": "Hormones & Signaling",
+        "description": "Endocrine hormones and receptor pathways"
+      },
+      {
+        "id": "metabolism",
+        "label": "Glucose Metabolism",
+        "description": "Hepatic and peripheral glucose uptake"
+      }
+    ],
+    "cards": [
+      {
+        "id": "card-insulin",
+        "verbatimLabel": "Insulin",
+        "displayLabel": "Insulin",
+        "aliases": [],
+        "domainId": "hormones",
+        "summary": "Anabolic peptide hormone secreted by pancreatic beta cells."
+      },
+      {
+        "id": "card-glucagon",
+        "verbatimLabel": "Glucagon",
+        "displayLabel": "Glucagon",
+        "aliases": [],
+        "domainId": "hormones",
+        "summary": "Counter-regulatory hormone secreted by pancreatic alpha cells."
+      },
+      {
+        "id": "card-beta-cell",
+        "verbatimLabel": "Pancreatic Beta Cell",
+        "displayLabel": "Beta Cell",
+        "aliases": [],
+        "domainId": "hormones",
+        "summary": "Endocrine islet cell that senses glucose and releases insulin."
+      },
+      {
+        "id": "card-glut4",
+        "verbatimLabel": "GLUT4 Transporter",
+        "displayLabel": "GLUT4",
+        "aliases": [],
+        "domainId": "metabolism",
+        "summary": "Insulin-regulated glucose transporter in skeletal muscle and adipose tissue."
+      },
+      {
+        "id": "card-glycogenolysis",
+        "verbatimLabel": "Hepatic Glycogenolysis",
+        "displayLabel": "Glycogenolysis",
+        "aliases": [],
+        "domainId": "metabolism",
+        "summary": "Breakdown of stored hepatic glycogen into glucose."
+      },
+      {
+        "id": "card-gluconeogenesis",
+        "verbatimLabel": "Hepatic Gluconeogenesis",
+        "displayLabel": "Gluconeogenesis",
+        "aliases": [],
+        "domainId": "metabolism",
+        "summary": "Synthesis of glucose from non-carbohydrate precursors in the liver."
+      },
+      {
+        "id": "card-hyperglycemia",
+        "verbatimLabel": "Hyperglycemia",
+        "displayLabel": "Hyperglycemia",
+        "aliases": [],
+        "domainId": "metabolism",
+        "summary": "Elevated blood glucose concentration due to relative or absolute insulin deficiency."
+      },
+      {
+        "id": "card-insulin-receptor",
+        "verbatimLabel": "Insulin Receptor Tyrosine Kinase",
+        "displayLabel": "Insulin Receptor",
+        "aliases": [],
+        "domainId": "hormones",
+        "summary": "Transmembrane receptor activated by insulin binding."
+      },
+      {
+        "id": "card-ampk",
+        "verbatimLabel": "AMP-Activated Protein Kinase",
+        "displayLabel": "AMPK",
+        "aliases": [],
+        "domainId": "metabolism",
+        "summary": "Cellular energy sensor that stimulates glucose uptake and fatty acid oxidation."
+      }
+    ],
+    "adjudicationRubric": {
+      "evaluatorPersona": "Academic endocrinologist evaluating mechanistic concept chains",
+      "subjectDomain": "Endocrinology and Glucose Homeostasis",
+      "chainContinuityCriteria": [
+        "Each consecutive pair of Keyword Cards must have a direct physiological or biochemical causal link."
+      ],
+      "calibrationExamples": []
+    },
+    "assessmentInstrument": null,
+    "perceptionSurvey": null
+  }
+}
+
+tests {
+  test("dry-run validates the Curriculum Pack and returns valid: true", function() {
+    expect(res.status).to.equal(200);
+    expect(res.body.valid).to.equal(true);
+    expect(res.body.errors).to.be.an("array");
+  });
+}
+
+docs {
+  # POST /api/v1/packs/validate (`validateCurriculumPack`)
+
+  Performs a dry-run validation of a draft **Curriculum Pack** without persisting it, checking semantic domain references, board capacity (`cards.length >= rows * cols`), calibration examples, and optional assessment/survey instruments.
+
+  ## Authentication
+  - **`AccountAuth`**: `Authorization: Bearer {{accountToken}}`
+
+  ## Responses & Error Codes (`ApiErrorCode`)
+  - **`200 OK`**: `{ valid: boolean, errors: ValidationError[], warnings: ValidationWarning[] }`
+  - **`400 INVALID_REQUEST_BODY`**: Missing required top-level schema field or wrong property type.
+  - **`401 UNAUTHORIZED_TOKEN`**: Missing, invalid, or non-Account bearer token.
+  - **`413 PAYLOAD_TOO_LARGE`**: Request body exceeds 256 KB.
+}

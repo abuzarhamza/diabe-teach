@@ -2,6 +2,7 @@ import type { APIGatewayProxyEvent, APIGatewayProxyResult } from "aws-lambda";
 import type { CapabilityTokenPort, VerifiedCapability } from "../../../src/application/ports/capability-token.port.js";
 import type { GameSessionRepositoryPort } from "../../../src/application/ports/game-session-repository.port.js";
 import { createApiHandler } from "../../../src/adapters/inbound/http/middy/api-handler.js";
+import { requestLoggerOf } from "../../../src/adapters/inbound/http/request-logger.js";
 import { AppRuntime } from "../../../src/app-runtime.js";
 import { ListRoundChainsUseCase } from "../../../src/application/use-cases/list-round-chains.use-case.js";
 import {
@@ -64,7 +65,7 @@ export function createListRoundChainsHandler(
       sessionId,
       roundNumber: parseRoundNumber(roundNumberStr),
       verifiedCapability: event.auth,
-    });
+    }, requestLoggerOf(event));
 
     return {
       statusCode: 200,

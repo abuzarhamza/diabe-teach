@@ -66,6 +66,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiErrorResponse"
+        "413":
+          $ref: "#/components/responses/PayloadTooLargeError"
         "401":
           description: UNAUTHORIZED_TOKEN. Missing or invalid x-api-key header.
           content:
@@ -113,6 +115,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiErrorResponse"
+        "413":
+          $ref: "#/components/responses/PayloadTooLargeError"
         "401":
           description: >-
             INVALID_CREDENTIALS with the message "Email or password is
@@ -236,12 +240,20 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [pack]
+                required: [packId, version, warnings]
                 properties:
-                  pack:
-                    $ref: "#/components/schemas/CurriculumPackSummary"
+                  packId:
+                    type: string
+                  version:
+                    type: string
+                  warnings:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/PackValidationIssue"
         "400":
           $ref: "#/components/responses/BadRequestError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLargeError"
         "401":
           description: >-
             UNAUTHORIZED_TOKEN. No Account Token, or one that is malformed,
@@ -298,21 +310,41 @@ paths:
               $ref: "#/components/schemas/CurriculumPackInput"
       responses:
         "200":
-          description: Validation result with any structural or topological issues
+          description: >-
+            Validation result. `valid` is true when `errors` is empty;
+            `warnings` (for example OPTIONAL_FIELD_MISSING) never make a pack
+            invalid.
           content:
             application/json:
               schema:
                 type: object
-                required: [valid, issues]
+                required: [valid, errors, warnings]
                 properties:
                   valid:
                     type: boolean
-                  issues:
+                  errors:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/PackValidationIssue"
+                  warnings:
                     type: array
                     items:
                       $ref: "#/components/schemas/PackValidationIssue"
         "400":
-          $ref: "#/components/responses/BadRequestError"
+          description: >-
+            INVALID_REQUEST_BODY. The body is checked against
+            `CurriculumPackInput` before the pack validator runs, so a pack
+            with a missing required field or a wrongly typed field is refused
+            here (with `details.field` and `details.reason`) rather than
+            returned as `{ valid: false }`. Also returned when the body is not
+            a JSON object. Only a body that passes the schema reaches the
+            validator and gets a 200.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "413":
+          $ref: "#/components/responses/PayloadTooLargeError"
         "401":
           description: >-
             UNAUTHORIZED_TOKEN. No Account Token, or one that is malformed,
@@ -509,6 +541,8 @@ paths:
                 $ref: "#/components/schemas/CreateSessionResponse"
         "400":
           $ref: "#/components/responses/BadRequestError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLargeError"
         "401":
           description: >-
             UNAUTHORIZED_TOKEN. A classroom (non-solo) start sent no Account
@@ -554,13 +588,16 @@ paths:
                 $ref: "#/components/schemas/JoinSessionResponse"
         "400":
           $ref: "#/components/responses/BadRequestError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLargeError"
         "404":
           $ref: "#/components/responses/NotFoundError"
         "409":
           description: >-
             CONCURRENT_UPDATE_CONFLICT. Other requests kept changing the Game
             Session while this one was being saved, and it still conflicted
-            after 3 attempts. Nothing was recorded. Safe to retry.
+            after 10 attempts with jittered backoff. Nothing was recorded. Safe
+            to retry.
           content:
             application/json:
               schema:
@@ -571,6 +608,13 @@ paths:
       operationId: getGameSessionState
       tags: [Sessions]
       summary: Get current Game Session state snapshot
+      description: >-
+        Either Capability Token for this Game Session works: the instructor
+        token or a participant token (including a learner who left). Screens
+        poll this route for live updates, since `streamGameSessionEvents` is
+        not implemented.
+      security:
+        - BearerAuth: []
       parameters:
         - $ref: "#/components/parameters/SessionIdParam"
       responses:
@@ -584,6 +628,15 @@ paths:
                 properties:
                   state:
                     $ref: "#/components/schemas/PublicSessionState"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "403":
+          description: >-
+            FORBIDDEN_ROLE. The token belongs to another Game Session.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
         "404":
           $ref: "#/components/responses/NotFoundError"
 
@@ -592,6 +645,12 @@ paths:
       operationId: streamGameSessionEvents
       tags: [Sessions]
       summary: Subscribe to real-time Server-Sent Events (SSE) for a Game Session
+      description: >-
+        Not implemented: no function serves this route. The design is kept
+        for later. Until then, poll
+        `getGameSessionState` (and `listRoundChains` or `getRoundStandings`
+        for round data).
+      x-implemented: false
       parameters:
         - $ref: "#/components/parameters/SessionIdParam"
       responses:
@@ -609,6 +668,10 @@ paths:
       operationId: transitionSessionPhase
       tags: [Sessions]
       summary: Advance or transition the Game Session phase (shuffles a fresh board on Round 1 & Round 2 entry)
+      description: >-
+        Moves the Game Session to the next phase only. `jump` names that
+        next phase in `targetPhase`; it cannot skip phases. Ending a Game
+        Session early goes through `endGameSession`.
       security:
         - BearerAuth: []
       parameters:
@@ -632,6 +695,8 @@ paths:
                     $ref: "#/components/schemas/PublicSessionState"
         "400":
           $ref: "#/components/responses/BadRequestError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLargeError"
         "401":
           $ref: "#/components/responses/UnauthorizedError"
         "403":
@@ -644,7 +709,164 @@ paths:
 
             CONCURRENT_UPDATE_CONFLICT. Other requests kept changing the Game
             Session while this one was being saved, and it still conflicted
-            after 3 attempts. Nothing was recorded. Safe to retry.
+            after 10 attempts with jittered backoff. Nothing was recorded. Safe
+            to retry.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+
+  /api/v1/sessions/{sessionId}/phase/extend:
+    post:
+      operationId: extendSessionPhase
+      tags: [Sessions]
+      summary: Give the current timed phase more time (instructor only)
+      description: >-
+        Moves the current phase's deadline to `max(phaseEndsAt, now) + seconds`.
+        A phase whose time had already run out (including the Chain-Mapping
+        submission grace period) reopens, so learners can submit chains again
+        until the new `phaseEndsAt`. The extension lasts until the next phase
+        transition. Instructor Capability Token only.
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/SessionIdParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExtendPhaseRequest"
+      responses:
+        "200":
+          description: Phase extended; the updated public state.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [state]
+                properties:
+                  state:
+                    $ref: "#/components/schemas/PublicSessionState"
+        "400":
+          $ref: "#/components/responses/BadRequestError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLargeError"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "403":
+          $ref: "#/components/responses/ForbiddenError"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+        "409":
+          description: >-
+            PHASE_HAS_NO_TIMER. The current phase is instructor-driven (no
+            `phaseEndsAt`), so there is no deadline to extend.
+
+            SESSION_ALREADY_COMPLETED. The session has ended.
+
+            CONCURRENT_UPDATE_CONFLICT. Other requests kept changing the Game
+            Session while this one was being saved, and it still conflicted
+            after 10 attempts with jittered backoff. Nothing was recorded. Safe
+            to retry.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+
+  /api/v1/sessions/{sessionId}/end:
+    post:
+      operationId: endGameSession
+      tags: [Sessions]
+      summary: End the Game Session early (instructor only)
+      description: >-
+        Moves the Game Session from any phase straight to `completed`. This is
+        the one exception to "next phase only" (`transitionSessionPhase`). Any
+        extension of the current phase is dropped; `completed` has no timer.
+        Learners see `currentPhase: completed` on their next state poll, and
+        chain submissions are refused with 409 PHASE_CLOSED_FOR_SUBMISSIONS.
+        Takes no request body. Instructor Capability Token only.
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/SessionIdParam"
+      responses:
+        "200":
+          description: Session ended; the updated public state.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [state]
+                properties:
+                  state:
+                    $ref: "#/components/schemas/PublicSessionState"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "403":
+          $ref: "#/components/responses/ForbiddenError"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+        "409":
+          description: >-
+            SESSION_ALREADY_COMPLETED. The session has already ended.
+
+            CONCURRENT_UPDATE_CONFLICT. Other requests kept changing the Game
+            Session while this one was being saved, and it still conflicted
+            after 10 attempts with jittered backoff. Nothing was recorded. Safe
+            to retry.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+
+  /api/v1/sessions/{sessionId}/leave:
+    post:
+      operationId: leaveGameSession
+      tags: [Sessions]
+      summary: Leave the Game Session (participant only)
+      description: >-
+        Records that the calling learner left: their entry in `participants`
+        gets a `leftAt` time and `participantCount` drops by one. Leaving
+        again is a no-op 200 that keeps the first `leftAt`. Their chains,
+        votes, assessments, survey response and standings are kept, and read
+        routes keep working for them, but every write (chain submission, peer
+        vote, assessment, survey) is refused afterwards with 403
+        PARTICIPANT_HAS_LEFT. Takes no request body. Participant Capability
+        Token only.
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/SessionIdParam"
+      responses:
+        "200":
+          description: The learner has left (or had already left); the updated public state.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [state]
+                properties:
+                  state:
+                    $ref: "#/components/schemas/PublicSessionState"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "403":
+          description: >-
+            FORBIDDEN_ROLE. The token is an instructor's, belongs to another
+            session, or names no participant of this session.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+        "409":
+          description: >-
+            CONCURRENT_UPDATE_CONFLICT. Other requests kept changing the Game
+            Session while this one was being saved, and it still conflicted
+            after 10 attempts with jittered backoff. Nothing was recorded. Safe
+            to retry.
           content:
             application/json:
               schema:
@@ -750,7 +972,9 @@ paths:
               $ref: "#/components/schemas/SubmitChainRequest"
       responses:
         "201":
-          description: Concept Chain passed topological validation and was recorded
+          description: >-
+            Concept Chain passed topological validation and was recorded. Its
+            `keywordIds` name the board's Keyword Cards at the path's cells.
           content:
             application/json:
               schema:
@@ -761,8 +985,12 @@ paths:
                     $ref: "#/components/schemas/SubmittedChain"
         "400":
           $ref: "#/components/responses/BadRequestError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLargeError"
         "401":
           $ref: "#/components/responses/UnauthorizedError"
+        "403":
+          $ref: "#/components/responses/ParticipantWriteForbiddenError"
         "404":
           $ref: "#/components/responses/NotFoundError"
         "409":
@@ -781,13 +1009,19 @@ paths:
 
             CONCURRENT_UPDATE_CONFLICT. Other requests kept changing the Game
             Session while this one was being saved, and it still conflicted
-            after 3 attempts. Nothing was recorded. Safe to retry.
+            after 10 attempts with jittered backoff. Nothing was recorded. Safe
+            to retry.
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiErrorResponse"
         "422":
-          description: Concept Chain failed topological validation (CHAIN_TOPOLOGY_INVALID)
+          description: >-
+            CHAIN_TOPOLOGY_INVALID. The Concept Chain failed topological
+            validation: fewer cells than the minimum chain length, two
+            consecutive cells that are not adjacent, a cell used twice, or a
+            cell outside the round's board (`row` must be below the board's
+            `rows` and `col` below its `cols`). Nothing is recorded.
           content:
             application/json:
               schema:
@@ -827,10 +1061,12 @@ paths:
                     $ref: "#/components/schemas/SubmittedChain"
         "400":
           $ref: "#/components/responses/BadRequestError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLargeError"
         "401":
           $ref: "#/components/responses/UnauthorizedError"
         "403":
-          $ref: "#/components/responses/ForbiddenError"
+          $ref: "#/components/responses/ParticipantWriteForbiddenError"
         "404":
           $ref: "#/components/responses/NotFoundError"
         "409":
@@ -839,7 +1075,8 @@ paths:
 
             CONCURRENT_UPDATE_CONFLICT. Other requests kept changing the Game
             Session while this one was being saved, and it still conflicted
-            after 3 attempts. Nothing was recorded. Safe to retry.
+            after 10 attempts with jittered backoff. Nothing was recorded. Safe
+            to retry.
           content:
             application/json:
               schema:
@@ -850,6 +1087,11 @@ paths:
       operationId: getRoundStandings
       tags: [Chains]
       summary: Get ranked round standings (longest approved chain primary, total distinct approved chains tie-breaker)
+      description: >-
+        Either Capability Token for this Game Session works: the instructor
+        token or a participant token.
+      security:
+        - BearerAuth: []
       parameters:
         - $ref: "#/components/parameters/SessionIdParam"
         - $ref: "#/components/parameters/RoundNumberParam"
@@ -871,6 +1113,15 @@ paths:
                     type: array
                     items:
                       $ref: "#/components/schemas/PlayerRoundStanding"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "403":
+          description: >-
+            FORBIDDEN_ROLE. The token belongs to another Game Session.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
         "404":
           $ref: "#/components/responses/NotFoundError"
 
@@ -906,8 +1157,12 @@ paths:
                 $ref: "#/components/schemas/AssessmentSubmissionResponse"
         "400":
           $ref: "#/components/responses/BadRequestError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLargeError"
         "401":
           $ref: "#/components/responses/UnauthorizedError"
+        "403":
+          $ref: "#/components/responses/ParticipantWriteForbiddenError"
         "404":
           $ref: "#/components/responses/NotFoundError"
         "409":
@@ -919,7 +1174,8 @@ paths:
 
             CONCURRENT_UPDATE_CONFLICT. Other requests kept changing the Game
             Session while this one was being saved, and it still conflicted
-            after 3 attempts. Nothing was recorded. Safe to retry.
+            after 10 attempts with jittered backoff. Nothing was recorded. Safe
+            to retry.
           content:
             application/json:
               schema:
@@ -964,8 +1220,12 @@ paths:
                     format: date-time
         "400":
           $ref: "#/components/responses/BadRequestError"
+        "413":
+          $ref: "#/components/responses/PayloadTooLargeError"
         "401":
           $ref: "#/components/responses/UnauthorizedError"
+        "403":
+          $ref: "#/components/responses/ParticipantWriteForbiddenError"
         "404":
           $ref: "#/components/responses/NotFoundError"
         "409":
@@ -976,19 +1236,36 @@ paths:
 
             CONCURRENT_UPDATE_CONFLICT. Other requests kept changing the Game
             Session while this one was being saved, and it still conflicted
-            after 3 attempts. Nothing was recorded. Safe to retry.
+            after 10 attempts with jittered backoff. Nothing was recorded. Safe
+            to retry.
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApiErrorResponse"
         "422":
-          $ref: "#/components/responses/UnprocessableEntityError"
+          description: >-
+            SURVEY_COMMENTS_TOO_LONG. Optional free-text `comments` exceed the
+            maximum length of 1,000 words.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
 
   /api/v1/sessions/{sessionId}/analytics:
     get:
       operationId: getSessionAnalytics
       tags: [Assessments & Analytics]
       summary: Fetch individual learner or full cohort metacognitive and gameplay analytics
+      description: >-
+        A participant Capability Token gets `{ role: "participant",
+        participantReport, cohortSummary }`, where `participantReport` is the
+        caller's own LearnerMetacognitiveReport. An instructor token gets
+        `{ role: "instructor", cohortSummary }` without `participantReport`.
+        Works in any phase: inputs that do not exist yet (for example the
+        Posttest before the learner has taken it) are `null`, never an error.
+        Pack data comes from the session's pinned Pack Version. Both roles get
+        the same `cohortSummary`, computed over the learners still in the
+        session.
       security:
         - BearerAuth: []
       parameters:
@@ -1002,6 +1279,13 @@ paths:
                 $ref: "#/components/schemas/SessionAnalyticsResponse"
         "401":
           $ref: "#/components/responses/UnauthorizedError"
+        "403":
+          description: >-
+            FORBIDDEN_ROLE. The token belongs to another session.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiErrorResponse"
         "404":
           $ref: "#/components/responses/NotFoundError"
 
@@ -1070,6 +1354,17 @@ components:
         application/json:
           schema:
             $ref: "#/components/schemas/ApiErrorResponse"
+    PayloadTooLargeError:
+      description: >-
+        PAYLOAD_TOO_LARGE. The raw request body is over 256 KB (262144 bytes,
+        counted in bytes, not characters). Checked for every route after the
+        token and before the body is parsed, so a request without a valid
+        token gets 401 first. `details.maxBytes` is the limit. Nothing is
+        stored.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiErrorResponse"
     UnauthorizedError:
       description: Missing or invalid bearer token
       content:
@@ -1078,6 +1373,19 @@ components:
             $ref: "#/components/schemas/ApiErrorResponse"
     ForbiddenError:
       description: Valid token does not have required role for this operation
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiErrorResponse"
+    ParticipantWriteForbiddenError:
+      description: >-
+        FORBIDDEN_ROLE. The token's role may not perform this action, or it
+        belongs to another session.
+
+        PARTICIPANT_HAS_LEFT. The learner left the Game Session
+        (`leaveGameSession`) and can no longer submit chains, cast peer votes,
+        or submit assessments or the survey. Nothing was recorded. Read
+        routes still work for them.
       content:
         application/json:
           schema:
@@ -1123,12 +1431,17 @@ components:
         - CONCURRENT_UPDATE_CONFLICT
         - CHAIN_ALREADY_SUBMITTED
         - SURVEY_ALREADY_SUBMITTED
+        - SURVEY_COMMENTS_TOO_LONG
         - EMAIL_ALREADY_REGISTERED
         - INVALID_CREDENTIALS
         - ACCOUNT_TEMPORARILY_LOCKED
         - PACK_IS_SYSTEM_PACK
         - PACK_ALREADY_ARCHIVED
         - PACK_NOT_ARCHIVED
+        - SESSION_ALREADY_COMPLETED
+        - PHASE_HAS_NO_TIMER
+        - PARTICIPANT_HAS_LEFT
+        - PAYLOAD_TOO_LARGE
         - INTERNAL_ERROR
 
     ApiErrorResponse:
@@ -1453,11 +1766,14 @@ components:
 
     PackValidationIssue:
       type: object
-      required: [jsonPointer, rule, message]
+      required: [path, code, message]
       properties:
-        jsonPointer:
+        path:
           type: string
-        rule:
+          description: >-
+            Dotted path of the offending field, for example
+            `boardConfig.rows` or `cards`.
+        code:
           type: string
           description: >-
             The rule that failed, for example REQUIRED_FIELD,
@@ -1643,6 +1959,7 @@ components:
         - phaseStartedAt
         - phaseEndsAt
         - participantCount
+        - participants
         - activeBoard
       properties:
         sessionId:
@@ -1676,7 +1993,10 @@ components:
           format: date-time
           description: >
             When the current phase is scheduled to end. `null` when the
-            phase is instructor-driven (its timer is set to `null`).
+            phase is instructor-driven (its timer is set to `null`). Phases
+            that have no timer setting at all (`round-1:round-summary`,
+            `round-2:round-summary` and `completed`) report `phaseEndsAt`
+            equal to `phaseStartedAt`: they have no deadline still to come.
         activeBoard:
           description: >
             The board of the active Gameplay Round, the same through its
@@ -1689,6 +2009,38 @@ components:
             - type: "null"
         participantCount:
           type: integer
+          description: >
+            The number of learners in `participants` whose `leftAt` is
+            `null`.
+        participants:
+          type: array
+          description: >
+            Every learner who joined, in join order, including those who
+            left. Both the instructor and participants receive it, so the
+            teacher's roster and a learner's classmate list come from the
+            state the screens already poll.
+          items:
+            $ref: "#/components/schemas/SessionParticipantView"
+
+    SessionParticipantView:
+      type: object
+      description: >
+        One learner in a Game Session. Carries no email or account id.
+      required: [participantId, displayName, joinedAt, leftAt]
+      properties:
+        participantId:
+          type: string
+        displayName:
+          type: string
+        joinedAt:
+          type: string
+          format: date-time
+        leftAt:
+          type: [string, "null"]
+          format: date-time
+          description: >
+            When the learner left the session; `null` while they are still
+            in it.
 
     TransitionPhaseRequest:
       type: object
@@ -1698,8 +2050,19 @@ components:
           type: string
           enum: [advance, jump]
           default: advance
+          description: >
+            `advance` moves to the next phase in the Game Session order.
+            `jump` moves to `targetPhase`, which must be that same next
+            phase: there is no skipping ahead or going back, and any other
+            `targetPhase` gets 409 INVALID_PHASE_TRANSITION. To finish a
+            Game Session early, use `endGameSession` (`POST
+            /api/v1/sessions/{sessionId}/end`), not `jump`.
         targetPhase:
           $ref: "#/components/schemas/PhaseIdentifier"
+          description: >
+            Required with `jump` (400 INVALID_REQUEST_BODY without it) and
+            ignored by `advance`: the phase to move to, which must be the
+            next phase.
         seed:
           type: string
           minLength: 1
@@ -1709,6 +2072,17 @@ components:
             the session's creation seed for Round 1. Without it, Round 1 uses
             the creation seed and otherwise the server generates a random
             seed. Ignored for transitions that enter no round.
+
+    ExtendPhaseRequest:
+      type: object
+      required: [seconds]
+      additionalProperties: false
+      properties:
+        seconds:
+          type: integer
+          minimum: 1
+          maximum: 600
+          description: Whole seconds to add to the current phase's deadline.
 
     StepRationale:
       type: string
@@ -1730,10 +2104,14 @@ components:
           minLength: 1
         keywordIds:
           type: array
+          deprecated: true
           description: >-
-            The keyword ids of the path's cells, in path order. Stored as sent
-            and returned on the chain; the server does not derive them from
-            the board. Defaults to an empty list.
+            Deprecated; send only `path`. Ignored for a round with a
+            server-dealt board: the server derives the chain's keyword ids
+            from the board at each path cell. Accepted (not rejected) so older
+            clients keep working. Only for a session stored before boards were
+            dealt (no `activeBoard`) are these ids stored as sent, defaulting
+            to an empty list.
           items:
             type: string
         stepRationales:
@@ -1758,27 +2136,31 @@ components:
       type: object
       required:
         - isApproved
-        - adjudicatorType
         - isLocked
-        - qualityScore
-        - transitionEvaluations
-        - overallFeedback
+        - decidedBy
+        - decidedAt
       properties:
         isApproved:
           type: boolean
+        isLocked:
+          type: boolean
+        decidedBy:
+          type: string
+          enum: [peer-consensus, ai, instructor]
+        decidedAt:
+          type: string
+          format: date-time
         adjudicatorType:
           type: string
           enum: [ai-specialist, peer-consensus, instructor-final]
-        isLocked:
-          type: boolean
         qualityScore:
           type: number
-          minimum: 1
-          maximum: 10
         transitionEvaluations:
           type: array
           items:
             $ref: "#/components/schemas/TransitionEvaluation"
+        feedback:
+          type: string
         overallFeedback:
           type: string
         suggestedRefinements:
@@ -1803,14 +2185,13 @@ components:
       type: object
       required:
         - chainId
-        - sessionId
         - roundNumber
         - participantId
         - path
         - keywordIds
         - narrativeExplanation
+        - chainLength
         - status
-        - peerVotes
         - submittedAt
       properties:
         chainId:
@@ -1828,10 +2209,18 @@ components:
             $ref: "#/components/schemas/GridCoord"
         keywordIds:
           type: array
+          description: >-
+            The ids of the Keyword Cards at the path's cells, in path order.
+            Derived by the server from the round's board, never taken from the
+            client. Only a chain recorded in a session stored before boards
+            were dealt keeps the ids its client sent.
           items:
             type: string
         narrativeExplanation:
           type: string
+        chainLength:
+          type: integer
+          minimum: 1
         stepRationales:
           type: array
           items:
@@ -1859,7 +2248,7 @@ components:
       allOf:
         - $ref: "#/components/schemas/SubmittedChain"
         - type: object
-          required: [participantDisplayName, peerVotes]
+          required: [sessionId, participantDisplayName, peerVotes]
           properties:
             participantDisplayName:
               type: string
@@ -1935,7 +2324,6 @@ components:
         - participantId
         - longestValidChainLength
         - totalValidChainsCount
-        - cumulativeRationaleScore
         - approvedChainIds
       properties:
         rank:
@@ -2011,8 +2399,15 @@ components:
 
     LearnerMetacognitiveReport:
       type: object
+      description: >-
+        One learner's report. A stage the learner has not taken is `null`, and
+        so is each delta that needs both stages.
       required:
         - participantId
+        - pretest
+        - posttest
+        - knowledgeGainDelta
+        - guessingReductionDelta
         - chainDiversityIndex
         - neglectedKeywordIds
       properties:
@@ -2028,14 +2423,24 @@ components:
             - type: "null"
         knowledgeGainDelta:
           type: [number, "null"]
+          description: Posttest correct % minus Pretest correct %.
         guessingReductionDelta:
           type: [number, "null"]
+          description: Pretest wrong-guess % minus Posttest wrong-guess %.
         chainDiversityIndex:
           type: number
           minimum: 0
           maximum: 1
+          description: >-
+            Distinct Semantic Domains crossed by the learner's approved Concept
+            Chains, divided by the pack's Semantic Domain count (0 with no
+            approved chain).
         neglectedKeywordIds:
           type: array
+          description: >-
+            Keyword Cards on the round boards dealt so far that none of the
+            learner's Concept Chains used (whatever their verdict), each once,
+            in round, row, column order. Empty before any board is dealt.
           items:
             type: string
 
@@ -2120,6 +2525,11 @@ components:
 
     CohortAnalyticsReport:
       type: object
+      description: >-
+        The cohort is the learners still in the session; learners who left are
+        not counted in any field. Each mean is taken over the cohort learners
+        who have its input and is `null` when none has (for example every
+        Posttest mean before anyone has taken the Posttest).
       required:
         - sessionId
         - participantCount
@@ -2134,23 +2544,38 @@ components:
           type: string
         participantCount:
           type: integer
+          description: Learners still in the session (those who left are not counted).
         pretestCohortMeanPercentage:
           type: [number, "null"]
+          description: Mean Pretest correct % over the learners who took the Pretest.
         posttestCohortMeanPercentage:
           type: [number, "null"]
+          description: Mean Posttest correct % over the learners who took the Posttest.
         posttestWrongGuessMeanPercentage:
           type: [number, "null"]
+          description: Mean Posttest wrong-guess % over the learners who took the Posttest.
         posttestIDontKnowMeanPercentage:
           type: [number, "null"]
+          description: Mean Posttest "I don't know" % over the learners who took the Posttest.
         meanChainDiversityIndex:
           type: number
+          minimum: 0
+          maximum: 1
+          description: >-
+            Mean of the cohort learners' `chainDiversityIndex` (0 when the
+            session has no learner).
         boardNeglectHeatmap:
           type: array
-          description: 2D matrix of usage frequencies per (row, col) cell
+          description: >-
+            `boardNeglectHeatmap[row][col]` is how many cohort learners never
+            used that grid coordinate in a Concept Chain (whatever its verdict)
+            in any round with a stored board. The grid spans the largest stored
+            board; empty before any board is dealt.
           items:
             type: array
             items:
-              type: number
+              type: integer
+              minimum: 0
 
     SessionAnalyticsResponse:
       type: object

@@ -1,4 +1,5 @@
 import type { MiddlewareObj } from "@middy/core";
+import type { RequestLogFields } from "../lambda-to-v2-wrapper.types.js";
 import {
   AccountTemporarilyLockedError,
   AdjudicationLockedError,
@@ -15,6 +16,7 @@ import {
   InvalidAccountPasswordError,
   InvalidBoardSeedError,
   InvalidCredentialsError,
+  InvalidPhaseExtensionError,
   InvalidPhaseTransitionError,
   InvalidSurveyResponseError,
   InvalidTimerConfigError,
@@ -27,13 +29,28 @@ import {
   PackNotArchivedError,
   PackNotFoundError,
   PackValidationFailedError,
+  ParticipantHasLeftError,
+  PayloadTooLargeError,
   PhaseClosedForSubmissionsError,
+  PhaseHasNoTimerError,
   RoomCodeNotFoundError,
+  SessionAlreadyCompletedError,
   SessionNotFoundError,
   SurveyAlreadySubmittedError,
   SurveyCommentsTooLongError,
   UnauthorizedTokenError,
 } from "../../../../domain/errors/domain-errors.js";
+
+/**
+ * Tells the wrapper's `request completed` line which DomainError refused the
+ * request. Events built without the wrapper (handler tests) carry no
+ * `requestOutcome`, so there is nothing to report.
+ */
+function reportErrorCode(event: Partial<RequestLogFields> | undefined, code: string): void {
+  if (event?.requestOutcome) {
+    event.requestOutcome.errorCode = code;
+  }
+}
 
 export function domainErrorMiddleware(): MiddlewareObj<any, any> {
   return {
@@ -51,6 +68,7 @@ export function domainErrorMiddleware(): MiddlewareObj<any, any> {
         else if (
           error instanceof InvalidTimerConfigError
           || error instanceof InvalidBoardSeedError
+          || error instanceof InvalidPhaseExtensionError
           || error instanceof MalformedRequestBodyError
           || error instanceof InvalidAccountEmailError
           || error instanceof InvalidAccountPasswordError
@@ -76,14 +94,20 @@ export function domainErrorMiddleware(): MiddlewareObj<any, any> {
           || error instanceof ConcurrentUpdateConflictError
           || error instanceof ChainAlreadySubmittedError
           || error instanceof EmailAlreadyRegisteredError
+          || error instanceof SessionAlreadyCompletedError
+          || error instanceof PhaseHasNoTimerError
         ) {
           statusCode = 409;
         }
         else if (
           error instanceof ForbiddenRoleError
           || error instanceof PackIsSystemPackError
+          || error instanceof ParticipantHasLeftError
         ) {
           statusCode = 403;
+        }
+        else if (error instanceof PayloadTooLargeError) {
+          statusCode = 413;
         }
         else if (error instanceof AccountTemporarilyLockedError) {
           statusCode = 423;
@@ -102,6 +126,8 @@ export function domainErrorMiddleware(): MiddlewareObj<any, any> {
         ) {
           statusCode = 422;
         }
+
+        reportErrorCode(request.event, error.code);
 
         const payload = {
           code: error.code,

@@ -1,0 +1,55 @@
+meta {
+  name: Sign Up Instructor
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/v1/accounts/sign-up
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "email": "{{teacherEmail}}",
+    "password": "{{teacherPassword}}"
+  }
+}
+
+script:post-response {
+  if (res.status === 201 && res.body) {
+    bru.setEnvVar("accountToken", res.body.accountToken);
+    bru.setEnvVar("accountId", res.body.accountId);
+  }
+}
+
+tests {
+  test("creates an Instructor Account (201) or reports already registered (409)", function() {
+    expect([201, 409]).to.include(res.status);
+    if (res.status === 201) {
+      expect(res.body.accountToken).to.be.a("string");
+      expect(res.body.accountId).to.be.a("string");
+    } else {
+      expect(res.body.code).to.equal("EMAIL_ALREADY_REGISTERED");
+    }
+  });
+}
+
+docs {
+  # POST /api/v1/accounts/sign-up (`signUpInstructor`)
+
+  Registers a new **Instructor Account** with an email (trimmed and lower-cased) and a password (at least 10 characters, hashed with Argon2id) and immediately signs it in, returning a 12-hour **Account Token**.
+
+  ## Automatic Variable Chaining
+  On `201 Created`, `script:post-response` saves:
+  - `{{accountToken}}`
+  - `{{accountId}}`
+
+  ## Responses & Error Codes (`ApiErrorCode`)
+  - **`201 Created`**: `{ accountId, email, accountToken, expiresAt }`
+  - **`400 INVALID_REQUEST_BODY`**: Malformed JSON, invalid email format (`details.field: "email"`), or password under 10 characters (`details.field: "password"`).
+  - **`401 UNAUTHORIZED_TOKEN`**: Missing or invalid `x-api-key` when API key enforcement is active.
+  - **`409 EMAIL_ALREADY_REGISTERED`**: An Instructor Account already exists for the normalized email.
+  - **`413 PAYLOAD_TOO_LARGE`**: Request body exceeds 256 KB.
+}

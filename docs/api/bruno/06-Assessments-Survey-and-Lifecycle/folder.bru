@@ -1,0 +1,14 @@
+meta {
+  name: 06 - Assessments, Survey & Lifecycle
+  seq: 6
+}
+
+docs {
+  # Pretest/Posttest Assessment Attempts, Analytics, Perception Survey & Session Exit
+
+  Covers the metacognitive assessment and end-of-session lifecycle endpoints:
+  - **Assessment Attempts** (`POST /api/v1/sessions/:sessionId/assessments/:stage` for `pretest` and `posttest` with explicit `"I_DONT_KNOW"` **Uncertainty Calibration**).
+  - **Session Analytics** (`GET /api/v1/sessions/:sessionId/analytics` returning **Chain Diversity Index**, **Board Neglect Heatmap**, knowledge gain, and guessing reduction).
+  - **Perception Survey** (`POST /api/v1/sessions/:sessionId/survey` with 9 Likert items `1..5` and optional comments).
+  - **Learner Leave & Instructor End Session** (`POST /api/v1/sessions/:sessionId/leave` and `POST /api/v1/sessions/:sessionId/end`).
+}

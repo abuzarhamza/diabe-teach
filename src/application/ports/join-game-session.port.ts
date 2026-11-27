@@ -1,10 +1,14 @@
 import type { CapabilityTokenSignerPort } from "./capability-token.port.js";
 import type { PublicSessionStateDto } from "./create-game-session.port.js";
 import type { GameSessionRepositoryPort } from "./game-session-repository.port.js";
+import type { LoggerPort } from "./logger.port.js";
+import type { WriteConflictBackoffPort } from "./write-conflict-backoff.port.js";
 
 export interface JoinGameSessionDependencies {
   readonly sessionRepo: GameSessionRepositoryPort;
   readonly tokenSigner: CapabilityTokenSignerPort;
+  /** Waits between write-conflict retries; without one the retrier retries at once. */
+  readonly writeConflictBackoff?: WriteConflictBackoffPort;
 }
 
 export interface JoinGameSessionCommand {
@@ -20,5 +24,5 @@ export interface JoinGameSessionResult {
 }
 
 export interface JoinGameSessionUseCasePort {
-  execute: (command: JoinGameSessionCommand) => Promise<JoinGameSessionResult>;
+  execute: (command: JoinGameSessionCommand, logger?: LoggerPort) => Promise<JoinGameSessionResult>;
 }

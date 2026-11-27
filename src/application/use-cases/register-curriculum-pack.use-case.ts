@@ -1,5 +1,6 @@
 import type { ClockPort } from "../ports/clock.port.js";
 import type { CurriculumPackRepositoryPort } from "../ports/curriculum-pack-repository.port.js";
+import type { LoggerPort } from "../ports/logger.port.js";
 import type {
   RegisterCurriculumPackDependencies,
   RegisterCurriculumPackInput,
@@ -10,6 +11,7 @@ import { CurriculumPack } from "../../domain/curriculum-pack/curriculum-pack.js"
 import { PackId } from "../../domain/curriculum-pack/pack-id.js";
 import { PackIsSystemPackError } from "../../domain/errors/domain-errors.js";
 import { PackValidator } from "../services/pack-validator.js";
+import { SilentLogger } from "../services/silent-logger.js";
 
 export class RegisterCurriculumPackUseCase
 implements RegisterCurriculumPackUseCasePort {
@@ -25,10 +27,11 @@ implements RegisterCurriculumPackUseCasePort {
 
   public async execute(
     input: RegisterCurriculumPackInput,
+    logger: LoggerPort = new SilentLogger(),
   ): Promise<RegisterCurriculumPackResult> {
     const { pack, accountId } = input;
 
-    const validation = PackValidator.validate(pack);
+    const validation = PackValidator.validate(pack, logger);
 
     if (!validation.valid) {
       return {
@@ -76,6 +79,10 @@ implements RegisterCurriculumPackUseCasePort {
     });
 
     await this.#packRepo.create(curriculumPack);
+    logger.info(
+      { packId: curriculumPack.id.value, version: curriculumPack.version, accountId },
+      "pack registered",
+    );
 
     return {
       success: true,

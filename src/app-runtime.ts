@@ -1,7 +1,9 @@
+import type { WrapLambdaHandlerOptions } from "./adapters/inbound/http/lambda-to-v2-wrapper.types.js";
 import type {
   ProductionDependencies,
   RuntimeEnvConfig,
 } from "./app-runtime.types.js";
+import type { LoggerPort, LogLevel } from "./application/ports/logger.port.js";
 import { Argon2PasswordHasher } from "./adapters/outbound/argon2-password-hasher.js";
 import { CryptoBoardSeedGenerator } from "./adapters/outbound/crypto-board-seed-generator.js";
 import { CryptoIdGenerator } from "./adapters/outbound/crypto-id-generator.js";
@@ -14,17 +16,43 @@ import {
   DEFAULT_MONGODB_DB_NAME,
   MongoCurriculumPackRepository,
 } from "./adapters/outbound/mongo-curriculum-pack-repository.js";
+import { MongoDevWorkerRelease } from "./adapters/outbound/mongo-dev-worker-release.js";
 import { MongoGameSessionRepository } from "./adapters/outbound/mongo-game-session-repository.js";
 import { MongoInstructorAccountRepository } from "./adapters/outbound/mongo-instructor-account-repository.js";
+import { PinoLogger } from "./adapters/outbound/pino-logger.js";
 import { SeedrandomSeededRandom } from "./adapters/outbound/seedrandom-seeded-random.js";
 import { SystemClock } from "./adapters/outbound/system-clock.js";
+import { TimerWriteConflictBackoff } from "./adapters/outbound/timer-write-conflict-backoff.js";
 
 export interface LoadEnvConfigOptions {
   readonly yamlFilePath?: string | false;
 }
 
+export interface BuildLoggerOptions {
+  /** Where lines go; stdout by default. Tests pass an in-memory stream. */
+  readonly destination?: NodeJS.WritableStream;
+}
+
 export class AppRuntime {
   static #cachedProductionDependencies: ProductionDependencies | null = null;
+
+  /**
+   * Passed by every route to `wrapLambdaHandler`. Under `netlify dev`, the
+   * Mongo connections are closed after each invocation so the worker thread
+   * netlify-cli started for it can exit (see `MongoDevWorkerRelease`).
+   * `logger` is read per invocation (a getter), so it is the production
+   * logger currently cached, built on first use.
+   */
+  public static readonly invocationOptions: WrapLambdaHandlerOptions = {
+    afterInvocation: async () => MongoDevWorkerRelease.afterInvocation(
+      process.env,
+      undefined,
+      AppRuntime.getProductionDependencies().logger,
+    ),
+    get logger(): LoggerPort | undefined {
+      return AppRuntime.getProductionDependencies().logger;
+    },
+  };
 
   public static loadEnvConfig(
     env: NodeJS.ProcessEnv = process.env,
@@ -59,7 +87,71 @@ export class AppRuntime {
       apiKey: AppRuntime.#apiKeyDisabledForDev(env)
         ? undefined
         : AppRuntime.#trimOrFallback(env.API_KEY, resolvedYaml.apiKey),
+      ...AppRuntime.#resolveLogLevel(env, resolvedYaml.logLevel),
+      logPretty: AppRuntime.#resolveLogPretty(env, resolvedYaml.logPretty),
     };
+  }
+
+  /**
+   * LOG_LEVEL wins over `logging.level`. Without either, `info`, or `debug`
+   * under netlify dev. A value that isn't a level falls back to `info` and is
+   * reported as `invalidLogLevel`, so a typo never crashes or silences logs.
+   */
+  static #resolveLogLevel(
+    env: NodeJS.ProcessEnv,
+    yamlLevel?: string,
+  ): { logLevel: LogLevel; invalidLogLevel?: string } {
+    const configured = AppRuntime.#trimOrFallback(env.LOG_LEVEL, yamlLevel?.trim());
+    if (configured === undefined) {
+      return {
+        logLevel: env.NETLIFY_DEV === "true"
+          ? "debug"
+          : "info",
+      };
+    }
+    const normalised = configured.toLowerCase();
+    return PinoLogger.isLogLevel(normalised)
+      ? { logLevel: normalised }
+      : { logLevel: "info", invalidLogLevel: configured };
+  }
+
+  /**
+   * Pretty output is on by default under netlify dev and can be turned off
+   * with LOG_PRETTY=false (or `logging.pretty: false`). Outside netlify dev it
+   * is always off, the same guard as DEV_DISABLE_API_KEY, so a copied
+   * variable can't change a deployed function's log format.
+   */
+  static #resolveLogPretty(env: NodeJS.ProcessEnv, yamlPretty?: boolean): boolean {
+    if (env.NETLIFY_DEV !== "true") {
+      return false;
+    }
+    const fromEnv = env.LOG_PRETTY?.trim().toLowerCase();
+    if (fromEnv === "true" || fromEnv === "false") {
+      return fromEnv === "true";
+    }
+    return yamlPretty ?? true;
+  }
+
+  /**
+   * Builds the logger for the resolved config, and writes the one warning for
+   * an invalid LOG_LEVEL through it.
+   */
+  public static buildLogger(
+    config: Pick<RuntimeEnvConfig, "logLevel" | "logPretty" | "invalidLogLevel">,
+    options?: BuildLoggerOptions,
+  ): LoggerPort {
+    const logger = PinoLogger.create({
+      level: config.logLevel,
+      pretty: config.logPretty,
+      destination: options?.destination,
+    });
+    if (config.invalidLogLevel !== undefined) {
+      logger.warn(
+        { invalidLogLevel: config.invalidLogLevel, logLevel: config.logLevel },
+        "LOG_LEVEL is not a known level; using info",
+      );
+    }
+    return logger;
   }
 
   /**
@@ -98,21 +190,25 @@ export class AppRuntime {
       config.accountTokenSecret,
     ) ?? new FakeAccountTokenAdapter();
 
+    const logger = AppRuntime.buildLogger(config);
+
     return {
-      packRepo: MongoCurriculumPackRepository.fromConfig(config),
-      sessionRepo: MongoGameSessionRepository.fromConfig(config),
+      packRepo: MongoCurriculumPackRepository.fromConfig(config, logger),
+      sessionRepo: MongoGameSessionRepository.fromConfig(config, logger),
       tokenSigner: tokenAdapter,
       tokenVerifier: tokenAdapter,
       clock: new SystemClock(),
+      writeConflictBackoff: new TimerWriteConflictBackoff(),
       seededRandom: new SeedrandomSeededRandom(),
       seedGenerator: new CryptoBoardSeedGenerator(),
-      accountRepo: MongoInstructorAccountRepository.fromConfig(config),
+      accountRepo: MongoInstructorAccountRepository.fromConfig(config, logger),
       passwordHasher: new Argon2PasswordHasher(),
       accountTokenSigner: accountTokenAdapter,
       accountTokenVerifier: accountTokenAdapter,
       idGenerator: new CryptoIdGenerator(),
       apiKey: config.apiKey,
       requireApiKey: Boolean(config.apiKey),
+      logger,
     };
   }
 

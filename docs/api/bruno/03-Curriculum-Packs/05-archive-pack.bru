@@ -1,0 +1,38 @@
+meta {
+  name: Archive Curriculum Pack
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{baseUrl}}/api/v1/packs/{{customPackId}}/archive
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accountToken}}
+}
+
+tests {
+  test("archives the custom Curriculum Pack", function() {
+    expect(res.status).to.equal(200);
+    expect(res.body.isArchived).to.equal(true);
+  });
+}
+
+docs {
+  # POST /api/v1/packs/:packId/archive (`archiveCurriculumPack`)
+
+  Performs a **Pack Archive** soft-removal of the latest **Pack Version** of `:packId` (`{{customPackId}}`), hiding it from default `GET /api/v1/packs` listings while keeping it accessible for existing Game Sessions and direct lookups.
+
+  ## Authentication
+  - **`AccountAuth`**: `Authorization: Bearer {{accountToken}}`
+
+  ## Responses & Error Codes (`ApiErrorCode`)
+  - **`200 OK`**: `{ packId, isArchived: true, archivedAt, archivedBy }`
+  - **`401 UNAUTHORIZED_TOKEN`**: Missing, invalid, or non-Account bearer token.
+  - **`403 PACK_IS_SYSTEM_PACK`**: System Packs (`diabe-teach`) cannot be archived.
+  - **`404 PACK_NOT_FOUND`**: Unknown `packId`.
+  - **`409 PACK_ALREADY_ARCHIVED`**: The pack is already archived.
+}
